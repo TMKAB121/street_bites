@@ -1,0 +1,109 @@
+name: steet-bites
+recipe: laravel
+config:
+  php: '8.3'
+  via: nginx
+  webroot: public
+  database: mariadb:10.11
+  cache: redis:7
+  xdebug: false
+
+services:
+
+  appserver:
+    build_as_root:
+      - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      - apt-get install -y nodejs
+    overrides:
+      environment:
+        APP_LOG: errorlog
+
+  database:
+    creds:
+      user: steet_bites
+      password: steet_bites
+      database: steet_bites
+    portforward: 3306
+
+  cache:
+    portforward: 6379
+
+  node:
+    type: node:20
+    overrides:
+      environment:
+        NODE_ENV: development
+
+  reverb:
+    type: lando
+    services:
+      image: devwithlando/php:8.3-fpm-7
+      command: >-
+        bash -c "
+          until [ -f /app/artisan ]; do
+            echo '[reverb] Waiting for /app/artisan...'; sleep 3;
+          done &&
+          php /app/artisan reverb:start
+            --host=0.0.0.0
+            --port=8080
+            --no-interaction
+        "
+      ports:
+        - '8080'
+    portforward: 8080
+
+  mailpit:
+    type: mailpit
+    mailFrom:
+      - appserver
+
+proxy:
+  reverb:
+    - reverb.steet-bites.lndo.site:8080
+  node:
+    - vite.steet-bites.lndo.site:5173
+
+tooling:
+  php:
+    service: appserver
+    cmd: php
+  composer:
+    service: appserver
+    cmd: composer
+  artisan:
+    service: appserver
+    cmd: php /app/artisan
+    description: Run an artisan command
+  npm:
+    service: node
+    cmd: npm
+  node:
+    service: node
+    cmd: node
+  npx:
+    service: node
+    cmd: npx
+  vite:
+    service: node
+    cmd: npx vite
+    description: Run Vite commands
+  reverb:start:
+    service: reverb
+    cmd: php /app/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction
+    description: Start the Laravel Reverb WebSocket server
+  queue:work:
+    service: appserver
+    cmd: php /app/artisan queue:work redis --tries=3
+    description: Start a Redis queue worker (foreground)
+  mariadb:
+    service: database
+    cmd: mariadb -u steet_bites -psteet_bites steet_bites
+    description: Open a MariaDB shell
+  redis-cli:
+    service: cache
+    cmd: redis-cli
+    description: Open a Redis CLI shell
+  pint:
+    service: appserver
+    cmd: ./vendor/bin/pint
+    description: Run Laravel Pint code style fixer
