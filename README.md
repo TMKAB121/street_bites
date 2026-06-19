@@ -1,58 +1,172 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Steet Bites
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A full-stack Laravel application built with Livewire, real-time WebSockets via Reverb, Redis-backed queues and sessions, and Tailwind CSS. Developed as part of a YouTube series — the project follows a structured build from initial scaffolding through a complete feature set.
 
-## About Laravel
+All development runs inside Docker containers managed by [Lando](https://lando.dev/). No local PHP, Composer, or Node installation is required.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Tech Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+| Layer | Technology |
+|---|---|
+| Framework | Laravel 13 |
+| Frontend Components | Livewire 4 |
+| WebSockets | Laravel Reverb 1 |
+| Build Tool | Vite 8 |
+| CSS | Tailwind CSS 4 |
+| Database | MariaDB 10.11 |
+| Cache / Queue / Sessions | Redis 7 |
+| Runtime | PHP 8.3 |
+| Node | 20.x |
+| Dev Environment | Lando (Docker) |
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Prerequisites
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) running
+- [Lando](https://lando.dev/download/) installed
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+No local PHP, Composer, or Node needed — everything runs inside containers.
 
-## Agentic Development
+---
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## First-Time Setup
 
 ```bash
-composer require laravel/boost --dev
+# 1. Clone the repo
+git clone <repo-url> steet_bites
+cd steet_bites
 
-php artisan boost:install
+# 2. Start Lando (boots all containers)
+lando start
+
+# 3. Run the one-shot setup script
+#    Installs PHP deps, copies .env, generates app key,
+#    runs migrations, installs JS deps, and builds assets
+lando composer setup
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+---
 
-## Contributing
+## Running the Development Server
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+# Start everything at once (PHP server, queue worker, log monitor, Vite HMR)
+lando composer dev
 
-## Code of Conduct
+# Or run each piece individually:
+lando npm run dev -- --host 0.0.0.0   # Vite dev server with HMR
+lando reverb:start                      # Reverb WebSocket server
+lando queue:work                        # Redis queue worker
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+---
 
-## Security Vulnerabilities
+## Service URLs
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+| Service | URL |
+|---|---|
+| App | https://steet-bites.lndo.site |
+| Vite Dev Server | http://localhost:5173 |
+| Reverb WebSocket | ws://localhost:8080 |
+| Mailpit (email UI) | https://mailpit.steet-bites.lndo.site |
 
-## License
+---
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Lando Tooling Reference
+
+```bash
+lando artisan <cmd>    # Run any Artisan command
+lando composer <cmd>   # Composer
+lando npm <cmd>        # npm (Node 20 container)
+lando pint             # Laravel Pint code style fixer
+lando reverb:start     # Start Reverb WebSocket server
+lando queue:work       # Start Redis queue worker
+lando mariadb          # Open a MariaDB shell
+lando redis-cli        # Open a Redis shell
+```
+
+---
+
+## Running Tests
+
+```bash
+lando composer test
+```
+
+PHPUnit is configured with an in-memory SQLite database — no extra setup needed.
+
+---
+
+## Project Structure
+
+```
+steet_bites/
+├── app/
+│   ├── Http/Controllers/
+│   ├── Livewire/               # Livewire components
+│   ├── Models/
+│   ├── Jobs/                   # Queued jobs
+│   └── Events/                 # Broadcast events
+├── database/
+│   ├── migrations/
+│   ├── factories/
+│   └── seeders/
+├── resources/
+│   ├── css/app.css             # Tailwind entry point
+│   ├── js/
+│   │   ├── app.js
+│   │   └── echo.js             # Laravel Echo / Reverb client config
+│   └── views/
+├── routes/
+│   ├── web.php
+│   └── channels.php            # Reverb broadcast channel definitions
+├── config/
+│   ├── broadcasting.php        # Reverb configured as default broadcaster
+│   └── reverb.php
+├── .lando.yml                  # Lando (Docker) service definitions
+└── vite.config.js
+```
+
+---
+
+## Environment & Configuration Notes
+
+### Database Credentials
+
+```
+DB_DATABASE=steet_bites
+DB_USERNAME=steet_bites
+DB_PASSWORD=steet_bites
+```
+
+### Reverb Host Split
+
+Two separate env variables control Reverb — **do not collapse them into one**:
+
+| Variable | Value | Used by |
+|---|---|---|
+| `REVERB_HOST` | `reverb` | PHP on the server (Docker internal network) |
+| `VITE_REVERB_HOST` | `localhost` | Browser (reaches Reverb via Lando port-forward on `localhost:8080`) |
+
+Docker service names are not resolvable from the browser, so these must stay separate.
+
+### Internal Docker Hostnames
+
+Services communicate by Docker service name, not `localhost`:
+
+| Service | Internal Hostname | External (Host Machine) |
+|---|---|---|
+| MariaDB | `database` | `127.0.0.1:3306` |
+| Redis | `cache` | `127.0.0.1:6379` |
+| Reverb | `reverb` | `localhost:8080` |
+
+---
+
+## YouTube Series
+
+This project is built live across a YouTube series. Each commit maps to a video episode — follow along to see every decision made from scratch.
+
+https://www.youtube.com/playlist?list=PLCFAvrjCdis-mdDgzj3wAYA6wXjzgml9z
