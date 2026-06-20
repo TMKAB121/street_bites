@@ -15,7 +15,66 @@ lando queue:work          # starts a Redis queue worker in the foreground
 lando mariadb             # MariaDB shell
 lando redis-cli           # Redis shell
 lando pint                # Laravel Pint code style fixer
+lando pest                # Pest test suite
 ```
+
+## Code quality & linting
+
+The project enforces a layered quality stack. Full detail lives in
+`docs_and_archetecture/linting-and-code-quality.md` (on the Desktop, outside the
+repo). Quick reference:
+
+| Concern | Tool | Command |
+|---|---|---|
+| PHP style | Laravel Pint | `lando pint` / `lando pint --test` |
+| PHP static analysis | Larastan (PHPStan, level 8) | `lando composer stan` |
+| PHP refactoring | Rector | `lando composer rector:dry` / `lando composer rector` |
+| PHP tests | Pest | `lando pest` / `lando composer test` |
+| CSS lint | Stylelint | `lando npm run lint:css` |
+| JS lint | ESLint | `lando npm run lint:js` |
+| JS/JSON format | Prettier | `lando npm run format:check` |
+
+A **pre-commit hook** at `.githooks/pre-commit` runs Pint, Larastan, ESLint,
+Stylelint, and Prettier on every commit; a failure aborts the commit. It is
+enabled via `git config core.hooksPath .githooks`, which `lando composer setup`
+runs automatically. Rector is intentionally **not** in the hook — run it on
+demand and review the diff. Bypass in an emergency with `git commit --no-verify`.
+
+- PHP style is owned by **Pint** (not phpcs — they overlap).
+- CSS formatting is owned by **Stylelint**; Prettier is scoped to JS/JSON only.
+  Do not point Prettier at `*.css` or `*.blade.php`.
+- PHPStan passes clean even at level 10; when real code can't pass, generate a
+  baseline with `lando composer stan:baseline` and uncomment the include in
+  `phpstan.neon`.
+
+## Front-end / design system
+
+Styling is **Tailwind CSS 4**, configured CSS-first (there is no
+`tailwind.config.js`). The "Urban Vibrant" design system from the style guide is
+encoded as Tailwind `@theme` tokens, which generate both CSS variables and
+utility classes from one source of truth. Full detail lives in
+`docs_and_archetecture/frontend-framework.md`.
+
+CSS is split into partials under `resources/css/`, all imported by `app.css`:
+
+```
+resources/css/
+├── app.css              # entry — @import 'tailwindcss' + the partials below
+├── theme.css            # @theme: design tokens (colors, type scale, radius, a11y)
+├── base.css             # body, ADA tap targets, focus-visible ring
+└── components/
+    ├── button.css       # .btn / .btn-primary / .btn-accent / .btn-mustard
+    └── card.css         # .food-truck-card
+```
+
+- Tokens are the source of truth — edit `theme.css`, never hard-code hex values
+  in components. `--color-accent-chili` auto-generates `bg-accent-chili`,
+  `text-accent-chili`, etc.
+- Mustard (`--color-accent-mustard`) must use **dark text only** (fails contrast
+  with white); `.btn-mustard` enforces this.
+- A living style guide renders at `/styleguide` (route in `routes/web.php`).
+- Vite compiles both CSS and JS (`resources/js/app.js`). Build: `lando npm run
+  build`. Dev: `lando npm run dev -- --host 0.0.0.0`.
 
 ## Internal Docker hostnames
 

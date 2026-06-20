@@ -19,6 +19,9 @@ All development runs inside Docker containers managed by [Lando](https://lando.d
 | Cache / Queue / Sessions | Redis 7 |
 | Runtime | PHP 8.3 |
 | Node | 20.x |
+| Testing | Pest 4 |
+| PHP Quality | Pint · Larastan (PHPStan) · Rector |
+| Asset Quality | ESLint · Stylelint · Prettier |
 | Dev Environment | Lando (Docker) |
 
 ---
@@ -82,6 +85,7 @@ lando artisan <cmd>    # Run any Artisan command
 lando composer <cmd>   # Composer
 lando npm <cmd>        # npm (Node 20 container)
 lando pint             # Laravel Pint code style fixer
+lando pest             # Pest test suite
 lando reverb:start     # Start Reverb WebSocket server
 lando queue:work       # Start Redis queue worker
 lando mariadb          # Open a MariaDB shell
@@ -92,11 +96,47 @@ lando redis-cli        # Open a Redis shell
 
 ## Running Tests
 
+Tests are written with [Pest](https://pestphp.com/) (running on top of PHPUnit),
+configured with an in-memory SQLite database — no extra setup needed.
+
 ```bash
-lando composer test
+lando pest                       # run the full suite
+lando pest --filter=StyleGuide   # run a subset
+lando composer test              # artisan test (also routes through Pest)
 ```
 
-PHPUnit is configured with an in-memory SQLite database — no extra setup needed.
+---
+
+## Code Quality & Linting
+
+A layered quality stack runs locally and on a pre-commit hook. See
+[`docs_and_archetecture/linting-and-code-quality.md`](../docs_and_archetecture/linting-and-code-quality.md)
+for full detail.
+
+| Concern | Tool | Command |
+|---|---|---|
+| PHP style | Laravel Pint | `lando pint` (fix) · `lando pint --test` (check) |
+| PHP static analysis | Larastan / PHPStan (level 8) | `lando composer stan` |
+| PHP refactoring | Rector | `lando composer rector:dry` · `lando composer rector` |
+| CSS lint | Stylelint | `lando npm run lint:css` (`:fix` to auto-fix) |
+| JS lint | ESLint | `lando npm run lint:js` (`:fix` to auto-fix) |
+| JS/JSON format | Prettier | `lando npm run format` · `lando npm run format:check` |
+| All JS checks | — | `lando npm run lint` |
+| All PHP checks | — | `lando composer lint` |
+
+### Pre-commit hook
+
+`.githooks/pre-commit` runs Pint, Larastan, ESLint, Stylelint, and Prettier on
+every commit — a failure aborts the commit. It is enabled automatically by
+`lando composer setup` (`git config core.hooksPath .githooks`). To enable it
+manually in an existing clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Bypass in an emergency with `git commit --no-verify`. Rector is **not** in the
+hook — run it on demand and review its diff before committing.
 
 ---
 
@@ -115,20 +155,52 @@ steet_bites/
 │   ├── factories/
 │   └── seeders/
 ├── resources/
-│   ├── css/app.css             # Tailwind entry point
+│   ├── css/                    # Tailwind 4 CSS-first design system
+│   │   ├── app.css             # entry: @import 'tailwindcss' + partials
+│   │   ├── theme.css           # @theme design tokens (source of truth)
+│   │   ├── base.css            # global base + ADA accessibility rules
+│   │   └── components/         # .btn, .food-truck-card, ...
 │   ├── js/
 │   │   ├── app.js
 │   │   └── echo.js             # Laravel Echo / Reverb client config
 │   └── views/
+│       └── styleguide.blade.php # living style guide (/styleguide)
 ├── routes/
 │   ├── web.php
 │   └── channels.php            # Reverb broadcast channel definitions
 ├── config/
 │   ├── broadcasting.php        # Reverb configured as default broadcaster
 │   └── reverb.php
+├── tests/                      # Pest tests (Feature + Unit)
+├── .githooks/pre-commit        # quality gate (Pint, Larastan, ESLint, ...)
+├── .stylelintrc.json           # Stylelint config (Tailwind-aware)
+├── eslint.config.js            # ESLint flat config
+├── .prettierrc.json            # Prettier config
+├── phpstan.neon                # Larastan / PHPStan config (level 8)
+├── rector.php                  # Rector config
 ├── .lando.yml                  # Lando (Docker) service definitions
 └── vite.config.js
 ```
+
+---
+
+## Front-End & Design System
+
+Styling uses **Tailwind CSS 4**, configured CSS-first (no `tailwind.config.js`).
+The "Urban Vibrant" design system is encoded as Tailwind `@theme` tokens in
+`resources/css/theme.css` — each token generates both a CSS variable and utility
+classes from a single source of truth. A living style guide renders at
+[`/styleguide`](https://steet-bites.lndo.site/styleguide).
+
+Vite compiles both CSS and JS:
+
+```bash
+lando npm run build                   # production build (minified, hashed)
+lando npm run dev -- --host 0.0.0.0   # dev server with HMR
+```
+
+See [`docs_and_archetecture/frontend-framework.md`](../docs_and_archetecture/frontend-framework.md)
+for a full breakdown of how the front-end framework works.
 
 ---
 

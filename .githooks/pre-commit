@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# Street Bites pre-commit quality gate.
+# Runs every linter / analyser inside Lando before a commit is allowed.
+#
+# Enable once per clone:
+#     git config core.hooksPath .githooks
+#
+# Skip in an emergency:
+#     git commit --no-verify
+#
+set -euo pipefail
+
+trap 'printf "\n\033[1;31m✖ Pre-commit checks failed — commit aborted.\033[0m\n" >&2' ERR
+
+step() { printf '\n\033[1;34m▶ %s\033[0m\n' "$1"; }
+
+step "Pint — PHP code style"
+lando pint --test
+
+step "Larastan — PHP static analysis"
+lando composer stan
+
+step "ESLint — JS lint"
+lando npm run --silent lint:js
+
+step "Stylelint — CSS lint"
+lando npm run --silent lint:css
+
+step "Prettier — JS format check"
+lando npm run --silent format:check
+
+printf '\n\033[1;32m✓ All checks passed.\033[0m\n'

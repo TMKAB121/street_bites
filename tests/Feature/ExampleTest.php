@@ -1,19 +1,12 @@
 <?php
 
-namespace Tests\Feature;
+/*
+ | Pest feature test. Files in tests/Feature ARE bound to Tests\TestCase
+ | (see tests/Pest.php), so the full Laravel app is booted and helpers like
+ | $this->get() are available — same capabilities as a PHPUnit feature test,
+ | far less boilerplate.
+ */
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class ExampleTest extends TestCase
-{
-    /**
-     * A basic test example.
-     */
-    public function test_the_application_returns_a_successful_response(): void
-    {
-        $response = $this->get('/');
-
-        $response->assertStatus(200);
-    }
-}
+it('returns a successful response for the home page', function (): void {
+    $this->get('/')->assertOk();
+});

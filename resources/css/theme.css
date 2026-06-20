@@ -1,0 +1,49 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Street Bites — "Urban Vibrant" design tokens
+ | -----------------------------------------------------------------------------
+ | Single source of truth for the design system. Everything here is a Tailwind
+ | v4 @theme token, which means each value does double duty:
+ |   1. It is emitted as a real CSS custom property (e.g. var(--color-primary)).
+ |   2. Tailwind auto-generates utility classes from it
+ |      (e.g. --color-accent-chili  ->  bg-accent-chili / text-accent-chili / ...).
+ |
+ | Token names follow Tailwind's namespaces so the utilities are generated:
+ |   --color-*  -> color utilities      --text-*   -> font-size utilities
+ |   --font-*   -> font-family utilities --radius-* -> border-radius utilities
+ | Non-namespaced tokens (e.g. --min-tap-target) are still exposed as CSS
+ | variables on :root for use in base.css / component partials.
+ |
+ */
+
+@theme {
+    /* --- Color palette (WCAG 2.1 AA/AAA) ----------------------------------- */
+    --color-primary: #1e2229; /* Asphalt Dark  — headers, nav, primary type   */
+    --color-accent-mustard: #ffc700; /* Neon Mustard  — accents/badges, DARK text only */
+    --color-accent-chili: #d63031; /* Chili Red     — callouts, destructive, focus  */
+    --color-bg: #fafafa; /* Clean Paper   — app background canvas         */
+    --color-surface: #fff; /* Crisp White   — cards, modals, sheets         */
+    --color-text-main: #2d3436; /* Charcoal      — primary body copy             */
+    --color-text-muted: #636e72; /* Slate Gray    — meta text (timestamps, etc.)  */
+
+    /* --- Typography -------------------------------------------------------- */
+    /* Instrument Sans is loaded via @fonts (bunny) in vite.config.js.         */
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Mobile-first fluid scale. NOTE: these intentionally redefine Tailwind's
+       default text-base/lg/xl to the style-guide scale, and add a new text-md. */
+    --text-base: 1rem; /* 16px — WCAG body baseline        */
+    --text-md: 1.25rem; /* 20px — subheadings / form labels */
+    --text-lg: 1.5rem; /* 24px — section titles            */
+    --text-xl: 2rem; /* 32px — branding / screen headers */
+
+    /* --- Radius ------------------------------------------------------------ */
+    /* Redefines Tailwind's rounded-md to the style guide's 12px card radius.  */
+    --radius-md: 0.75rem; /* 12px */
+
+    /* --- Interaction & ADA tokens (plain CSS vars, no utilities) ------------ */
+    --min-tap-target: 48px; /* WCAG 2.1 minimum touch target              */
+    --transition-fast: all 0.2s ease-in-out;
+    --focus-outline-width: 3px;
+}

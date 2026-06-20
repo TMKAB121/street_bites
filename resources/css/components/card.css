@@ -1,0 +1,27 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Food truck card
+ | -----------------------------------------------------------------------------
+ | Card-based layout from the style guide: a Crisp White surface floating over
+ | the Clean Paper canvas, accented with a Neon Mustard rail.
+ |
+ |   <article class="food-truck-card"> ... </article>
+ */
+
+@layer components {
+    .food-truck-card {
+        @apply bg-surface rounded-md p-6;
+        border-left: 6px solid var(--color-accent-mustard);
+        box-shadow: 0 4px 12px rgb(30 34 41 / 4%);
+    }
+
+    .food-truck-card__title {
+        @apply text-lg font-semibold;
+        color: var(--color-primary);
+    }
+
+    .food-truck-card__meta {
+        @apply text-sm;
+        color: var(--color-text-muted);
+    }
+}
