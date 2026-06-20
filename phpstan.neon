@@ -1,0 +1,15 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    # When real code can no longer pass cleanly, grandfather the existing issues:
+    #   lando composer stan:baseline
+    # then uncomment the next line so old issues are ignored but new ones aren't.
+    # - phpstan-baseline.neon
+
+parameters:
+    paths:
+        - app
+
+    # 0 (loosest) .. 10 (strictest, "max"). The current skeleton passes even at
+    # 10; 8 is set as a strong, sustainable target as the app grows. Raise to 9
+    # or 10 later and generate a baseline (above) if the jump is too noisy.
+    level: 8

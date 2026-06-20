@@ -1,0 +1,49 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Button component
+ | -----------------------------------------------------------------------------
+ | Reusable button classes built from design tokens. Use these for repeated
+ | patterns; reach for raw Tailwind utilities for one-offs.
+ |
+ |   <button class="btn btn-primary">Order now</button>
+ |   <button class="btn btn-accent">Close</button>
+ |   <button class="btn btn-mustard">New</button>
+ */
+
+@layer components {
+    .btn {
+        @apply inline-flex items-center justify-center rounded-md font-semibold;
+        min-height: var(--min-tap-target);
+        padding: 0.75rem 1.5rem;
+        transition: var(--transition-fast);
+        cursor: pointer;
+    }
+
+    /* Asphalt Dark — primary action. Passes AAA against white text. */
+    .btn-primary {
+        @apply bg-primary text-white;
+    }
+
+    .btn-primary:hover {
+        @apply bg-primary/90;
+    }
+
+    /* Chili Red — high-visibility callouts / destructive actions. */
+    .btn-accent {
+        @apply bg-accent-chili text-white;
+    }
+
+    .btn-accent:hover {
+        @apply bg-accent-chili/90;
+    }
+
+    /* Neon Mustard — DARK text only. Never pair mustard with white text
+       (fails contrast). Token-enforced here so misuse can't slip in. */
+    .btn-mustard {
+        @apply bg-accent-mustard text-primary;
+    }
+
+    .btn-mustard:hover {
+        @apply bg-accent-mustard/90;
+    }
+}

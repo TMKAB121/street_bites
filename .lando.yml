@@ -107,3 +107,7 @@ tooling:
     service: appserver
     cmd: ./vendor/bin/pint
     description: Run Laravel Pint code style fixer
+  pest:
+    service: appserver
+    cmd: ./vendor/bin/pest
+    description: Run the Pest test suite

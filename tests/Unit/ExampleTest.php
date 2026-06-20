@@ -1,16 +1,13 @@
 <?php
 
-namespace Tests\Unit;
+declare(strict_types=1);
 
-use PHPUnit\Framework\TestCase;
-
-class ExampleTest extends TestCase
-{
-    /**
-     * A basic test example.
-     */
-    public function test_that_true_is_true(): void
-    {
-        $this->assertTrue(true);
-    }
-}
+/*
+| Pest unit test. Files in tests/Unit are NOT bound to the Laravel TestCase
+| (see tests/Pest.php), so they stay fast and framework-free — pure PHP logic.
+|
+| `test()` and its alias `it()` define a test; `expect()` makes assertions.
+*/
+test('true is true', function (): void {
+    expect(true)->toBeTrue();
+});
