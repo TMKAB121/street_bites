@@ -55,26 +55,74 @@ encoded as Tailwind `@theme` tokens, which generate both CSS variables and
 utility classes from one source of truth. Full detail lives in
 `docs_and_archetecture/frontend-framework.md`.
 
-CSS is split into partials under `resources/css/`, all imported by `app.css`:
+CSS is split into partials under `resources/css/`, all imported by `app.css`
+(order matters: tokens → base → components):
 
 ```
 resources/css/
 ├── app.css              # entry — @import 'tailwindcss' + the partials below
 ├── theme.css            # @theme: design tokens (colors, type scale, radius, a11y)
-├── base.css             # body, ADA tap targets, focus-visible ring
+├── base.css             # body, ADA tap targets, focus-visible ring, [x-cloak]
 └── components/
     ├── button.css       # .btn / .btn-primary / .btn-accent / .btn-mustard
-    └── card.css         # .food-truck-card
+    ├── card.css         # .food-truck-card (image + title + FIND NOW CTA)
+    ├── nav.css          # .mobile-nav (bottom tab bar)
+    ├── header.css       # .mobile-header + .mobile-search + .mobile-menu
+    ├── carousel.css     # .card-carousel (CSS scroll-snap)
+    └── filters.css      # .filter-row / .filter-pill
 ```
 
 - Tokens are the source of truth — edit `theme.css`, never hard-code hex values
   in components. `--color-accent-chili` auto-generates `bg-accent-chili`,
   `text-accent-chili`, etc.
 - Mustard (`--color-accent-mustard`) must use **dark text only** (fails contrast
-  with white); `.btn-mustard` enforces this.
-- A living style guide renders at `/styleguide` (route in `routes/web.php`).
+  with white); `.btn-mustard` enforces this. On a *dark* surface (e.g. the
+  bottom nav, the header menu) mustard text is fine — the rule is white-bg only.
 - Vite compiles both CSS and JS (`resources/js/app.js`). Build: `lando npm run
   build`. Dev: `lando npm run dev -- --host 0.0.0.0`.
+
+### Blade components
+
+Reusable UI lives in `resources/views/components/` as **anonymous Blade
+components**. Each pairs a CSS partial (visuals, BEM, `@layer components`) with a
+`.blade.php` file (markup + `@props`):
+
+| Component | CSS partial | Notes |
+|---|---|---|
+| `<x-mobile-nav>` | `nav.css` | Bottom tab bar (Home/Map/Favorites/Profile) |
+| `<x-mobile-header>` | `header.css` | Top bar: hamburger + brand + map + search; hamburger opens a full-screen Alpine menu |
+| `<x-food-truck-card>` | `card.css` | Image + title + Mustard FIND NOW CTA; `image` prop, graceful placeholder when null |
+| `<x-card-carousel>` | `carousel.css` | Slot-based horizontal scroller; any child card becomes a snap item |
+| `<x-truck-filters>` | `filters.css` | Scrollable cuisine pills; Alpine-driven active state (visual only — real filtering becomes Livewire later) |
+
+Conventions for these components:
+
+- **Mobile-only:** the header/nav apply `md:hidden`; desktop variants are
+  deferred. Positioning utilities (`fixed`, `top-0`/`bottom-0`, `md:hidden`) live
+  on the component element via `$attributes->class([...])`, **not** in the CSS
+  partial — the partial owns visuals only. A `fixed` prop (default `true`) toggles
+  in-flow rendering for styleguide demos.
+- **Icons are inline SVG** (no icon library) — store path data in a `@php $icons`
+  array and inject with `{!! … !!}`; styling comes from CSS (`stroke: currentcolor`).
+- **Carousels & the filter row use native CSS scroll-snap** (`overflow-x` +
+  `scroll-snap-type`), not a JS slider lib — Livewire-safe and ADA-native. The
+  scroll region is `tabindex="0"` + `role="region"` for keyboard scrolling.
+
+### JavaScript / Alpine
+
+`resources/js/app.js` imports `echo.js` (Reverb) **and starts Alpine.js**
+(`window.Alpine`). Alpine is the client-side primitive for interactive components
+(e.g. the header menu toggle via `x-data`/`x-show`); `[x-cloak]` is globally
+hidden in `base.css` so collapsed UI never flashes on load. Prefer Alpine for
+pure-UI state; reserve Livewire for server-backed interactivity.
+
+### Pages
+
+- `/` → `welcome.blade.php` — the **assembled mobile shell**: `<x-mobile-header>`,
+  a `<x-card-carousel>`, `<x-truck-filters>` + a results grid, and `<x-mobile-nav>`.
+  Content uses `pt-32 pb-24 md:pt-8 md:pb-8` to clear the fixed bars on mobile.
+- `/styleguide` → `styleguide.blade.php` — living style guide demoing every token
+  and component in isolation (route in `routes/web.php`).
 
 ## Internal Docker hostnames
 
