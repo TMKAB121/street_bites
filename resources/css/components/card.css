@@ -2,26 +2,54 @@
  | -----------------------------------------------------------------------------
  | Food truck card
  | -----------------------------------------------------------------------------
- | Card-based layout from the style guide: a Crisp White surface floating over
- | the Clean Paper canvas, accented with a Neon Mustard rail.
+ | Discovery card: a Crisp White surface with a rounded border, a food-truck
+ | image on top, the truck name, and a full-width Mustard "FIND NOW" CTA. Width
+ | is set by the parent (carousel item / results grid), so the card is fluid.
  |
- |   <article class="food-truck-card"> ... </article>
+ |   <x-food-truck-card name="…" :image="…" href="…" />
  */
 
 @layer components {
     .food-truck-card {
-        @apply bg-surface rounded-md p-6;
-        border-left: 6px solid var(--color-accent-mustard);
+        @apply flex w-full flex-col overflow-hidden rounded-md bg-surface;
+        border: 1px solid rgb(30 34 41 / 8%);
         box-shadow: 0 4px 12px rgb(30 34 41 / 4%);
     }
 
-    .food-truck-card__title {
-        @apply text-lg font-semibold;
-        color: var(--color-primary);
+    .food-truck-card__media {
+        @apply relative w-full overflow-hidden;
+        aspect-ratio: 4 / 3;
+        background: var(--color-bg);
     }
 
-    .food-truck-card__meta {
-        @apply text-sm;
+    .food-truck-card__image {
+        @apply block h-full w-full;
+        object-fit: cover;
+    }
+
+    /* Shown until a real image is provided. */
+    .food-truck-card__placeholder {
+        @apply flex h-full w-full items-center justify-center;
+        background: linear-gradient(135deg, #eef0f2, #dfe3e6);
         color: var(--color-text-muted);
+    }
+
+    .food-truck-card__placeholder svg {
+        width: 40%;
+        max-width: 5rem;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .food-truck-card__body {
+        @apply flex flex-col gap-3 p-4;
+    }
+
+    .food-truck-card__title {
+        @apply text-md font-semibold;
+        color: var(--color-primary);
     }
 }

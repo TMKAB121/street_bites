@@ -1,0 +1,63 @@
+/*
+ | Mobile bottom navigation
+ | Persistent tab bar for the mobile-first app: an Asphalt Dark bar that stands
+ | out against the Clean Paper canvas, with icon-over-label buttons. Mobile only;
+ | the desktop nav is a separate component.
+ |   <x-mobile-nav active="home" />            -- fixed to the viewport bottom
+ |   <x-mobile-nav active="home" :fixed="false" />  -- in-flow (styleguide demo)
+ |
+ | Positioning (fixed bottom-0 / md:hidden) is applied as utilities on the <nav>
+ | by the Blade component, so .mobile-nav itself only owns the bar visuals.
+ */
+
+@layer components {
+    .mobile-nav {
+        @apply flex w-full;
+        background: var(--color-primary);
+        border-top: 1px solid rgb(255 255 255 / 10%);
+        box-shadow: 0 -2px 12px rgb(30 34 41 / 12%);
+        /* Respect the iOS home-indicator safe area when fixed to the bottom. */
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .mobile-nav__item {
+        @apply flex flex-1 flex-col items-center justify-center gap-1;
+        min-height: var(--min-tap-target);
+        padding: 0.5rem 0.25rem;
+        color: rgb(255 255 255 / 65%); /* inactive — dark-bg-safe */
+        text-decoration: none;
+        transition: var(--transition-fast);
+    }
+
+    .mobile-nav__item:hover {
+        color: #fff;
+    }
+
+    /* Neon Mustard reads cleanly on the dark bar; the dark-text-only rule only
+       applies when mustard sits on light/white surfaces. */
+    .mobile-nav__item--active {
+        color: var(--color-accent-mustard);
+    }
+
+    .mobile-nav__icon {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    .mobile-nav__icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .mobile-nav__label {
+        font-size: 0.75rem; /* 12px caption under the icon */
+        line-height: 1;
+        font-weight: 500;
+    }
+}

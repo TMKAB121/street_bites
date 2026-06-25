@@ -1,0 +1,157 @@
+/*
+ | Mobile header
+ | Top app bar for the mobile-first app: a Crisp White bar pinned to the top with
+ | a left hamburger, a center brand mark, a right map-pin link, and a full-width
+ | search field beneath. The hamburger toggles a full-screen Asphalt Dark menu
+ | (Alpine x-data). Mobile only; the desktop header is a separate component.
+ |   <x-mobile-header active="home" />              -- fixed to the viewport top
+ |   <x-mobile-header active="home" :fixed="false" />  -- in-flow (styleguide demo)
+ |
+ | Positioning (fixed top-0 / md:hidden) is applied as utilities on the <header>
+ | by the Blade component, so .mobile-header itself only owns the bar visuals.
+ */
+
+@layer components {
+    .mobile-header {
+        @apply flex w-full flex-col;
+        background: var(--color-surface);
+        border-bottom: 1px solid rgb(30 34 41 / 8%);
+        box-shadow: 0 2px 12px rgb(30 34 41 / 4%);
+        padding: 0.5rem 1rem;
+        /* Respect the iOS notch / status-bar safe area when fixed to the top. */
+        padding-top: max(0.5rem, env(safe-area-inset-top));
+        gap: 0.5rem;
+    }
+
+    .mobile-header__bar {
+        @apply flex items-center justify-between;
+        min-height: var(--min-tap-target);
+    }
+
+    /* Icon button (hamburger left, map-pin right). */
+    .mobile-header__action {
+        @apply inline-flex items-center justify-center;
+        min-height: var(--min-tap-target);
+        min-width: var(--min-tap-target);
+        color: var(--color-primary);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        transition: var(--transition-fast);
+    }
+
+    .mobile-header__action:hover {
+        color: var(--color-accent-chili);
+    }
+
+    .mobile-header__icon {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    .mobile-header__icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .mobile-header__brand {
+        @apply text-md font-semibold;
+        color: var(--color-primary);
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    /* --- Search ---------------------------------------------------------- */
+    .mobile-search {
+        @apply relative w-full;
+    }
+
+    .mobile-search__icon {
+        @apply pointer-events-none absolute;
+        top: 50%;
+        left: 0.875rem;
+        transform: translateY(-50%);
+        width: 1.25rem;
+        height: 1.25rem;
+        color: var(--color-text-muted);
+    }
+
+    .mobile-search__icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .mobile-search__input {
+        @apply w-full rounded-md;
+        min-height: var(--min-tap-target);
+        padding: 0.5rem 1rem 0.5rem 2.75rem; /* room for the icon on the left */
+        background: var(--color-bg);
+        border: 1px solid rgb(30 34 41 / 8%);
+        color: var(--color-text-main);
+        font-size: var(--text-base);
+    }
+
+    .mobile-search__input::placeholder {
+        color: var(--color-text-muted);
+    }
+
+    /* --- Full-screen overlay menu --------------------------------------- */
+    .mobile-menu {
+        @apply fixed inset-0 flex flex-col items-center justify-center gap-6;
+        z-index: 50;
+        background: var(--color-primary);
+        padding: 2rem;
+    }
+
+    .mobile-menu__close {
+        @apply absolute inline-flex items-center justify-center;
+        top: max(0.75rem, env(safe-area-inset-top));
+        right: 0.75rem;
+        min-height: var(--min-tap-target);
+        min-width: var(--min-tap-target);
+        color: #fff;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        transition: var(--transition-fast);
+    }
+
+    .mobile-menu__close:hover {
+        color: var(--color-accent-mustard);
+    }
+
+    .mobile-menu__close .mobile-header__icon {
+        width: 1.75rem;
+        height: 1.75rem;
+    }
+
+    .mobile-menu__link {
+        @apply text-lg font-semibold;
+        color: rgb(255 255 255 / 85%);
+        text-decoration: none;
+        transition: var(--transition-fast);
+    }
+
+    .mobile-menu__link:hover {
+        color: #fff;
+    }
+
+    /* Neon Mustard reads cleanly on the dark menu; the dark-text-only rule
+       only applies when mustard sits on light/white surfaces. */
+    .mobile-menu__link--active {
+        color: var(--color-accent-mustard);
+    }
+}

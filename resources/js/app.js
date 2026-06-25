@@ -7,3 +7,12 @@
  */
 
 import './echo';
+
+/**
+ * Alpine powers the design system's client-side interactivity (menu toggles,
+ * dropdowns, etc.). Exposed on window so component markup can use x-data.
+ */
+import Alpine from 'alpinejs';
+
+window.Alpine = Alpine;
+Alpine.start();

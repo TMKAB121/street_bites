@@ -37,3 +37,9 @@
         outline-offset: 3px;
     }
 }
+
+/* Alpine: keep x-cloak'd elements hidden until Alpine initializes, so the
+   collapsed menu never flashes on page load. Outside @layer base so it wins. */
+[x-cloak] {
+    display: none !important;
+}
