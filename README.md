@@ -12,6 +12,7 @@ All development runs inside Docker containers managed by [Lando](https://lando.d
 |---|---|
 | Framework | Laravel 13 |
 | Frontend Components | Livewire 4 |
+| Client Interactivity | Alpine.js |
 | WebSockets | Laravel Reverb 1 |
 | Build Tool | Vite 8 |
 | CSS | Tailwind CSS 4 |
@@ -159,11 +160,15 @@ steet_bites/
 │   │   ├── app.css             # entry: @import 'tailwindcss' + partials
 │   │   ├── theme.css           # @theme design tokens (source of truth)
 │   │   ├── base.css            # global base + ADA accessibility rules
-│   │   └── components/         # .btn, .food-truck-card, ...
+│   │   └── components/         # .btn, .food-truck-card, .mobile-nav, .mobile-header,
+│   │                           #   .card-carousel, .filter-row, ...
 │   ├── js/
-│   │   ├── app.js
+│   │   ├── app.js              # starts Alpine.js + imports echo.js
 │   │   └── echo.js             # Laravel Echo / Reverb client config
 │   └── views/
+│       ├── components/         # anonymous Blade components (x-mobile-nav, x-mobile-header,
+│       │                       #   x-food-truck-card, x-card-carousel, x-truck-filters)
+│       ├── welcome.blade.php   # home page — assembled mobile shell (/)
 │       └── styleguide.blade.php # living style guide (/styleguide)
 ├── routes/
 │   ├── web.php
@@ -192,6 +197,14 @@ The "Urban Vibrant" design system is encoded as Tailwind `@theme` tokens in
 classes from a single source of truth. A living style guide renders at
 [`/styleguide`](https://steet-bites.lndo.site/styleguide).
 
+Reusable UI is built as **anonymous Blade components** in
+`resources/views/components/` (mobile header, bottom nav, food-truck card, card
+carousel, cuisine filters), each pairing a CSS partial with a Blade template. The
+home page (`/`) assembles them into a mobile app shell. Client-side interactivity
+(e.g. the header's hamburger menu) is powered by **Alpine.js**, started in
+`resources/js/app.js`; carousels and the filter row use native **CSS scroll-snap**
+rather than a JS slider library.
+
 Vite compiles both CSS and JS:
 
 ```bash
@@ -200,7 +213,9 @@ lando npm run dev -- --host 0.0.0.0   # dev server with HMR
 ```
 
 See [`docs_and_archetecture/frontend-framework.md`](../docs_and_archetecture/frontend-framework.md)
-for a full breakdown of how the front-end framework works.
+for the front-end framework, and
+[`docs_and_archetecture/ui-component-architecture.md`](../docs_and_archetecture/ui-component-architecture.md)
+for the component library and its design decisions.
 
 ---
 
