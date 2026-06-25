@@ -66,17 +66,89 @@
             {{-- Card component --}}
             <section class="mb-12">
                 <h2 class="text-lg font-semibold text-primary mb-4">Food truck card</h2>
-                <article class="food-truck-card">
-                    <h3 class="food-truck-card__title">Smokin' Wheels BBQ</h3>
-                    <p class="food-truck-card__meta">0.3 mi away · open until 11pm</p>
-                    <p class="mt-2 text-text-main">
-                        Slow-smoked brisket, burnt ends, and loaded street fries.
-                    </p>
-                    <div class="mt-4 flex gap-3">
-                        <button class="btn btn-primary">View menu</button>
-                        <button class="btn btn-mustard">Save</button>
-                    </div>
-                </article>
+                <div class="max-w-xs">
+                    <x-food-truck-card name="Smokin' Wheels BBQ" />
+                </div>
+                <p class="text-sm text-text-muted mt-3">
+                    Image + title + full-width Mustard FIND NOW. The image is a placeholder
+                    until real photos land (pass <code>:image</code>). Width is set by the
+                    parent — here a <code>max-w-xs</code> wrapper.
+                </p>
+            </section>
+
+            {{-- Card carousel --}}
+            <section class="mb-12">
+                <h2 class="text-lg font-semibold text-primary mb-4">Card carousel</h2>
+                {{-- Negative margins let the scroller bleed to the section edges. --}}
+                <div class="-mx-6">
+                    <x-card-carousel label="Popular trucks">
+                        <x-food-truck-card name="Smokin' Wheels BBQ" href="#" />
+                        <x-food-truck-card name="Taco Libre" href="#" />
+                        <x-food-truck-card name="Burger Bloc" href="#" />
+                        <x-food-truck-card name="Nacho Average" href="#" />
+                        <x-food-truck-card name="Curry Cart" href="#" />
+                        <x-food-truck-card name="Waffle Wagon" href="#" />
+                    </x-card-carousel>
+                </div>
+                <p class="text-sm text-text-muted mt-3">
+                    Native CSS scroll-snap — swipe horizontally, or focus the row and
+                    arrow-key scroll. No JS dependency; Livewire-safe.
+                </p>
+            </section>
+
+            {{-- Filters & results --}}
+            <section class="mb-12">
+                <h2 class="text-lg font-semibold text-primary mb-4">Filters &amp; results</h2>
+                <div class="-mx-6">
+                    <x-truck-filters active="all" />
+                </div>
+                <div class="grid grid-cols-2 gap-4 mt-4">
+                    <x-food-truck-card name="Taco Libre" href="#" />
+                    <x-food-truck-card name="Burger Bloc" href="#" />
+                    <x-food-truck-card name="Nacho Average" href="#" />
+                    <x-food-truck-card name="Smokin' Wheels BBQ" href="#" />
+                </div>
+                <p class="text-sm text-text-muted mt-3">
+                    The pill row scrolls horizontally; tapping a pill moves the active
+                    state (Alpine, purely visual for now). Real filtering of the results
+                    grid below becomes a Livewire action once truck data exists.
+                </p>
+            </section>
+
+            {{-- Mobile header --}}
+            <section class="mb-12">
+                <h2 class="text-lg font-semibold text-primary mb-4">Mobile header</h2>
+                {{-- Real usage pins it to the viewport top and hides at >= md
+                     (`<x-mobile-header active="home" />`). Here we render an in-flow
+                     copy inside a phone-width frame so it's visible on desktop. --}}
+                <div class="max-w-sm overflow-hidden rounded-md border border-text-muted/15">
+                    <x-mobile-header active="home" :fixed="false" />
+                    <div class="h-32 bg-bg"></div>
+                </div>
+                <p class="text-sm text-text-muted mt-3">
+                    Mobile only — pinned to the top and hidden at ≥ md in real use.
+                    Hamburger (left), brand (center), Map pin (right), and a full-width
+                    search bar. Tap the hamburger to open the full-screen dark menu;
+                    press Escape or the ✕ to close. Tab through to see the Chili-Red
+                    focus ring; controls meet the 48px tap target.
+                </p>
+            </section>
+
+            {{-- Mobile bottom nav --}}
+            <section class="mb-12">
+                <h2 class="text-lg font-semibold text-primary mb-4">Mobile bottom nav</h2>
+                {{-- Real usage pins it to the viewport bottom and hides at >= md
+                     (`<x-mobile-nav active="home" />`). Here we render an in-flow
+                     copy inside a phone-width frame so it's visible on desktop. --}}
+                <div class="max-w-sm overflow-hidden rounded-md border border-text-muted/15">
+                    <div class="h-32 bg-bg"></div>
+                    <x-mobile-nav active="home" :fixed="false" />
+                </div>
+                <p class="text-sm text-text-muted mt-3">
+                    Mobile only — pinned to the bottom and hidden at ≥ md in real use.
+                    Home shows the Mustard active state. Tab through to see the Chili-Red
+                    focus ring; each button meets the 48px tap target.
+                </p>
             </section>
 
         </div>
