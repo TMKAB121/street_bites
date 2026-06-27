@@ -1,0 +1,65 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Auth component
+ | -----------------------------------------------------------------------------
+ | Card + form-field styling for the sign-up flow (email entry, code
+ | verification, set password). Visuals only — positioning and one-off layout
+ | live on the markup as Tailwind utilities. Tokens only, no hard-coded hex.
+ |
+ |   <div class="auth-card"> … </div>
+ |   <div class="field">
+ |       <label class="field__label">Email</label>
+ |       <input class="field__input">
+ |       <p class="field__error">…</p>
+ |   </div>
+ */
+
+@layer components {
+    .auth-card {
+        @apply rounded-2xl bg-white p-6 shadow-sm;
+    }
+
+    .auth-card__title {
+        @apply text-xl font-semibold text-primary;
+    }
+
+    .auth-card__subtitle {
+        @apply mt-1 text-sm text-text-muted;
+    }
+
+    .field {
+        @apply mb-4;
+    }
+
+    .field__label {
+        @apply mb-1 block text-sm font-medium text-text-main;
+    }
+
+    .field__input {
+        @apply w-full rounded-md bg-bg px-3 text-text-main;
+        min-height: var(--min-tap-target);
+        border: 1px solid color-mix(in srgb, var(--color-text-muted) 35%, transparent);
+        transition: var(--transition-fast);
+    }
+
+    .field__input::placeholder {
+        color: var(--color-text-muted);
+    }
+
+    .field__input:focus {
+        border-color: var(--color-primary);
+    }
+
+    /* Field-level validation message, in the design system's error color. */
+    .field__error {
+        @apply mt-1 text-sm;
+        color: var(--color-accent-chili);
+    }
+
+    /* Centered, monospaced one-time-code entry. */
+    .field__input--code {
+        @apply text-center font-semibold;
+        letter-spacing: 0.5em;
+        font-variant-numeric: tabular-nums;
+    }
+}
