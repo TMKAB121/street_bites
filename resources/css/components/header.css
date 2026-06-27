@@ -139,7 +139,7 @@
     }
 
     .mobile-menu__link {
-        @apply text-lg font-semibold;
+        @apply inline-flex items-center gap-3 text-lg font-semibold;
         color: rgb(255 255 255 / 85%);
         text-decoration: none;
         transition: var(--transition-fast);
@@ -147,6 +147,23 @@
 
     .mobile-menu__link:hover {
         color: #fff;
+    }
+
+    /* Optional leading icon (e.g. the auth-aware Login / Profile link). */
+    .mobile-menu__icon {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    .mobile-menu__icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
     }
 
     /* Neon Mustard reads cleanly on the dark menu; the dark-text-only rule

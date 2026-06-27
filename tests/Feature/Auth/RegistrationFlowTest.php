@@ -18,9 +18,10 @@ uses(RefreshDatabase::class);
 
 // --- Entry points -----------------------------------------------------------
 
-it('exposes the sign-up flow from the home navigation', function (): void {
+it('exposes the sign-up flow from the login page', function (): void {
+    // Guests reach Login from the home nav; sign-up is offered from there.
     $this->withoutVite()
-        ->get('/')
+        ->get(route('auth.login'))
         ->assertOk()
         ->assertSee(route('auth.email'));
 });

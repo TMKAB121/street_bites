@@ -177,7 +177,7 @@ database only needs to *exist*; its contents are rebuilt automatically per run.
 | | URL |
 |---|---|
 | App | `https://steet-bites.lndo.site` |
-| Mailpit UI | `https://mailpit.steet-bites.lndo.site` |
+| Mailpit UI | `http://localhost:8025` (or `https://mailpit.steet-bites.lndo.site`) |
 | Reverb WebSocket (browser) | `ws://localhost:8080` |
 | Vite dev server | `https://vite.steet-bites.lndo.site:5173` |
 

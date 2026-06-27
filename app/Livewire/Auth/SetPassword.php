@@ -39,8 +39,10 @@ class SetPassword extends Component
             return;
         }
 
+        // Password::defaults() carries the app-wide policy (min length + breach
+        // check); max:128 caps input length to blunt long-string hashing DoS.
         $this->validate([
-            'password' => ['required', 'confirmed', Password::defaults()],
+            'password' => ['required', 'confirmed', 'max:128', Password::defaults()],
         ]);
 
         if (User::query()->where('email', $email)->exists()) {
