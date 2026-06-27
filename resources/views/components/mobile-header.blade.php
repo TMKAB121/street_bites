@@ -16,7 +16,7 @@
         'home' => ['label' => 'Home', 'href' => '#'],
         'map' => ['label' => 'Map', 'href' => '#'],
         'favorites' => ['label' => 'Favorites', 'href' => '#'],
-        'profile' => ['label' => 'Profile', 'href' => '#'],
+        'profile' => ['label' => 'Profile', 'href' => route('auth.email')],
     ];
 
     // Inline SVG inner markup (viewBox 0 0 24 24); stroke styling comes from CSS.

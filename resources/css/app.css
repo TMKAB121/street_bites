@@ -9,6 +9,7 @@
 @import './components/header.css';
 @import './components/carousel.css';
 @import './components/filters.css';
+@import './components/auth.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
