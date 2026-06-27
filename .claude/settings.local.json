@@ -10,7 +10,12 @@
       "Bash(git config *)",
       "Bash(echo \"hooksPath set to: $\\(git config core.hooksPath\\)\")",
       "Bash(lando pint *)",
-      "Bash(lando pest *)"
+      "Bash(lando pest *)",
+      "Read(//Users/anthonysayge/projects/**)",
+      "Read(//Users/anthonysayge/projects/docs_and_archetecture/**)",
+      "Read(//Users/anthonysayge/.claude/projects/-Users-anthonysayge-Desktop-steet-bites/**)",
+      "Read(//Users/anthonysayge/.claude/projects/-Users-anthonysayge-Desktop-steet-bites/memory/**)",
+      "Bash(OLD=/Users/anthonysayge/.claude/projects/-Users-anthonysayge-Desktop-steet-bites/memory; rm -rf \"$OLD\" && echo \"removed old memory dir\"; echo \"--- new memory dir now ---\"; ls -la /Users/anthonysayge/.claude/projects/-Users-anthonysayge-projects-street-bites/memory/)"
     ]
   }
 }

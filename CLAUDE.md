@@ -21,8 +21,8 @@ lando pest                # Pest test suite
 ## Code quality & linting
 
 The project enforces a layered quality stack. Full detail lives in
-`docs_and_archetecture/linting-and-code-quality.md` (on the Desktop, outside the
-repo). Quick reference:
+`docs_and_archetecture/linting-and-code-quality.md` (in the sibling
+`../docs_and_archetecture/` directory, outside the repo). Quick reference:
 
 | Concern | Tool | Command |
 |---|---|---|
