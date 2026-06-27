@@ -56,15 +56,24 @@ lando composer setup
 
 ## Running the Development Server
 
-```bash
-# Start everything at once (PHP server, queue worker, log monitor, Vite HMR)
-lando composer dev
+The app is served by nginx at https://steet-bites.lndo.site as soon as Lando is
+up — there is no `artisan serve` step. Reverb also runs automatically as the
+`reverb` service (don't start it manually — see the Reverb note below). Run the
+remaining dev-time services individually, each in its own Lando command:
 
-# Or run each piece individually:
-lando npm run dev -- --host 0.0.0.0   # Vite dev server with HMR
-lando reverb:start                      # Reverb WebSocket server
-lando queue:work                        # Redis queue worker
+```bash
+lando npm run dev      # Vite dev server with HMR (HTTPS on :5173 — see Vite note)
+lando queue:work       # Redis queue worker
 ```
+
+> Reverb is already running — `lando reverb:start` would collide on port 8080
+> ("Address already in use"). Follow its output with `lando logs -s reverb -f`.
+
+> Do **not** use `lando composer dev`. The stock Laravel `dev` script runs bare
+> `vite` (no `--host`) and `artisan serve` inside the appserver container, which
+> writes an unreachable `http://[::1]:5173` into `public/hot` and bypasses the
+> nginx-served app. If assets ever 404 from a stale dev URL, delete `public/hot`
+> to fall back to the built manifest in `public/build`.
 
 ---
 
@@ -73,7 +82,7 @@ lando queue:work                        # Redis queue worker
 | Service | URL |
 |---|---|
 | App | https://steet-bites.lndo.site |
-| Vite Dev Server | http://localhost:5173 |
+| Vite Dev Server | https://vite.steet-bites.lndo.site:5173 |
 | Reverb WebSocket | ws://localhost:8080 |
 | Mailpit (email UI) | https://mailpit.steet-bites.lndo.site |
 
@@ -87,7 +96,7 @@ lando composer <cmd>   # Composer
 lando npm <cmd>        # npm (Node 20 container)
 lando pint             # Laravel Pint code style fixer
 lando pest             # Pest test suite
-lando reverb:start     # Start Reverb WebSocket server
+lando logs -s reverb -f # Follow Reverb output (auto-runs as the reverb service)
 lando queue:work       # Start Redis queue worker
 lando mariadb          # Open a MariaDB shell
 lando redis-cli        # Open a Redis shell
@@ -208,9 +217,16 @@ rather than a JS slider library.
 Vite compiles both CSS and JS:
 
 ```bash
-lando npm run build                   # production build (minified, hashed)
-lando npm run dev -- --host 0.0.0.0   # dev server with HMR
+lando npm run build   # production build (minified, hashed)
+lando npm run dev     # dev server with HMR
 ```
+
+The dev server serves **HTTPS** at `https://vite.steet-bites.lndo.site:5173`
+(directly on a published host port — the Lando proxy won't route Vite's custom
+port). HTTPS is required because the app is HTTPS and browsers block mixed
+content; the `node` service's `ssl: true` provides a CA-trusted cert at `/certs`
+that `vite.config.js` loads. This is all pre-wired — just run the command. If
+assets 404 from a stale URL, delete `public/hot` to fall back to `public/build`.
 
 See [`docs_and_archetecture/frontend-framework.md`](../docs_and_archetecture/frontend-framework.md)
 for the front-end framework, and
@@ -236,9 +252,16 @@ Two separate env variables control Reverb — **do not collapse them into one**:
 | Variable | Value | Used by |
 |---|---|---|
 | `REVERB_HOST` | `reverb` | PHP on the server (Docker internal network) |
-| `VITE_REVERB_HOST` | `localhost` | Browser (reaches Reverb via Lando port-forward on `localhost:8080`) |
+| `VITE_REVERB_HOST` | `localhost` | Browser (reaches Reverb on `localhost:8080`) |
 
 Docker service names are not resolvable from the browser, so these must stay separate.
+
+The browser's `localhost:8080` works because the `reverb` service in `.lando.yml`
+binds host port 8080 with an **explicit `ports: ['8080:8080']`** mapping. Do not
+swap this for Lando's `portforward:` directive — for this custom service it
+assigns a *random* host port and silently breaks `localhost:8080`. Reverb itself
+runs automatically as that service's main process; never run `lando reverb:start`
+manually (it collides on 8080).
 
 ### Internal Docker Hostnames
 

@@ -10,7 +10,7 @@ Local dev runs entirely inside Lando (Docker). Do not assume local PHP, Composer
 lando artisan <cmd>
 lando composer <cmd>
 lando npm <cmd>
-lando reverb:start        # starts the Reverb WebSocket server in the foreground
+lando logs -s reverb -f   # follow Reverb output (it auto-runs as the reverb service)
 lando queue:work          # starts a Redis queue worker in the foreground
 lando mariadb             # MariaDB shell
 lando redis-cli           # Redis shell
@@ -79,7 +79,8 @@ resources/css/
   with white); `.btn-mustard` enforces this. On a *dark* surface (e.g. the
   bottom nav, the header menu) mustard text is fine — the rule is white-bg only.
 - Vite compiles both CSS and JS (`resources/js/app.js`). Build: `lando npm run
-  build`. Dev: `lando npm run dev -- --host 0.0.0.0`.
+  build`. Dev: `lando npm run dev` (HTTPS dev-server settings live in
+  `vite.config.js`; see "Running Vite" below).
 
 ### Blade components
 
@@ -138,9 +139,13 @@ Services communicate by Docker service name, not `localhost`. Use these in confi
 
 `REVERB_HOST=reverb` in `.env` is the **server-side** hostname — PHP in `appserver` uses `config/broadcasting.php → options.host` to connect to the Reverb container over the internal Docker network.
 
-`VITE_REVERB_HOST=localhost` is hardcoded separately — the browser reaches Reverb via the Lando portforward on `localhost:8080`. It cannot inherit `REVERB_HOST` because Docker service names are not resolvable from the browser.
+`VITE_REVERB_HOST=localhost` is hardcoded separately — the browser reaches Reverb on `localhost:8080`. It cannot inherit `REVERB_HOST` because Docker service names are not resolvable from the browser.
 
-Do not collapse these into one variable.
+The host `8080` binding comes from an **explicit `ports: ['8080:8080']`** mapping on the `reverb` service in `.lando.yml` — **not** Lando's `portforward:` directive, which assigns a *random* host port for this custom service and silently breaks `localhost:8080`. Do not replace the explicit mapping with `portforward`.
+
+The `reverb` service also **auto-runs `artisan reverb:start`** as its main process and stays up. Do not run `lando reverb:start` manually — it execs into the same container and collides on 8080 ("Address already in use").
+
+Do not collapse `REVERB_HOST` and `VITE_REVERB_HOST` into one variable.
 
 ## Database credentials
 
@@ -152,6 +157,21 @@ DB_PASSWORD=steet_bites
 
 Default Laravel recipe credentials (`laravel/laravel`) are overridden.
 
+The connection driver is **`mariadb`** (not `mysql`) to match the MariaDB 10.11
+backend — Laravel's dedicated driver, set in `.env` and as the `config/database.php`
+default.
+
+### Test database
+
+`phpunit.xml` points the suite at a separate **`steet_bites_testing`** database on
+the same MariaDB container (driver `mariadb`; host/user/password inherited from
+`.env`). A `run_as_root` step on the `database` service in `.lando.yml` creates it
+(idempotently) on every `lando start`, so a fresh clone needs no manual setup.
+
+You never seed or sync data into it — DB-touching tests `use RefreshDatabase`,
+which migrates the schema fresh and rolls back each test in a transaction. The
+database only needs to *exist*; its contents are rebuilt automatically per run.
+
 ## Service URLs
 
 | | URL |
@@ -159,15 +179,46 @@ Default Laravel recipe credentials (`laravel/laravel`) are overridden.
 | App | `https://steet-bites.lndo.site` |
 | Mailpit UI | `https://mailpit.steet-bites.lndo.site` |
 | Reverb WebSocket (browser) | `ws://localhost:8080` |
-| Vite dev server | `http://localhost:5173` |
+| Vite dev server | `https://vite.steet-bites.lndo.site:5173` |
 
 ## Running Vite
 
-Must pass `--host 0.0.0.0` for the dev server to be reachable from outside the container:
-
 ```bash
-lando npm run dev -- --host 0.0.0.0
+lando npm run dev
 ```
+
+Run Vite in the `node` service. The browser loads dev assets from
+**`https://vite.steet-bites.lndo.site:5173`** — Vite serving **HTTPS directly**
+on its published host port, **not** the Lando proxy. This took deliberate setup;
+the moving parts (all already wired) must stay in sync:
+
+1. **HTTPS, not HTTP.** The app is served over HTTPS, so http dev assets are
+   blocked as mixed content. The `node` service sets `ssl: true` in `.lando.yml`,
+   which makes Lando issue a CA-trusted `*.lndo.site` cert at `/certs`.
+   `vite.config.js` reads `/certs/cert.crt`+`cert.key` into `server.https`.
+2. **Published port, not the proxy.** The Lando proxy will **not** route to
+   Vite's custom port (returns a Traefik 404), so `node` publishes `5173:5173`
+   via `overrides.ports`. The browser hits `vite.steet-bites.lndo.site` (which
+   resolves to `127.0.0.1` via lndo.site DNS) on `:5173` directly; the cert
+   covers that hostname, so it's valid TLS with no warning.
+3. **`allowedHosts`.** Vite 8 returns `403 Blocked request` for non-allow-listed
+   `Host` headers; `vite.config.js` allows `.lndo.site`.
+4. **`origin`.** `server.origin` is `https://vite.steet-bites.lndo.site:5173`, so
+   `laravel-vite-plugin` writes exactly that into `public/hot` and `@vite()`
+   generates browser-correct asset URLs.
+
+Do **not** revert any of these to a plain `localhost:5173` / proxy / http setup —
+each one individually breaks asset loading (mixed-content block, Traefik 404,
+403, or an unreachable `[::1]` in `public/hot`).
+
+Do **not** use `lando composer dev` — the stock Laravel `dev` script runs bare
+`vite` (no `--host`) and `artisan serve` inside the appserver container, which
+writes an unreachable `http://[::1]:5173` into `public/hot` and bypasses the
+nginx-served app. Run Vite (above) and the queue (`lando queue:work`) as separate
+Lando commands instead; Reverb already runs automatically as the `reverb` service.
+
+If assets ever 404 from a stale dev URL, delete `public/hot` to fall back to the
+built manifest in `public/build`.
 
 ## Reverb container startup
 
