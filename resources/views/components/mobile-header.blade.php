@@ -10,13 +10,26 @@
              Pass :fixed="false" to render in-flow (e.g. the styleguide demo).
     The hamburger toggles a full-screen Asphalt Dark menu via Alpine (x-data).
     Menu links mirror the bottom nav; '#' placeholders until the real routes exist.
+    The final menu link is auth-aware: Login for guests, Profile once signed in.
 --}}
 @php
+    $account = auth()->check()
+        ? [
+            'label' => 'Profile',
+            'href' => route('auth.email'),
+            'icon' => '<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+        ]
+        : [
+            'label' => 'Login',
+            'href' => route('auth.login'),
+            'icon' => '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/>',
+        ];
+
     $items = [
         'home' => ['label' => 'Home', 'href' => '#'],
         'map' => ['label' => 'Map', 'href' => '#'],
         'favorites' => ['label' => 'Favorites', 'href' => '#'],
-        'profile' => ['label' => 'Profile', 'href' => route('auth.email')],
+        'profile' => $account,
     ];
 
     // Inline SVG inner markup (viewBox 0 0 24 24); stroke styling comes from CSS.
@@ -100,6 +113,11 @@
                     ])
                     @if ($key === $active) aria-current="page" @endif
                 >
+                    @isset($item['icon'])
+                        <span class="mobile-menu__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">{!! $item['icon'] !!}</svg>
+                        </span>
+                    @endisset
                     {{ $item['label'] }}
                 </a>
             @endforeach

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Livewire\Auth\EmailEntry;
+use App\Livewire\Auth\Login;
+use App\Livewire\Auth\LoginVerify;
 use App\Livewire\Auth\SetPassword;
 use App\Livewire\Auth\VerifyCode;
 use Illuminate\Support\Facades\Route;
@@ -16,3 +18,7 @@ Route::view('/styleguide', 'styleguide');
 Route::get('/auth/email', EmailEntry::class)->name('auth.email');
 Route::get('/auth/verify', VerifyCode::class)->name('auth.verify');
 Route::get('/auth/password', SetPassword::class)->name('auth.password');
+
+// Sign-in flow: password (primary factor) → emailed one-time code (second factor).
+Route::get('/auth/login', Login::class)->name('auth.login');
+Route::get('/auth/login/verify', LoginVerify::class)->name('auth.login.verify');

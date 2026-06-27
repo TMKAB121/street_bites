@@ -84,7 +84,7 @@ lando queue:work       # Redis queue worker
 | App | https://steet-bites.lndo.site |
 | Vite Dev Server | https://vite.steet-bites.lndo.site:5173 |
 | Reverb WebSocket | ws://localhost:8080 |
-| Mailpit (email UI) | https://mailpit.steet-bites.lndo.site |
+| Mailpit (email UI) | http://localhost:8025 (or https://mailpit.steet-bites.lndo.site) |
 
 ---
 
