@@ -24,15 +24,35 @@ services:
       password: steet_bites
       database: steet_bites
     portforward: 3306
+    # Create the test database (used by phpunit.xml) on every start. Idempotent
+    # via IF NOT EXISTS; the schema/data inside it are managed automatically by
+    # Laravel's RefreshDatabase at test time, so it only needs to exist + be
+    # grantable to the app user. Waits for mysqld to accept connections first.
+    run_as_root:
+      - |
+        until mysqladmin -uroot ping --silent 2>/dev/null; do sleep 1; done
+        mysql -uroot -e "CREATE DATABASE IF NOT EXISTS steet_bites_testing;
+          GRANT ALL PRIVILEGES ON steet_bites_testing.* TO 'steet_bites'@'%';
+          FLUSH PRIVILEGES;"
 
   cache:
     portforward: 6379
 
   node:
     type: node:20
+    # The Lando proxy will not reliably route to Vite's custom port, so the
+    # browser hits Vite directly on the published host port 5173. ssl: true makes
+    # Lando issue a CA-trusted *.lndo.site cert (mounted at /certs in the
+    # container) so Vite can serve HTTPS — required because the app is HTTPS and
+    # browsers block mixed (http) content. sslExpose: false = no extra SSL port;
+    # we publish 5173 ourselves.
+    ssl: true
+    sslExpose: false
     overrides:
       environment:
         NODE_ENV: development
+      ports:
+        - '5173:5173'
 
   reverb:
     type: lando
@@ -48,9 +68,12 @@ services:
             --port=8080
             --no-interaction
         "
+      # Pin host 8080 -> container 8080 explicitly. Lando's `portforward: 8080`
+      # does NOT guarantee the host port (it assigned a random one), which broke
+      # the browser's VITE_REVERB_HOST=localhost:8080 path. An explicit compose
+      # mapping is deterministic.
       ports:
-        - '8080'
-    portforward: 8080
+        - '8080:8080'
 
   mailpit:
     type: mailpit
@@ -60,8 +83,9 @@ services:
 proxy:
   reverb:
     - reverb.steet-bites.lndo.site:8080
-  node:
-    - vite.steet-bites.lndo.site:5173
+  # No node/Vite proxy entry: the Lando proxy will not route Vite's custom port
+  # (Traefik 404). Vite is reached directly on the published HTTPS port 5173
+  # (see the node service's ssl/ports config and vite.config.js).
 
 tooling:
   php:
@@ -87,10 +111,6 @@ tooling:
     service: node
     cmd: npx vite
     description: Run Vite commands
-  reverb:start:
-    service: reverb
-    cmd: php /app/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction
-    description: Start the Laravel Reverb WebSocket server
   queue:work:
     service: appserver
     cmd: php /app/artisan queue:work redis --tries=3
