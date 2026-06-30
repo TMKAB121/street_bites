@@ -22,7 +22,17 @@
       "Bash(sed -n '/mailpit/,/}/p')",
       "Bash(curl -sS -o /dev/null -w \"localhost:8025 -> HTTP %{http_code}\\\\n\" http://localhost:8025 --max-time 5)",
       "Bash(curl -skS -o /dev/null -w \"https alias -> HTTP %{http_code}\\\\n\" https://mailpit.steet-bites.lndo.site --max-time 8)",
-      "Bash(curl -sS -o /dev/null -w \"localhost:53015 -> HTTP %{http_code}\\\\n\" http://localhost:53015 --max-time 8)"
+      "Bash(curl -sS -o /dev/null -w \"localhost:53015 -> HTTP %{http_code}\\\\n\" http://localhost:53015 --max-time 8)",
+      "Bash(lando version *)",
+      "Bash(security verify-cert *)",
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "Bash(curl -sk https://steet-bites.lndo.site/auth/email)",
+      "Bash(php -r '$l=json_decode\\(file_get_contents\\(\"composer.lock\"\\),true\\); foreach\\($l[\"packages\"] as $p\\){if\\($p[\"name\"]===\"livewire/livewire\"\\){echo \"livewire \".$p[\"version\"].PHP_EOL;}}')",
+      "Bash(curl -sk -o /dev/null -w \"vite client: %{http_code}\\\\n\" https://vite.steet-bites.lndo.site:5173/@vite/client)",
+      "mcp__Claude_in_Chrome__select_browser",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__read_console_messages",
+      "mcp__Claude_in_Chrome__browser_batch"
     ]
   }
 }

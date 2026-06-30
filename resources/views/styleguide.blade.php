@@ -7,6 +7,7 @@
 
         @fonts
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @livewireStyles
     </head>
 
     {{-- Tokens drive everything below: bg-bg, text-*, bg-surface, etc. are all
@@ -152,5 +153,6 @@
             </section>
 
         </div>
+        @livewireScripts
     </body>
 </html>

@@ -7,6 +7,7 @@
 
         @fonts
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @livewireStyles
     </head>
 
     <body class="bg-bg text-text-main min-h-screen">
@@ -58,5 +59,6 @@
 
         {{-- Fixed mobile bottom nav. --}}
         <x-mobile-nav active="home" />
+        @livewireScripts
     </body>
 </html>

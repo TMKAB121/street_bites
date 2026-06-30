@@ -1,0 +1,83 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Profile page
+ | -----------------------------------------------------------------------------
+ | The signed-in profile: empty states, the collapsible truck disclosure cards,
+ | and the lazy-load skeleton shown while a truck editor hydrates. Visuals only,
+ | tokens not hex. The editable form itself lives in truck-form.css.
+ */
+
+@layer components {
+    .profile__empty {
+        @apply rounded-2xl bg-white p-5 text-sm text-text-muted shadow-sm;
+    }
+
+    /* Collapsible owned-truck card. */
+    .truck-disclosure {
+        @apply mb-3 overflow-hidden rounded-2xl bg-white shadow-sm;
+    }
+
+    .truck-disclosure__trigger {
+        @apply flex w-full items-center justify-between gap-3 px-4 text-left;
+        min-height: var(--min-tap-target);
+    }
+
+    .truck-disclosure__title {
+        @apply font-semibold text-primary;
+    }
+
+    .truck-disclosure__chevron {
+        @apply text-text-muted;
+        transition: var(--transition-fast);
+    }
+
+    .truck-disclosure__chevron svg {
+        width: 1.25rem;
+        height: 1.25rem;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    /* Rotate the chevron when its card is open. */
+    .truck-disclosure__trigger[aria-expanded='true'] .truck-disclosure__chevron {
+        transform: rotate(180deg);
+    }
+
+    .truck-disclosure__panel {
+        @apply border-t px-4 pb-4 pt-2;
+        border-color: color-mix(in srgb, var(--color-text-muted) 20%, transparent);
+    }
+
+    /* Lazy-load skeleton (placeholder() while the editor hydrates). */
+    .truck-editor--loading {
+        @apply py-2;
+    }
+
+    .truck-editor__skeleton {
+        @apply mb-3 h-4 w-full rounded;
+        background: color-mix(in srgb, var(--color-text-muted) 18%, transparent);
+        animation: truck-skeleton-pulse 1.2s ease-in-out infinite;
+    }
+
+    .truck-editor__skeleton--title {
+        @apply h-6 w-1/2;
+    }
+
+    .truck-editor__skeleton--short {
+        @apply w-2/3;
+    }
+
+    @keyframes truck-skeleton-pulse {
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.45;
+        }
+    }
+}

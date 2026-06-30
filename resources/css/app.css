@@ -10,6 +10,9 @@
 @import './components/carousel.css';
 @import './components/filters.css';
 @import './components/auth.css';
+@import './components/profile.css';
+@import './components/truck-form.css';
+@import './components/toast.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
