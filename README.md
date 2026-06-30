@@ -106,8 +106,10 @@ lando redis-cli        # Open a Redis shell
 
 ## Running Tests
 
-Tests are written with [Pest](https://pestphp.com/) (running on top of PHPUnit),
-configured with an in-memory SQLite database — no extra setup needed.
+Tests are written with [Pest](https://pestphp.com/) (running on top of PHPUnit).
+The suite runs against a separate MariaDB database (`steet_bites_testing`) on the
+same container, created automatically on `lando start` — no extra setup needed.
+DB-touching tests `use RefreshDatabase` (migrate fresh, roll back per test).
 
 ```bash
 lando pest                       # run the full suite
@@ -232,6 +234,33 @@ See [`docs_and_archetecture/frontend-framework.md`](../docs_and_archetecture/fro
 for the front-end framework, and
 [`docs_and_archetecture/ui-component-architecture.md`](../docs_and_archetecture/ui-component-architecture.md)
 for the component library and its design decisions.
+
+---
+
+## Authentication
+
+Two email-verified [Livewire](https://livewire.laravel.com/) flows live under
+`app/Livewire/Auth/`:
+
+- **Sign-up** — enter email → confirm a 6-digit code (or click the emailed magic
+  link) → set a password. The account is created only after the email is verified.
+- **Sign-in** — email + password (primary factor) → a one-time code emailed as a
+  second factor → home. The bottom nav and hamburger menu show a **Login** link
+  for guests and **Profile** once authenticated.
+
+Security follows NIST SP 800-63B / OWASP guidance:
+
+- **Argon2id** password hashing (`config/hashing.php`), with legacy bcrypt hashes
+  rehashed on next sign-in.
+- Password policy of **min 12 characters** plus a **breach-database check** (Have
+  I Been Pwned) — favouring length over forced complexity.
+- Hardened session cookies (`Secure`, `HttpOnly`, `SameSite`, encrypted payload);
+  the session id is regenerated on login.
+- Generic, rate-limited errors at each step to resist account enumeration and
+  brute force.
+
+> The second factor is **email OTP** by design (not TOTP/SMS) to limit PII and
+> complexity for now. See `CLAUDE.md` → *Authentication* for the full convention set.
 
 ---
 

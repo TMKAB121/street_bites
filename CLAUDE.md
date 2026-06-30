@@ -69,7 +69,8 @@ resources/css/
     ├── nav.css          # .mobile-nav (bottom tab bar)
     ├── header.css       # .mobile-header + .mobile-search + .mobile-menu
     ├── carousel.css     # .card-carousel (CSS scroll-snap)
-    └── filters.css      # .filter-row / .filter-pill
+    ├── filters.css      # .filter-row / .filter-pill
+    └── auth.css         # .auth-card + .field (login / sign-up form styling)
 ```
 
 - Tokens are the source of truth — edit `theme.css`, never hard-code hex values
@@ -90,8 +91,8 @@ components**. Each pairs a CSS partial (visuals, BEM, `@layer components`) with 
 
 | Component | CSS partial | Notes |
 |---|---|---|
-| `<x-mobile-nav>` | `nav.css` | Bottom tab bar (Home/Map/Favorites/Profile) |
-| `<x-mobile-header>` | `header.css` | Top bar: hamburger + brand + map + search; hamburger opens a full-screen Alpine menu |
+| `<x-mobile-nav>` | `nav.css` | Bottom tab bar (Home/Map/Favorites + auth-aware slot: **Login** when guest, **Profile** when signed in) |
+| `<x-mobile-header>` | `header.css` | Top bar: hamburger + brand + map + search; hamburger opens a full-screen Alpine menu (last link is the same auth-aware Login/Profile slot) |
 | `<x-food-truck-card>` | `card.css` | Image + title + Mustard FIND NOW CTA; `image` prop, graceful placeholder when null |
 | `<x-card-carousel>` | `carousel.css` | Slot-based horizontal scroller; any child card becomes a snap item |
 | `<x-truck-filters>` | `filters.css` | Scrollable cuisine pills; Alpine-driven active state (visual only — real filtering becomes Livewire later) |
@@ -124,6 +125,48 @@ pure-UI state; reserve Livewire for server-backed interactivity.
   Content uses `pt-32 pb-24 md:pt-8 md:pb-8` to clear the fixed bars on mobile.
 - `/styleguide` → `styleguide.blade.php` — living style guide demoing every token
   and component in isolation (route in `routes/web.php`).
+
+## Authentication
+
+Two email-verified flows live under `app/Livewire/Auth/` (full-page Livewire
+components; views in `resources/views/livewire/auth/`). State passes between steps
+via the session; the user is logged in only at the final step.
+
+| Flow | Steps (route → component) | Notes |
+|---|---|---|
+| Sign-up | `auth.email` → `auth.verify` → `auth.password` (`EmailEntry` → `VerifyCode` → `SetPassword`) | Verify email via 6-digit code, then set a password and create the account |
+| Sign-in | `auth.login` → `auth.login.verify` (`Login` → `LoginVerify`) | Password (primary factor) → emailed 6-digit code (second factor) → home |
+
+- **One-time codes:** `App\Models\EmailVerification` stores a **hashed** 6-digit
+  code per email (10-min TTL, 5-attempt cap, burned on success/exhaustion). Mailed
+  via `EmailVerificationCode` (sign-up — includes an auto-verifying signed magic
+  link to `auth.verify`) and `LoginCode` (sign-in — code only, **no** magic link,
+  so it can't drop the user into the sign-up flow).
+- **Email-as-2FA is deliberate** — the second factor stays email OTP (not
+  TOTP/SMS) to limit PII and complexity. Don't swap it without a product decision.
+- **Stepped auth + anti-enumeration:** `Login` validates the password first, then
+  hands off; a single generic error covers both unknown email and wrong password,
+  and the code step gives a generic "invalid or expired" error. Both steps are
+  rate-limited via `RateLimiter`. Pending sign-in is tracked by
+  `session('auth.login.pending')` = the user id only — never the password.
+
+### Password & session security (NIST SP 800-63B / OWASP)
+
+- **Hashing: Argon2id** (memory-hard) — `config/hashing.php`, `HASH_DRIVER=argon2id`.
+  `rehash_on_login` upgrades legacy bcrypt hashes to Argon2id on the next sign-in
+  (done in `Login` while the plaintext is in hand); the salt is embedded per
+  password. **Tests override `HASH_DRIVER=bcrypt` (rounds=4) in `phpunit.xml` for
+  speed** — don't assert the Argon2id hash format under the default test driver.
+- **Password policy** is centralised in `AppServiceProvider::boot()` via
+  `Password::defaults()`: **min 12 chars, no forced character classes** (length
+  over complexity) plus a **Have I Been Pwned breach check** (`uncompromised()`)
+  that is skipped only under the test suite (`runningUnitTests()`). `SetPassword`
+  also caps length at `max:128` (hashing-DoS guard).
+- **Session cookies** are hardened in `.env` / `.env.example`:
+  `SESSION_SECURE_COOKIE`, `SESSION_HTTP_ONLY`, `SESSION_SAME_SITE=lax`, and
+  `SESSION_ENCRYPT` are all on, and the session id is regenerated on successful
+  sign-in/sign-up. `APP_URL` is HTTPS locally (lndo.site), so the Secure flag
+  doesn't break local auth.
 
 ## Internal Docker hostnames
 
