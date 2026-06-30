@@ -13,7 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // The sign-in route is named auth.login (there is no 'login' route), so
+        // point the auth middleware's guest redirect at it.
+        $middleware->redirectGuestsTo(fn (): string => route('auth.login'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

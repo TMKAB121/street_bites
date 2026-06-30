@@ -50,6 +50,9 @@ lando start
 #    Installs PHP deps, copies .env, generates app key,
 #    runs migrations, installs JS deps, and builds assets
 lando composer setup
+
+# 4. Link the public storage disk (needed for food-truck image uploads)
+lando artisan storage:link
 ```
 
 ---
@@ -157,9 +160,10 @@ hook — run it on demand and review its diff before committing.
 ```
 steet_bites/
 ├── app/
+│   ├── Actions/                # single-purpose actions (e.g. StoreTruckImage)
 │   ├── Http/Controllers/
-│   ├── Livewire/               # Livewire components
-│   ├── Models/
+│   ├── Livewire/               # Livewire components (Auth/, Profile/)
+│   ├── Models/                 # User, FoodTruck, MenuItem, TruckImage, ...
 │   ├── Jobs/                   # Queued jobs
 │   └── Events/                 # Broadcast events
 ├── database/
@@ -172,13 +176,15 @@ steet_bites/
 │   │   ├── theme.css           # @theme design tokens (source of truth)
 │   │   ├── base.css            # global base + ADA accessibility rules
 │   │   └── components/         # .btn, .food-truck-card, .mobile-nav, .mobile-header,
-│   │                           #   .card-carousel, .filter-row, ...
+│   │                           #   .card-carousel, .filter-row, .profile, .truck-form, .toast, ...
 │   ├── js/
-│   │   ├── app.js              # starts Alpine.js + imports echo.js
+│   │   ├── app.js              # imports echo.js (Alpine is bundled & started by Livewire 4)
 │   │   └── echo.js             # Laravel Echo / Reverb client config
 │   └── views/
 │       ├── components/         # anonymous Blade components (x-mobile-nav, x-mobile-header,
-│       │                       #   x-food-truck-card, x-card-carousel, x-truck-filters)
+│       │                       #   x-food-truck-card, x-card-carousel, x-truck-filters, x-truck-form, x-toast)
+│       ├── layouts/            # app.blade.php (centered) + shell.blade.php (mobile chrome)
+│       ├── livewire/           # full-page Livewire views (auth/, profile/)
 │       ├── welcome.blade.php   # home page — assembled mobile shell (/)
 │       └── styleguide.blade.php # living style guide (/styleguide)
 ├── routes/
@@ -210,11 +216,12 @@ classes from a single source of truth. A living style guide renders at
 
 Reusable UI is built as **anonymous Blade components** in
 `resources/views/components/` (mobile header, bottom nav, food-truck card, card
-carousel, cuisine filters), each pairing a CSS partial with a Blade template. The
-home page (`/`) assembles them into a mobile app shell. Client-side interactivity
-(e.g. the header's hamburger menu) is powered by **Alpine.js**, started in
-`resources/js/app.js`; carousels and the filter row use native **CSS scroll-snap**
-rather than a JS slider library.
+carousel, cuisine filters, the vendor truck form, and a toast), each pairing a CSS
+partial with a Blade template. The home page (`/`) assembles them into a mobile app
+shell. Client-side interactivity (e.g. the header's hamburger menu and the toast)
+is powered by **Alpine.js**, which **Livewire 4 bundles and starts automatically** —
+do not start a second Alpine instance in `resources/js/app.js`. Carousels and the
+filter row use native **CSS scroll-snap** rather than a JS slider library.
 
 Vite compiles both CSS and JS:
 
@@ -261,6 +268,27 @@ Security follows NIST SP 800-63B / OWASP guidance:
 
 > The second factor is **email OTP** by design (not TOTP/SMS) to limit PII and
 > complexity for now. See `CLAUDE.md` → *Authentication* for the full convention set.
+
+---
+
+## Profile & Vendor Management
+
+`/profile` (the **Profile** link in the nav/menu once signed in) is the
+authenticated home for two roles in one page:
+
+- **Eater by default** — it shows the trucks a user has favourited. No one is
+  assumed to be a vendor.
+- **Vendor on demand** — an "Add a food truck" button registers a food truck
+  against the user. Owned trucks list as collapsible cards; expanding one
+  **lazy-loads** an editable form for the truck's name, **today's** operating
+  hours, menu items, and photos. Saves confirm with a toast.
+
+Data is persisted in a normalized schema (`food_trucks`, `truck_operating_hours`,
+`menu_items`, `truck_images`, and a `favorites` pivot). Photo uploads are
+normalized to a **250×250 WebP** (centre-cropped, EXIF stripped) via
+[`intervention/image`](https://image.intervention.io/) and stored on the public
+disk — so a fresh environment needs `lando artisan storage:link` once (see setup).
+See `CLAUDE.md` → *Profile & vendor management* for the schema and conventions.
 
 ---
 

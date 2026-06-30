@@ -7,11 +7,13 @@
 
         @fonts
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @livewireStyles
     </head>
 
     <body class="bg-bg text-text-main min-h-screen">
         <main class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
             {{ $slot }}
         </main>
+        @livewireScripts
     </body>
 </html>

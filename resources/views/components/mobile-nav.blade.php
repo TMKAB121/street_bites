@@ -16,7 +16,7 @@
     $account = auth()->check()
         ? [
             'label' => 'Profile',
-            'href' => route('auth.email'),
+            'href' => route('profile'),
             'icon' => '<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
         ]
         : [
@@ -28,17 +28,17 @@
     $items = [
         'home' => [
             'label' => 'Home',
-            'href' => '#',
+            'href' => '/',
             'icon' => '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/>',
         ],
         'map' => [
             'label' => 'Map',
-            'href' => '#',
+            'href' => '/',
             'icon' => '<path d="M12 21s7-6.4 7-11a7 7 0 1 0-14 0c0 4.6 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/>',
         ],
         'favorites' => [
             'label' => 'Favorites',
-            'href' => '#',
+            'href' => '/',
             'icon' => '<path d="m12 4 2.5 5.1 5.6.8-4 3.9 1 5.6-5.1-2.7L6.9 19.4l1-5.6-4-3.9 5.6-.8L12 4Z"/>',
         ],
         'profile' => $account,

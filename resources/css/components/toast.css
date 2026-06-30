@@ -1,0 +1,67 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Toast
+ | -----------------------------------------------------------------------------
+ | Transient confirmation notifications (<x-toast>), stacked above the bottom nav
+ | on mobile. Success rides the Asphalt Dark surface (mustard tick is allowed on
+ | dark); errors use Chili Red. Tokens only, no hard-coded hex.
+ */
+
+@layer components {
+    .toast-stack {
+        @apply fixed inset-x-0 bottom-24 z-50 flex flex-col items-center gap-2 px-4 md:bottom-6;
+        pointer-events: none;
+    }
+
+    .toast {
+        @apply flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium shadow-lg;
+        max-width: 24rem;
+        pointer-events: auto;
+        cursor: pointer;
+    }
+
+    .toast--success {
+        background: var(--color-primary);
+        color: #fff;
+    }
+
+    /* Mustard tick is fine here — the surface is dark (the white-bg rule only). */
+    .toast--success .toast__icon {
+        color: var(--color-accent-mustard);
+    }
+
+    .toast--error {
+        background: var(--color-accent-chili);
+        color: #fff;
+    }
+
+    .toast__icon {
+        @apply shrink-0;
+    }
+
+    .toast__icon svg {
+        width: 1.25rem;
+        height: 1.25rem;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    /* Slide-up + fade entrance (Alpine x-transition hooks). */
+    .toast--enter,
+    .toast--leave {
+        transition: var(--transition-fast);
+    }
+
+    .toast--enter-start {
+        opacity: 0;
+        transform: translateY(0.5rem);
+    }
+
+    .toast--enter-end {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

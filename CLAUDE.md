@@ -70,7 +70,10 @@ resources/css/
     ├── header.css       # .mobile-header + .mobile-search + .mobile-menu
     ├── carousel.css     # .card-carousel (CSS scroll-snap)
     ├── filters.css      # .filter-row / .filter-pill
-    └── auth.css         # .auth-card + .field (login / sign-up form styling)
+    ├── auth.css         # .auth-card + .field (login / sign-up form styling)
+    ├── profile.css      # .profile + .truck-disclosure (collapsible owned-truck cards)
+    ├── truck-form.css   # .truck-form + .menu-row + .truck-image (vendor edit form)
+    └── toast.css        # .toast / .toast-stack (transient save/upload confirmations)
 ```
 
 - Tokens are the source of truth — edit `theme.css`, never hard-code hex values
@@ -96,6 +99,8 @@ components**. Each pairs a CSS partial (visuals, BEM, `@layer components`) with 
 | `<x-food-truck-card>` | `card.css` | Image + title + Mustard FIND NOW CTA; `image` prop, graceful placeholder when null |
 | `<x-card-carousel>` | `carousel.css` | Slot-based horizontal scroller; any child card becomes a snap item |
 | `<x-truck-filters>` | `filters.css` | Scrollable cuisine pills; Alpine-driven active state (visual only — real filtering becomes Livewire later) |
+| `<x-truck-form>` | `truck-form.css` | The vendor edit form. **Nested inside the `TruckEditor` Livewire view** (not a standalone demo): it compiles inline, so its `wire:model` / `wire:click` bind to the component. Props: `truck-id`, `menu-items`, `images` |
+| `<x-toast>` | `toast.css` | App-wide transient confirmations. Alpine-only; listens for the browser `toast` event Livewire dispatches (`$this->dispatch('toast', message:…, type:…)`). Stacked once in `layouts/shell.blade.php` |
 
 Conventions for these components:
 
@@ -112,17 +117,29 @@ Conventions for these components:
 
 ### JavaScript / Alpine
 
-`resources/js/app.js` imports `echo.js` (Reverb) **and starts Alpine.js**
-(`window.Alpine`). Alpine is the client-side primitive for interactive components
-(e.g. the header menu toggle via `x-data`/`x-show`); `[x-cloak]` is globally
-hidden in `base.css` so collapsed UI never flashes on load. Prefer Alpine for
-pure-UI state; reserve Livewire for server-backed interactivity.
+`resources/js/app.js` imports `echo.js` (Reverb) only. **Do not import or start
+Alpine here.** Livewire 4 bundles its own Alpine and starts it automatically;
+running a second instance (the standalone `alpinejs` package) triggers a
+"multiple instances of Alpine" conflict that silently breaks every `wire:`
+directive. Livewire's bundled Alpine scans the whole document, so plain
+`x-data`/`x-show` markup still works, and it's exposed on `window.Alpine` for any
+custom directives. `[x-cloak]` is globally hidden in `base.css` so collapsed UI
+never flashes on load. Prefer Alpine for pure-UI state; reserve Livewire for
+server-backed interactivity.
+
+Because Livewire owns the JS, every full-page view must include `@livewireStyles`
+in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
+`styleguide`, and both layouts (`layouts/app.blade.php`, `layouts/shell.blade.php`).
 
 ### Pages
 
 - `/` → `welcome.blade.php` — the **assembled mobile shell**: `<x-mobile-header>`,
   a `<x-card-carousel>`, `<x-truck-filters>` + a results grid, and `<x-mobile-nav>`.
   Content uses `pt-32 pb-24 md:pt-8 md:pb-8` to clear the fixed bars on mobile.
+- `/profile` → `App\Livewire\Profile\ProfilePage` (`auth` middleware) — the
+  signed-in profile (see *Profile & vendor management* below). Uses the
+  `layouts/shell.blade.php` layout, which factors the welcome shell's chrome
+  (fixed header + bottom nav + `<x-toast>`) into a reusable layout for app pages.
 - `/styleguide` → `styleguide.blade.php` — living style guide demoing every token
   and component in isolation (route in `routes/web.php`).
 
@@ -167,6 +184,63 @@ via the session; the user is logged in only at the final step.
   `SESSION_ENCRYPT` are all on, and the session id is regenerated on successful
   sign-in/sign-up. `APP_URL` is HTTPS locally (lndo.site), so the Secure flag
   doesn't break local auth.
+
+- **Guest redirect:** the sign-in route is named `auth.login` (there is no `login`
+  route), so `bootstrap/app.php` sets `$middleware->redirectGuestsTo(fn () =>
+  route('auth.login'))`. Without it the `auth` middleware would error resolving the
+  default `login` route.
+
+## Profile & vendor management
+
+`/profile` (`App\Livewire\Profile\ProfilePage`, `auth`-guarded) is the signed-in
+home for two roles in one page. Views live in `resources/views/livewire/profile/`.
+
+- **Eater by default, vendor on demand.** We never assume a user is a food-truck
+  owner: the page shows their **favourited trucks**, and only an explicit "Add a
+  food truck" CTA (`addTruck()`) creates a `FoodTruck` tied to their user id. A
+  user can own several.
+- **Collapsed list → lazy editor.** Owned trucks render as collapsed
+  `.truck-disclosure` cards (stub data: id + name only). Expanding one renders
+  `<livewire:profile.truck-editor :truck-id … lazy />` — `TruckEditor` is
+  `#[Lazy]`, so its full data (today's hours, menu, images) loads in a **follow-up
+  request** behind a `placeholder()` skeleton. The editable form is the nested
+  `<x-truck-form>` Blade component.
+- **Ownership is re-checked on every action.** `TruckEditor::truck()` does
+  `findOrFail` + `abort_unless($truck->user_id === auth()->id(), 403)` and is
+  called by mount **and** every mutating method — never trust the lazy snapshot.
+- **Saves are silent → confirmed by toast.** `save`/`uploadImage`/`deleteImage`/
+  `deleteTruck` dispatch a `toast` browser event (`<x-toast>`); `save` also
+  dispatches `truck-saved`/`truck-deleted` to `ProfilePage` to refresh the list.
+- **Testing lazy components:** pass `['truckId' => …, 'lazy' => false]` to
+  `Livewire::test()` so `mount()` runs immediately (see `tests/Feature/Profile/`).
+
+### Normalized schema
+
+Five migrations (`2026_06_29_0000xx_*`), all `cascadeOnDelete` from the truck:
+
+| Table | Shape / decisions |
+|---|---|
+| `food_trucks` | `user_id` owner, `name`, `description`; nullable `latitude`/`longitude`/`location_label`/`located_at` (**geolocation columns are reserved — no pin-setting UI this PR**); `is_published` gates future discovery |
+| `truck_operating_hours` | One row **per business date** (`unique(food_truck_id, business_date)`) — vendors operate in real time day-by-day, **not** on a recurring weekly schedule. The editor only upserts **today's** row via `updateOrCreate` |
+| `truck_images` | `path` to a normalized WebP on the public disk + `sort_order` |
+| `menu_items` | `name`, `description`, `price_cents` (**money as integer cents, never float**), `is_available`, `sort_order` |
+| `favorites` | `user_id`+`food_truck_id` pivot (`unique`). This PR **reads** it for display; the favourite/unfavourite action is a follow-up |
+
+Models: `FoodTruck` (`user`, `operatingHours`, `todayHours`, `images`,
+`menuItems`, `favoritedBy`), `TruckOperatingHour`, `TruckImage` (`url` accessor),
+`MenuItem` (`price` accessor); `User` gained `foodTrucks()` and `favorites()`.
+
+### Image pipeline
+
+Uploads go through `App\Actions\StoreTruckImage` (uses **`intervention/image` v4**,
+GD/Imagick both available in the container): `cover(250, 250)` (centre-crop to a
+1:1 square) → `WebpEncoder(quality: 80)` → stored at
+`truck-images/{truck}/{uuid}.webp` on the **public** disk. Re-encoding strips
+EXIF/GPS metadata (privacy) and arbitrary file bytes; the component validates
+`image|mimes:jpeg,png,webp|max:5120`.
+
+> Image uploads need the public-disk symlink — run `lando artisan storage:link`
+> once per environment (a fresh clone has no `public/storage`).
 
 ## Internal Docker hostnames
 
