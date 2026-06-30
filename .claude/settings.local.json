@@ -22,7 +22,9 @@
       "Bash(sed -n '/mailpit/,/}/p')",
       "Bash(curl -sS -o /dev/null -w \"localhost:8025 -> HTTP %{http_code}\\\\n\" http://localhost:8025 --max-time 5)",
       "Bash(curl -skS -o /dev/null -w \"https alias -> HTTP %{http_code}\\\\n\" https://mailpit.steet-bites.lndo.site --max-time 8)",
-      "Bash(curl -sS -o /dev/null -w \"localhost:53015 -> HTTP %{http_code}\\\\n\" http://localhost:53015 --max-time 8)"
+      "Bash(curl -sS -o /dev/null -w \"localhost:53015 -> HTTP %{http_code}\\\\n\" http://localhost:53015 --max-time 8)",
+      "Bash(lando version *)",
+      "Bash(security verify-cert *)"
     ]
   }
 }

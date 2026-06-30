@@ -237,16 +237,26 @@ the moving parts (all already wired) must stay in sync:
 
 1. **HTTPS, not HTTP.** The app is served over HTTPS, so http dev assets are
    blocked as mixed content. The `node` service sets `ssl: true` in `.lando.yml`,
-   which makes Lando issue a CA-trusted `*.lndo.site` cert at `/certs`.
+   which makes Lando issue a cert (signed by the trusted Lando CA) at `/certs`.
    `vite.config.js` reads `/certs/cert.crt`+`cert.key` into `server.https`.
-2. **Published port, not the proxy.** The Lando proxy will **not** route to
+2. **Cert SAN must cover the browser hostname.** Lando derives a service's cert
+   SANs from its **proxy hostnames**. A custom service's cert otherwise covers
+   only `<service>.internal` / `node` / `localhost` / `127.0.0.1` — **not** the
+   `*.lndo.site` name the browser uses — so Chrome rejects it
+   (`NET::ERR_CERT_COMMON_NAME_INVALID`) and forces a manual bypass. The fix is a
+   `node` entry in the `proxy:` block (`vite.steet-bites.lndo.site:5173`), present
+   **solely** to inject that hostname into the cert SANs. After changing it,
+   `lando rebuild -s node` reissues the cert; verify with
+   `lando ssh -s node -c "openssl x509 -in /certs/cert.crt -noout -ext subjectAltName"`.
+3. **Published port, not the proxy.** The Lando proxy will **not** route to
    Vite's custom port (returns a Traefik 404), so `node` publishes `5173:5173`
    via `overrides.ports`. The browser hits `vite.steet-bites.lndo.site` (which
-   resolves to `127.0.0.1` via lndo.site DNS) on `:5173` directly; the cert
-   covers that hostname, so it's valid TLS with no warning.
-3. **`allowedHosts`.** Vite 8 returns `403 Blocked request` for non-allow-listed
+   resolves to `127.0.0.1` via lndo.site DNS) on `:5173` directly. The `proxy:`
+   entry from point 2 is **not** used for routing — only for the cert SAN — so
+   the Traefik 404 never matters.
+4. **`allowedHosts`.** Vite 8 returns `403 Blocked request` for non-allow-listed
    `Host` headers; `vite.config.js` allows `.lndo.site`.
-4. **`origin`.** `server.origin` is `https://vite.steet-bites.lndo.site:5173`, so
+5. **`origin`.** `server.origin` is `https://vite.steet-bites.lndo.site:5173`, so
    `laravel-vite-plugin` writes exactly that into `public/hot` and `@vite()`
    generates browser-correct asset URLs.
 
