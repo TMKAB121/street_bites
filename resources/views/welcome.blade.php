@@ -15,9 +15,8 @@
         <x-mobile-header active="home" />
 
         {{-- Main scrolls between the fixed header and footer. The top/bottom
-             padding clears those bars on mobile; on >= md the bars are hidden
-             (mobile-only components), so the offset is removed. --}}
-        <main class="mx-auto max-w-md px-4 pt-32 pb-24 md:pt-8 md:pb-8">
+             padding clears those bars on both mobile and desktop. --}}
+        <main class="mx-auto max-w-md px-4 pt-32 pb-24 md:max-w-4xl md:pt-20 md:pb-20">
             <section class="mb-8">
                 <h1 class="text-xl font-semibold text-primary">Street eats near you</h1>
                 <p class="text-text-muted mt-1">
@@ -25,34 +24,50 @@
                 </p>
             </section>
 
-            {{-- Carousel of featured trucks. --}}
+            {{-- Carousel of featured trucks (unfiltered — always shows all published). --}}
             <section class="mb-8">
                 <h2 class="text-lg font-semibold text-primary mb-3 px-1">Popular near you</h2>
                 <div class="-mx-4">
                     <x-card-carousel label="Popular trucks">
-                        <x-food-truck-card name="Smokin' Wheels BBQ" href="#" />
-                        <x-food-truck-card name="Taco Libre" href="#" />
-                        <x-food-truck-card name="Burger Bloc" href="#" />
-                        <x-food-truck-card name="Nacho Average" href="#" />
-                        <x-food-truck-card name="Curry Cart" href="#" />
-                        <x-food-truck-card name="Waffle Wagon" href="#" />
+                        @forelse ($trucks->take(8) as $truck)
+                            <x-food-truck-card
+                                :name="$truck->name"
+                                :image="$truck->images->first()?->url"
+                                href="#"
+                            />
+                        @empty
+                            <p class="px-4 text-sm text-text-muted">No trucks yet — check back soon!</p>
+                        @endforelse
                     </x-card-carousel>
                 </div>
             </section>
 
-            {{-- Cuisine filters + results listing. --}}
-            <section>
+            {{-- Cuisine filters + results grid. The Alpine scope here is the
+                 single source of truth for which tag is active. The filter row
+                 dispatches `tag-filter` events; the grid x-shows cards that match. --}}
+            <section
+                x-data="{ activeTag: 'all' }"
+                @tag-filter.window="activeTag = $event.detail.tag"
+            >
                 <h2 class="text-lg font-semibold text-primary mb-3 px-1">Browse by cuisine</h2>
                 <div class="-mx-4">
-                    <x-truck-filters active="all" />
+                    <x-truck-filters :tags="$tags" />
                 </div>
-                <div class="grid grid-cols-2 gap-4 mt-4">
-                    <x-food-truck-card name="Taco Libre" href="#" />
-                    <x-food-truck-card name="Burger Bloc" href="#" />
-                    <x-food-truck-card name="Nacho Average" href="#" />
-                    <x-food-truck-card name="Smokin' Wheels BBQ" href="#" />
-                    <x-food-truck-card name="Curry Cart" href="#" />
-                    <x-food-truck-card name="Waffle Wagon" href="#" />
+                <div class="grid grid-cols-2 gap-4 mt-4 md:grid-cols-3">
+                    @forelse ($trucks as $truck)
+                        <div
+                            x-show="activeTag === 'all' || {{ Js::from($truck->tags->pluck('slug')) }}.includes(activeTag)"
+                            x-transition
+                        >
+                            <x-food-truck-card
+                                :name="$truck->name"
+                                :image="$truck->images->first()?->url"
+                                href="#"
+                            />
+                        </div>
+                    @empty
+                        <p class="col-span-2 text-sm text-text-muted">No trucks yet.</p>
+                    @endforelse
                 </div>
             </section>
         </main>

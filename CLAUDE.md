@@ -73,15 +73,17 @@ resources/css/
     ├── auth.css         # .auth-card + .field (login / sign-up form styling)
     ├── profile.css      # .profile + .truck-disclosure (collapsible owned-truck cards)
     ├── truck-form.css   # .truck-form + .menu-row + .truck-image (vendor edit form)
+    ├── tag-picker.css   # .tag-picker + .tag-pill (cuisine tag toggles in truck editor)
     └── toast.css        # .toast / .toast-stack (transient save/upload confirmations)
 ```
 
 - Tokens are the source of truth — edit `theme.css`, never hard-code hex values
   in components. `--color-accent-chili` auto-generates `bg-accent-chili`,
   `text-accent-chili`, etc.
-- Mustard (`--color-accent-mustard`) must use **dark text only** (fails contrast
-  with white); `.btn-mustard` enforces this. On a *dark* surface (e.g. the
-  bottom nav, the header menu) mustard text is fine — the rule is white-bg only.
+- Mustard (`--color-accent-mustard`) and Tangerine (`--color-accent-tangerine`)
+  must use **dark text only** (both fail contrast with white). On a *dark* surface
+  (e.g. the bottom nav, the header menu) mustard text is fine — the rule is
+  white-bg only. Tangerine is currently used for the active filter pill.
 - Vite compiles both CSS and JS (`resources/js/app.js`). Build: `lando npm run
   build`. Dev: `lando npm run dev` (HTTPS dev-server settings live in
   `vite.config.js`; see "Running Vite" below).
@@ -98,8 +100,8 @@ components**. Each pairs a CSS partial (visuals, BEM, `@layer components`) with 
 | `<x-mobile-header>` | `header.css` | Top bar: hamburger + brand + map + search; hamburger opens a full-screen Alpine menu (last link is the same auth-aware Login/Profile slot) |
 | `<x-food-truck-card>` | `card.css` | Image + title + Mustard FIND NOW CTA; `image` prop, graceful placeholder when null |
 | `<x-card-carousel>` | `carousel.css` | Slot-based horizontal scroller; any child card becomes a snap item |
-| `<x-truck-filters>` | `filters.css` | Scrollable cuisine pills; Alpine-driven active state (visual only — real filtering becomes Livewire later) |
-| `<x-truck-form>` | `truck-form.css` | The vendor edit form. **Nested inside the `TruckEditor` Livewire view** (not a standalone demo): it compiles inline, so its `wire:model` / `wire:click` bind to the component. Props: `truck-id`, `menu-items`, `images` |
+| `<x-truck-filters>` | `filters.css` | Scrollable cuisine pills driven from the `Tag` DB. Each pill click sets Alpine's local active state **and** dispatches a `tag-filter` window event (`{ tag: slug }`). The results grid listens with `@tag-filter.window` and uses `x-show` to filter cards client-side. Props: `tags` (Collection of Tag models) |
+| `<x-truck-form>` | `truck-form.css` | The vendor edit form. **Nested inside the `TruckEditor` Livewire view** (not a standalone demo): it compiles inline, so its `wire:model` / `wire:click` bind to the component. Props: `truck-id`, `menu-items`, `images`, `all-tags` |
 | `<x-toast>` | `toast.css` | App-wide transient confirmations. Alpine-only; listens for the browser `toast` event Livewire dispatches (`$this->dispatch('toast', message:…, type:…)`). Stacked once in `layouts/shell.blade.php` |
 
 Conventions for these components:
@@ -136,6 +138,9 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
 - `/` → `welcome.blade.php` — the **assembled mobile shell**: `<x-mobile-header>`,
   a `<x-card-carousel>`, `<x-truck-filters>` + a results grid, and `<x-mobile-nav>`.
   Content uses `pt-32 pb-24 md:pt-8 md:pb-8` to clear the fixed bars on mobile.
+  The route closure queries published `FoodTruck`s (with images + tags eager-loaded)
+  and all `Tag`s that have at least one published truck, passing both to the view.
+  Client-side tag filtering is Alpine-driven via the `tag-filter` window event.
 - `/profile` → `App\Livewire\Profile\ProfilePage` (`auth` middleware) — the
   signed-in profile (see *Profile & vendor management* below). Uses the
   `layouts/shell.blade.php` layout, which factors the welcome shell's chrome
@@ -202,12 +207,18 @@ home for two roles in one page. Views live in `resources/views/livewire/profile/
 - **Collapsed list → lazy editor.** Owned trucks render as collapsed
   `.truck-disclosure` cards (stub data: id + name only). Expanding one renders
   `<livewire:profile.truck-editor :truck-id … lazy />` — `TruckEditor` is
-  `#[Lazy]`, so its full data (today's hours, menu, images) loads in a **follow-up
-  request** behind a `placeholder()` skeleton. The editable form is the nested
-  `<x-truck-form>` Blade component.
+  `#[Lazy]`, so its full data (today's hours, menu, images, **cuisine tags**) loads
+  in a **follow-up request** behind a `placeholder()` skeleton. The editable form
+  is the nested `<x-truck-form>` Blade component.
 - **Ownership is re-checked on every action.** `TruckEditor::truck()` does
   `findOrFail` + `abort_unless($truck->user_id === auth()->id(), 403)` and is
   called by mount **and** every mutating method — never trust the lazy snapshot.
+- **Cuisine tags.** `TruckEditor` holds `$selectedTagIds` (array of tag IDs) and
+  `$newTagName`. The form shows a pill-checkbox grid (`.tag-picker`) of all `Tag`
+  rows; checked pills sync on `save()` via `$truck->tags()->sync(...)`. The "Add"
+  button calls `addTag()`, which does `Tag::firstOrCreate(['slug' => Str::slug(…)])`
+  and appends the new ID to `$selectedTagIds`. CSS-only active state via
+  `:has(input:checked)` — no Alpine needed in the picker.
 - **Saves are silent → confirmed by toast.** `save`/`uploadImage`/`deleteImage`/
   `deleteTruck` dispatch a `toast` browser event (`<x-toast>`); `save` also
   dispatches `truck-saved`/`truck-deleted` to `ProfilePage` to refresh the list.
@@ -216,19 +227,20 @@ home for two roles in one page. Views live in `resources/views/livewire/profile/
 
 ### Normalized schema
 
-Five migrations (`2026_06_29_0000xx_*`), all `cascadeOnDelete` from the truck:
+Six migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*`), all `cascadeOnDelete` from the truck:
 
 | Table | Shape / decisions |
 |---|---|
-| `food_trucks` | `user_id` owner, `name`, `description`; nullable `latitude`/`longitude`/`location_label`/`located_at` (**geolocation columns are reserved — no pin-setting UI this PR**); `is_published` gates future discovery |
+| `food_trucks` | `user_id` owner, `name`, `description`; nullable `latitude`/`longitude`/`location_label`/`located_at` (**geolocation columns are reserved — no pin-setting UI yet**); `is_published` gates discovery |
 | `truck_operating_hours` | One row **per business date** (`unique(food_truck_id, business_date)`) — vendors operate in real time day-by-day, **not** on a recurring weekly schedule. The editor only upserts **today's** row via `updateOrCreate` |
 | `truck_images` | `path` to a normalized WebP on the public disk + `sort_order` |
 | `menu_items` | `name`, `description`, `price_cents` (**money as integer cents, never float**), `is_available`, `sort_order` |
-| `favorites` | `user_id`+`food_truck_id` pivot (`unique`). This PR **reads** it for display; the favourite/unfavourite action is a follow-up |
+| `favorites` | `user_id`+`food_truck_id` pivot (`unique`). Reads for display; the favourite/unfavourite action is a follow-up |
+| `tags` + `food_truck_tag` | Cuisine taxonomy. `tags`: `name`, `slug` (unique, auto-generated from name via `Str::slug()` on creating). `food_truck_tag`: composite PK pivot — no timestamps, cascade deletes on both FKs |
 
 Models: `FoodTruck` (`user`, `operatingHours`, `todayHours`, `images`,
-`menuItems`, `favoritedBy`), `TruckOperatingHour`, `TruckImage` (`url` accessor),
-`MenuItem` (`price` accessor); `User` gained `foodTrucks()` and `favorites()`.
+`menuItems`, `favoritedBy`, `tags`), `TruckOperatingHour`, `TruckImage` (`url` accessor),
+`MenuItem` (`price` accessor), `Tag` (`foodTrucks`); `User` gained `foodTrucks()` and `favorites()`.
 
 ### Image pipeline
 
@@ -241,6 +253,17 @@ EXIF/GPS metadata (privacy) and arbitrary file bytes; the component validates
 
 > Image uploads need the public-disk symlink — run `lando artisan storage:link`
 > once per environment (a fresh clone has no `public/storage`).
+
+### Dev seed
+
+`database/seeders/FoodTruckSeeder` (called by `DatabaseSeeder`) creates 3 vendor
+users, the full tag taxonomy, and 10 published trucks with menu items and images.
+Fixture images live in `database/seeders/fixtures/images/` and are processed
+through `StoreTruckImage` (same pipeline as live uploads). Re-seed with:
+
+```bash
+lando artisan migrate:fresh --seed
+```
 
 ## Internal Docker hostnames
 

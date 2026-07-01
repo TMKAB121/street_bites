@@ -12,6 +12,7 @@
 @import './components/auth.css';
 @import './components/profile.css';
 @import './components/truck-form.css';
+@import './components/tag-picker.css';
 @import './components/toast.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';

@@ -30,6 +30,6 @@
 
     <div class="food-truck-card__body">
         <h3 class="food-truck-card__title">{{ $name }}</h3>
-        <a href="{{ $href }}" class="btn btn-mustard w-full">FIND NOW</a>
+        <a href="{{ $href }}" class="btn btn-mustard w-full">Find Now</a>
     </div>
 </article>

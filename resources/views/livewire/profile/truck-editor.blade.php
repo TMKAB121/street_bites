@@ -9,5 +9,6 @@
         :truck-id="$truckId"
         :menu-items="$menuItems"
         :images="$images"
+        :all-tags="$allTags"
     />
 </div>

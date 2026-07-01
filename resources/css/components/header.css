@@ -171,4 +171,72 @@
     .mobile-menu__link--active {
         color: var(--color-accent-mustard);
     }
+
+    /* --- Desktop nav links (hidden on mobile via Tailwind) --------------- */
+    .mobile-header__desktop-nav {
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .mobile-header__desktop-nav-link {
+        @apply inline-flex items-center rounded-md px-3 py-2 text-sm font-medium;
+        color: var(--color-text-muted);
+        text-decoration: none;
+        white-space: nowrap;
+        transition: var(--transition-fast);
+    }
+
+    .mobile-header__desktop-nav-link:hover {
+        color: var(--color-primary);
+        background: var(--color-bg);
+    }
+
+    .mobile-header__desktop-nav-link--active {
+        color: var(--color-primary);
+        font-weight: 600;
+    }
+
+    /* --- Desktop account link (hidden on mobile via Tailwind) ------------ */
+    .mobile-header__desktop-account {
+        align-items: center;
+        gap: 0.5rem;
+        flex: 0 0 auto;
+        color: var(--color-primary);
+        text-decoration: none;
+        transition: var(--transition-fast);
+        white-space: nowrap;
+    }
+
+    .mobile-header__desktop-account:hover {
+        color: var(--color-accent-chili);
+    }
+
+    .mobile-header__desktop-account-label {
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+}
+
+/* --- Desktop layout overrides ------------------------------------------- */
+@media (width >= 768px) {
+    .mobile-header {
+        flex-direction: row;
+        align-items: center;
+        gap: 1.5rem;
+        padding: 0.75rem 2rem;
+        padding-top: 0.75rem; /* no safe-area-inset needed on desktop */
+    }
+
+    .mobile-header__bar {
+        flex: 0 0 auto;
+        min-height: unset;
+    }
+
+    /* Search: fixed width, pushed right by auto left-margin so map pin + account
+       hug the right edge of the header regardless of screen width. */
+    .mobile-search {
+        flex: 0 0 18rem;
+        width: 18rem; /* override @apply w-full */
+        margin-left: auto;
+    }
 }

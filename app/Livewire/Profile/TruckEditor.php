@@ -6,8 +6,10 @@ namespace App\Livewire\Profile;
 
 use App\Actions\StoreTruckImage;
 use App\Models\FoodTruck;
+use App\Models\Tag;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Lazy;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -45,6 +47,17 @@ class TruckEditor extends Component
 
     public mixed $upload = null;
 
+    /**
+     * IDs of cuisine tags currently selected for this truck. Livewire populates
+     * this from the checkbox group in truck-form via wire:model.
+     *
+     * @var array<int, int>
+     */
+    public array $selectedTagIds = [];
+
+    /** Name typed into the "add new tag" input. */
+    public string $newTagName = '';
+
     public function mount(int $truckId): void
     {
         $truck = $this->truck();
@@ -63,6 +76,8 @@ class TruckEditor extends Component
             'price' => $item->price_cents === null ? '' : number_format($item->price_cents / 100, 2, '.', ''),
             'is_available' => $item->is_available,
         ])->all();
+
+        $this->selectedTagIds = $truck->tags->pluck('id')->map(fn ($id): int => (int) $id)->all();
     }
 
     /**
@@ -92,6 +107,9 @@ class TruckEditor extends Component
             'menuItems.*.name' => 'required|string|max:255',
             'menuItems.*.description' => 'nullable|string|max:500',
             'menuItems.*.price' => 'nullable|numeric|min:0|max:99999.99',
+            'selectedTagIds' => 'array',
+            'selectedTagIds.*' => 'integer|exists:tags,id',
+            'newTagName' => 'nullable|string|max:100',
         ];
     }
 
@@ -108,6 +126,9 @@ class TruckEditor extends Component
 
     public function save(): void
     {
+        // Coerce checkbox values to int before validation (Livewire sends strings).
+        $this->selectedTagIds = array_map('intval', $this->selectedTagIds);
+
         $this->validate($this->rules());
 
         $truck = $this->truck();
@@ -123,9 +144,35 @@ class TruckEditor extends Component
         );
 
         $this->saveMenuItems($truck);
+        $this->saveTags($truck);
 
         $this->dispatch('truck-saved', name: $truck->name)->to(ProfilePage::class);
         $this->toast('Changes saved');
+    }
+
+    /**
+     * Find-or-create a tag by the typed name and add it to the current
+     * selection. Called from the "Add" button in the tag picker fieldset so the
+     * vendor doesn't have to wait until Save to see the new pill appear.
+     */
+    public function addTag(): void
+    {
+        $name = trim($this->newTagName);
+
+        if ($name === '') {
+            return;
+        }
+
+        $tag = Tag::query()->firstOrCreate(
+            ['slug' => Str::slug($name)],
+            ['name' => $name],
+        );
+
+        if (! in_array($tag->id, $this->selectedTagIds, true)) {
+            $this->selectedTagIds[] = $tag->id;
+        }
+
+        $this->newTagName = '';
     }
 
     /**
@@ -136,6 +183,35 @@ class TruckEditor extends Component
     private function toast(string $message, string $type = 'success'): void
     {
         $this->dispatch('toast', message: $message, type: $type);
+    }
+
+    /**
+     * Sync cuisine tags. If $newTagName is still set (vendor typed a name but
+     * didn't click Add), find-or-create it here so saving the form is one action.
+     * Mirrors saveMenuItems() but uses sync() because tags are shared taxonomy
+     * rows — the truck doesn't own them, it only references them via pivot.
+     */
+    private function saveTags(FoodTruck $truck): void
+    {
+        $ids = $this->selectedTagIds;
+
+        if (trim($this->newTagName) !== '') {
+            $tag = Tag::query()->firstOrCreate(
+                ['slug' => Str::slug($this->newTagName)],
+                ['name' => trim($this->newTagName)],
+            );
+
+            if (! in_array($tag->id, $ids, true)) {
+                $ids[] = $tag->id;
+            }
+
+            $this->newTagName = '';
+        }
+
+        $truck->tags()->sync($ids);
+
+        // Refresh so the re-render shows any newly-created tag as checked.
+        $this->selectedTagIds = $truck->tags()->pluck('id')->map(fn ($id): int => (int) $id)->all();
     }
 
     /**
@@ -209,6 +285,7 @@ class TruckEditor extends Component
     {
         return view('livewire.profile.truck-editor', [
             'images' => $this->truck()->images,
+            'allTags' => Tag::query()->orderBy('name')->get(),
         ]);
     }
 }

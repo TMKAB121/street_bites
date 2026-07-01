@@ -46,7 +46,7 @@
 @endphp
 
 <nav
-    {{ $attributes->class(['mobile-nav', 'fixed inset-x-0 bottom-0 z-40 md:hidden' => $fixed]) }}
+    {{ $attributes->class(['mobile-nav', 'fixed inset-x-0 bottom-0 z-40' => $fixed]) }}
     aria-label="Primary"
 >
     @foreach ($items as $key => $item)
