@@ -32,7 +32,11 @@
       "mcp__Claude_in_Chrome__select_browser",
       "mcp__Claude_in_Chrome__navigate",
       "mcp__Claude_in_Chrome__read_console_messages",
-      "mcp__Claude_in_Chrome__browser_batch"
+      "mcp__Claude_in_Chrome__browser_batch",
+      "Bash(git -C /Users/anthonysayge/projects/street_bites rev-parse --show-toplevel)",
+      "Bash(git -C /Users/anthonysayge/projects/street_bites diff develop...HEAD --stat)",
+      "Bash(git -C /Users/anthonysayge/projects/street_bites diff --stat)",
+      "Bash(git -C /Users/anthonysayge/projects/street_bites log --oneline -10)"
     ]
   }
 }

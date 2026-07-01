@@ -21,6 +21,7 @@
     --color-primary: #1e2229; /* Asphalt Dark  — headers, nav, primary type   */
     --color-accent-mustard: #ffc700; /* Neon Mustard  — accents/badges, DARK text only */
     --color-accent-chili: #d63031; /* Chili Red     — callouts, destructive, focus  */
+    --color-accent-tangerine: #f07c00; /* Tangerine     — filter active state, DARK text only */
     --color-bg: #fafafa; /* Clean Paper   — app background canvas         */
     --color-surface: #fff; /* Crisp White   — cards, modals, sheets         */
     --color-text-main: #2d3436; /* Charcoal      — primary body copy             */

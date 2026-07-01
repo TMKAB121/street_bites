@@ -2,6 +2,7 @@
     'truckId',
     'menuItems' => [],
     'images' => null,
+    'allTags' => collect(),
 ])
 
 {{--
@@ -39,6 +40,41 @@
         ></textarea>
         @error('description') <p class="field__error">{{ $message }}</p> @enderror
     </div>
+
+    {{-- Cuisine tags ---------------------------------------------------------- --}}
+    @if ($allTags->isNotEmpty())
+        <fieldset class="truck-form__section">
+            <legend class="truck-form__legend">Cuisine tags</legend>
+            <p class="truck-form__hint">Select all that apply, or add a new one below.</p>
+
+            <div class="tag-picker">
+                @foreach ($allTags as $tag)
+                    <label class="tag-pill" wire:key="tag-{{ $truckId }}-{{ $tag->id }}">
+                        <input
+                            type="checkbox"
+                            class="sr-only"
+                            wire:model="selectedTagIds"
+                            value="{{ $tag->id }}"
+                        >
+                        <span class="tag-pill__label">{{ $tag->name }}</span>
+                    </label>
+                @endforeach
+            </div>
+            @error('selectedTagIds') <p class="field__error">{{ $message }}</p> @enderror
+
+            <div class="tag-picker__new">
+                <input
+                    type="text"
+                    class="field__input tag-picker__input"
+                    wire:model="newTagName"
+                    placeholder="New cuisine (e.g. Fusion)"
+                    maxlength="100"
+                >
+                <button type="button" class="btn btn-accent" wire:click="addTag">Add</button>
+            </div>
+            @error('newTagName') <p class="field__error">{{ $message }}</p> @enderror
+        </fieldset>
+    @endif
 
     {{-- Today's hours --------------------------------------------------------- --}}
     <fieldset class="truck-form__section">

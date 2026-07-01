@@ -8,9 +8,24 @@ use App\Livewire\Auth\LoginVerify;
 use App\Livewire\Auth\SetPassword;
 use App\Livewire\Auth\VerifyCode;
 use App\Livewire\Profile\ProfilePage;
+use App\Models\FoodTruck;
+use App\Models\Tag;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', fn () => view('welcome'))->name('home');
+Route::get('/', function () {
+    $trucks = FoodTruck::query()
+        ->where('is_published', true)
+        ->with(['images', 'tags'])
+        ->orderBy('name')
+        ->get();
+
+    $tags = Tag::query()
+        ->whereHas('foodTrucks', fn ($q) => $q->where('is_published', true))
+        ->orderBy('name')
+        ->get();
+
+    return view('welcome', compact('trucks', 'tags'));
+})->name('home');
 
 // Living style guide — visual reference for the "Urban Vibrant" design tokens.
 Route::view('/styleguide', 'styleguide');

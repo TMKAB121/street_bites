@@ -26,7 +26,7 @@
         ];
 
     $items = [
-        'home' => ['label' => 'Home', 'href' => '#'],
+        'home' => ['label' => 'Home', 'href' => '/'],
         'map' => ['label' => 'Map', 'href' => '#'],
         'favorites' => ['label' => 'Favorites', 'href' => '#'],
         'profile' => $account,
@@ -44,12 +44,13 @@
 
 <div x-data="{ open: false }" @keydown.escape.window="open = false">
     <header
-        {{ $attributes->class(['mobile-header', 'fixed inset-x-0 top-0 z-40 md:hidden' => $fixed]) }}
+        {{ $attributes->class(['mobile-header', 'fixed inset-x-0 top-0 z-40' => $fixed]) }}
     >
         <div class="mobile-header__bar">
+            {{-- Hamburger: mobile only --}}
             <button
                 type="button"
-                class="mobile-header__action"
+                class="mobile-header__action md:hidden"
                 aria-label="Open menu"
                 :aria-expanded="open"
                 @click="open = true"
@@ -60,15 +61,34 @@
             </button>
 
             {{-- Brand wordmark — placeholder until the real Street Bites logo exists. --}}
-            <a href="#" class="mobile-header__brand">Street Bites</a>
+            <a href="/" class="mobile-header__brand">Street Bites</a>
 
-            <a href="{{ $items['map']['href'] }}" class="mobile-header__action" aria-label="Map">
+            {{-- Map pin: mobile only --}}
+            <a href="{{ $items['map']['href'] }}" class="mobile-header__action md:hidden" aria-label="Map">
                 <span class="mobile-header__icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24">{!! $icons['map'] !!}</svg>
                 </span>
             </a>
         </div>
 
+        {{-- Desktop nav links (Home / Map / Favorites) — profile handled separately --}}
+        <nav class="mobile-header__desktop-nav hidden md:flex" aria-label="Primary">
+            @foreach ($items as $key => $item)
+                @if ($key === 'profile') @continue @endif
+                <a
+                    href="{{ $item['href'] }}"
+                    @class([
+                        'mobile-header__desktop-nav-link',
+                        'mobile-header__desktop-nav-link--active' => $key === $active,
+                    ])
+                    @if ($key === $active) aria-current="page" @endif
+                >
+                    {{ $item['label'] }}
+                </a>
+            @endforeach
+        </nav>
+
+        {{-- Search: full-width second row on mobile; right-aligned on desktop via CSS margin-left:auto --}}
         <div class="mobile-search">
             <span class="mobile-search__icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">{!! $icons['search'] !!}</svg>
@@ -80,14 +100,29 @@
                 aria-label="Search food trucks"
             >
         </div>
+
+        {{-- Map pin: right-side action on desktop (hidden on mobile — the bar has one) --}}
+        <a href="{{ $items['map']['href'] }}" class="mobile-header__action hidden md:inline-flex" aria-label="Map">
+            <span class="mobile-header__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">{!! $icons['map'] !!}</svg>
+            </span>
+        </a>
+
+        {{-- Account link: desktop only, far-right --}}
+        <a href="{{ $account['href'] }}" class="mobile-header__desktop-account hidden md:inline-flex">
+            <span class="mobile-header__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">{!! $account['icon'] !!}</svg>
+            </span>
+            <span class="mobile-header__desktop-account-label">{{ $account['label'] }}</span>
+        </a>
     </header>
 
-    {{-- Full-screen overlay menu. --}}
+    {{-- Full-screen overlay menu (mobile only — triggered by hamburger). --}}
     <div
         x-show="open"
         x-cloak
         x-transition.opacity
-        class="mobile-menu"
+        class="mobile-menu md:hidden"
         role="dialog"
         aria-modal="true"
         aria-label="Menu"

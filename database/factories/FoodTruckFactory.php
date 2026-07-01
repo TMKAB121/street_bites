@@ -25,4 +25,9 @@ class FoodTruckFactory extends Factory
             'is_published' => false,
         ];
     }
+
+    public function published(): static
+    {
+        return $this->state(['is_published' => true]);
+    }
 }

@@ -27,6 +27,7 @@
                     @foreach ([
                         'Primary' => 'bg-primary',
                         'Mustard' => 'bg-accent-mustard',
+                        'Tangerine' => 'bg-accent-tangerine',
                         'Chili' => 'bg-accent-chili',
                         'Surface' => 'bg-surface',
                         'Background' => 'bg-bg',
@@ -100,8 +101,9 @@
             {{-- Filters & results --}}
             <section class="mb-12">
                 <h2 class="text-lg font-semibold text-primary mb-4">Filters &amp; results</h2>
+                @php $styleguideFilterTags = \App\Models\Tag::orderBy('name')->get(); @endphp
                 <div class="-mx-6">
-                    <x-truck-filters active="all" />
+                    <x-truck-filters :tags="$styleguideFilterTags" />
                 </div>
                 <div class="grid grid-cols-2 gap-4 mt-4">
                     <x-food-truck-card name="Taco Libre" href="#" />
@@ -110,9 +112,9 @@
                     <x-food-truck-card name="Smokin' Wheels BBQ" href="#" />
                 </div>
                 <p class="text-sm text-text-muted mt-3">
-                    The pill row scrolls horizontally; tapping a pill moves the active
-                    state (Alpine, purely visual for now). Real filtering of the results
-                    grid below becomes a Livewire action once truck data exists.
+                    The pill row scrolls horizontally; tapping a pill moves the active state
+                    (Alpine visual + window event). Filter pills are driven from the database —
+                    only tags attached to published trucks appear on the home page.
                 </p>
             </section>
 

@@ -18,7 +18,7 @@
     <body class="bg-bg text-text-main min-h-screen">
         <x-mobile-header :active="$active ?? 'home'" />
 
-        <main class="mx-auto max-w-md px-4 pt-32 pb-24 md:pt-8 md:pb-8">
+        <main class="mx-auto max-w-md px-4 pt-32 pb-24 md:max-w-4xl md:pt-20 md:pb-20">
             {{ $slot }}
         </main>
 
