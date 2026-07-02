@@ -31,6 +31,16 @@
         @apply grid grid-cols-2 gap-3;
     }
 
+    /* Set-my-location row: the CTA with the pinned-at status beside it. */
+    .truck-form__location {
+        @apply flex flex-wrap items-center;
+        gap: 0.75rem;
+    }
+
+    .truck-form__location-status {
+        margin: 0;
+    }
+
     /* Repeatable menu item. */
     .menu-row {
         @apply mb-3 rounded-xl p-3;

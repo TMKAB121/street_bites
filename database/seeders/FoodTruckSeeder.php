@@ -16,14 +16,29 @@ use Illuminate\Support\Str;
  * Seeds 3 vendor users, the full cuisine tag taxonomy, and ~10 published food
  * trucks across those tags. Fixture images from database/seeders/fixtures/images/
  * are processed through StoreTruckImage (resize → 250×250 WebP) so the seeded
- * data exercises the full image pipeline. Re-running is idempotent for tags
- * (firstOrCreate by slug); it will create duplicate trucks/users unless you
- * run migrate:fresh --seed instead.
+ * data exercises the full image pipeline. Every truck gets a GPS pin near ZIP
+ * 66202 (Mission, KS) — most within the maps' ~5-mile default view, every third
+ * one an outlier up to 20 miles out; maps themselves are NOT pre-generated
+ * (seeding must work offline — the first page view renders and caches each
+ * one). Re-running is idempotent
+ * for tags (firstOrCreate by slug); it will create duplicate trucks/users
+ * unless you run migrate:fresh --seed instead.
  *
  * Usage: lando artisan migrate:fresh --seed
  */
 class FoodTruckSeeder extends Seeder
 {
+    /** ZIP 66202 (Mission, KS) — the centre of the dev-data map area. */
+    private const BASE_LAT = 39.0272;
+
+    private const BASE_LNG = -94.6558;
+
+    /** 5 miles in meters — most pins land inside the maps' ~5-mile default view. */
+    private const NEAR_OFFSET_METERS = 8047;
+
+    /** 20 miles in meters — a few outliers land beyond it (reachable by panning). */
+    private const FAR_OFFSET_METERS = 32187;
+
     public function run(): void
     {
         // Taxonomy — finds-or-creates by slug so re-seeding doesn't duplicate.
@@ -51,12 +66,13 @@ class FoodTruckSeeder extends Seeder
         $vendor2 = User::factory()->create(['name' => 'Priya Nair',   'email' => 'priya@streetbites.test']);
         $vendor3 = User::factory()->create(['name' => 'Jamie Okafor', 'email' => 'jamie@streetbites.test']);
 
-        // Truck definitions: [vendor, name, description, tag keys, menu items].
+        // Truck definitions: [vendor, name, description, location label, tag keys, menu items].
         $truckData = [
             [
                 'vendor' => $vendor1,
                 'name' => "Smokin' Wheels BBQ",
                 'desc' => 'Slow-smoked Texas-style brisket, ribs, and pulled pork served with house pickles.',
+                'label' => 'Power & Light District',
                 'tags' => ['BBQ'],
                 'menu' => [
                     ['Brisket Plate', 1800],
@@ -70,6 +86,7 @@ class FoodTruckSeeder extends Seeder
                 'vendor' => $vendor1,
                 'name' => 'Taco Libre',
                 'desc' => 'Handcrafted street tacos with house-made salsas and fresh corn tortillas.',
+                'label' => 'Johnson Dr & Nall Ave, Mission',
                 'tags' => ['Mexican', 'Tacos'],
                 'menu' => [
                     ['Al Pastor Taco', 450],
@@ -83,6 +100,7 @@ class FoodTruckSeeder extends Seeder
                 'vendor' => $vendor1,
                 'name' => 'Verde Kitchen',
                 'desc' => 'Plant-based bowls, wraps, and smoothies — bold flavour, zero compromise.',
+                'label' => 'Downtown Overland Park',
                 'tags' => ['Vegan'],
                 'menu' => [
                     ['Buddha Bowl', 1300],
@@ -95,6 +113,7 @@ class FoodTruckSeeder extends Seeder
                 'vendor' => $vendor2,
                 'name' => 'Burger Bloc',
                 'desc' => 'Crispy smash burgers stacked with premium toppings on toasted brioche buns.',
+                'label' => 'Westport Rd & Broadway',
                 'tags' => ['Burgers'],
                 'menu' => [
                     ['Classic Smash', 1100],
@@ -108,6 +127,7 @@ class FoodTruckSeeder extends Seeder
                 'vendor' => $vendor2,
                 'name' => 'Nacho Average',
                 'desc' => 'Loaded nachos, quesadillas, and churros — the ultimate Mexican street snacks.',
+                'label' => 'Country Club Plaza',
                 'tags' => ['Mexican', 'Dessert'],
                 'menu' => [
                     ['Loaded Nachos', 1100],
@@ -120,6 +140,7 @@ class FoodTruckSeeder extends Seeder
                 'vendor' => $vendor2,
                 'name' => 'Curry Cart',
                 'desc' => 'South Asian street food: fragrant curries, golden samosas, and masala chai.',
+                'label' => 'Crown Center',
                 'tags' => ['Asian'],
                 'menu' => [
                     ['Butter Chicken Curry', 1300],
@@ -133,6 +154,7 @@ class FoodTruckSeeder extends Seeder
                 'vendor' => $vendor3,
                 'name' => 'Waffle Wagon',
                 'desc' => 'Belgian waffles with indulgent sweet and savoury toppings made to order.',
+                'label' => 'City Market, River Market',
                 'tags' => ['Dessert'],
                 'menu' => [
                     ['Classic Waffle', 800],
@@ -145,6 +167,7 @@ class FoodTruckSeeder extends Seeder
                 'vendor' => $vendor3,
                 'name' => 'Pier 7 Seafood',
                 'desc' => 'Fresh fish tacos, clam chowder cups, and grilled shrimp skewers from the coast.',
+                'label' => 'Shawnee Mission Park',
                 'tags' => ['Seafood', 'Tacos'],
                 'menu' => [
                     ['Fish Taco', 550],
@@ -158,6 +181,7 @@ class FoodTruckSeeder extends Seeder
                 'vendor' => $vendor3,
                 'name' => 'Pizza Peddler',
                 'desc' => 'Wood-fired Neapolitan-style pizza slices — crispy crust, San Marzano tomatoes.',
+                'label' => 'Crossroads Arts District',
                 'tags' => ['Pizza'],
                 'menu' => [
                     ['Margherita Slice', 500],
@@ -171,6 +195,7 @@ class FoodTruckSeeder extends Seeder
                 'vendor' => $vendor3,
                 'name' => 'Seoul Bowl',
                 'desc' => 'Korean BBQ bowls, bibimbap, and kimchi fries — big umami energy.',
+                'label' => 'Legends Outlets, KCK',
                 'tags' => ['Asian', 'BBQ'],
                 'menu' => [
                     ['Bulgogi Bowl', 1300],
@@ -185,11 +210,21 @@ class FoodTruckSeeder extends Seeder
         $storeTruckImage = new StoreTruckImage;
 
         foreach ($truckData as $i => $data) {
+            // Every third truck is an outlier (up to 20 miles out); the rest
+            // cluster within the maps' default ~5-mile view.
+            [$lat, $lng] = $this->randomPinNearBase(
+                $i % 3 === 2 ? self::FAR_OFFSET_METERS : self::NEAR_OFFSET_METERS,
+            );
+
             $truck = FoodTruck::query()->create([
                 'user_id' => $data['vendor']->id,
                 'name' => $data['name'],
                 'description' => $data['desc'],
                 'is_published' => true,
+                'latitude' => $lat,
+                'longitude' => $lng,
+                'location_label' => $data['label'],
+                'located_at' => now()->subMinutes(random_int(10, 300)),
             ]);
 
             $tagIds = array_map(fn (string $t): int => $tags[$t]->id, $data['tags']);
@@ -217,6 +252,25 @@ class FoodTruckSeeder extends Seeder
                 }
             }
         }
+    }
+
+    /**
+     * A random GPS pin uniformly distributed within $maxOffsetMeters of the
+     * base point: random bearing + sqrt-weighted distance (uniform over the
+     * area, not clustered at the centre), converted with the equirectangular
+     * approximation — plenty accurate at this scale.
+     *
+     * @return array{0: float, 1: float} [latitude, longitude]
+     */
+    private function randomPinNearBase(int $maxOffsetMeters): array
+    {
+        $bearing = mt_rand() / mt_getrandmax() * 2 * M_PI;
+        $distance = sqrt(mt_rand() / mt_getrandmax()) * $maxOffsetMeters;
+
+        $lat = self::BASE_LAT + ($distance * cos($bearing)) / 111320;
+        $lng = self::BASE_LNG + ($distance * sin($bearing)) / (111320 * cos(deg2rad(self::BASE_LAT)));
+
+        return [round($lat, 7), round($lng, 7)];
     }
 
     /**

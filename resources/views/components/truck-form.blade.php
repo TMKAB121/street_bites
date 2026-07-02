@@ -3,6 +3,8 @@
     'menuItems' => [],
     'images' => null,
     'allTags' => collect(),
+    'locatedAt' => null,
+    'locationLabel' => null,
 ])
 
 {{--
@@ -13,6 +15,9 @@
     - $truckId:   namespaces input ids so several open editors stay unique.
     - $menuItems: repeatable menu rows (for iteration; values are wire:model-bound).
     - $images:    the truck's stored gallery images (collection).
+    - $locatedAt: when the truck's pin was last set (Carbon|null) — shown next
+                  to the Set-my-location CTA.
+    - $locationLabel: reverse-geocoded area name for the pin (string|null).
 --}}
 <form wire:submit="save" class="truck-form">
     {{-- Identity -------------------------------------------------------------- --}}
@@ -92,6 +97,53 @@
                 <input id="closes-{{ $truckId }}" type="time" class="field__input" wire:model="closesAt">
                 @error('closesAt') <p class="field__error">{{ $message }}</p> @enderror
             </div>
+        </div>
+    </fieldset>
+
+    {{-- Today's location -------------------------------------------------------
+         Parked for the day → one tap pins the truck at the vendor's GPS
+         position (browser geolocation feeds TruckEditor::setLocation, which
+         also refreshes the truck-page map). Alpine owns the busy state; errors
+         surface through the app-wide toast stack. --}}
+    <fieldset class="truck-form__section">
+        <legend class="truck-form__legend">Today’s location</legend>
+        <p class="truck-form__hint">
+            Parked for the day? Pin your spot so eaters can find you on the map.
+        </p>
+
+        <div class="truck-form__location" x-data="{ locating: false }">
+            <button
+                type="button"
+                class="btn btn-mustard"
+                :disabled="locating"
+                @click="
+                    if (!navigator.geolocation) {
+                        $dispatch('toast', { message: 'Location isn’t available in this browser.', type: 'error' });
+                        return;
+                    }
+                    locating = true;
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => $wire
+                            .setLocation(position.coords.latitude, position.coords.longitude)
+                            .finally(() => (locating = false)),
+                        () => {
+                            locating = false;
+                            $dispatch('toast', { message: 'We couldn’t get your location — check your browser’s permission.', type: 'error' });
+                        }
+                    );
+                "
+            >
+                <span x-show="!locating">Set my location</span>
+                <span x-show="locating" x-cloak>Locating…</span>
+            </button>
+
+            <p class="truck-form__hint truck-form__location-status">
+                @if ($locatedAt)
+                    Pinned {{ $locatedAt->isToday() ? 'today at '.$locatedAt->format('g:i A') : $locatedAt->format('M j \a\t g:i A') }}{{ $locationLabel ? ' · '.$locationLabel : '' }}
+                @else
+                    No location pinned yet.
+                @endif
+            </p>
         </div>
     </fieldset>
 

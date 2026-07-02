@@ -1,0 +1,48 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Truck map
+ | -----------------------------------------------------------------------------
+ | The interactive homepage map (<x-truck-map>, Leaflet + OSM tiles). Leaflet's
+ | own stylesheet is imported by resources/js/truck-map.js; this partial owns
+ | the container chrome and our custom pin/"you are here" markers.
+ |
+ |   <x-truck-map :trucks="$trucks" />
+ */
+
+@layer components {
+    /* z-index: 0 opens a stacking context so Leaflet's internal pane/control
+       z-indexes (up to ~800) can never float above the fixed header/nav. */
+    .truck-map {
+        @apply relative z-0 overflow-hidden rounded-md bg-surface;
+        border: 1px solid rgb(30 34 41 / 8%);
+        box-shadow: 0 4px 12px rgb(30 34 41 / 4%);
+    }
+
+    .truck-map__canvas {
+        height: 18rem;
+    }
+
+    /* Truck pin — same silhouette and Chili colouring as .truck-page__pin. */
+    .truck-map__pin {
+        color: var(--color-accent-chili);
+        filter: drop-shadow(0 1px 2px rgb(30 34 41 / 35%));
+    }
+
+    .truck-map__pin svg {
+        width: 100%;
+        height: 100%;
+        fill: var(--color-surface);
+        stroke: currentcolor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    /* The visitor's own position (an SVG circleMarker, hence stroke/fill). */
+    .truck-map__here {
+        fill: var(--color-accent-tangerine);
+        fill-opacity: 0.9;
+        stroke: var(--color-surface);
+        stroke-width: 2;
+    }
+}

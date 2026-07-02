@@ -10,5 +10,7 @@
         :menu-items="$menuItems"
         :images="$images"
         :all-tags="$allTags"
+        :located-at="$locatedAt"
+        :location-label="$locationLabel"
     />
 </div>

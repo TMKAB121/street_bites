@@ -30,4 +30,18 @@ class FoodTruckFactory extends Factory
     {
         return $this->state(['is_published' => true]);
     }
+
+    /**
+     * Give the truck a pinned GPS location (fixed coords near ZIP 66202) so
+     * tests can exercise the map without caring about specific values.
+     */
+    public function located(): static
+    {
+        return $this->state([
+            'latitude' => 39.0272,
+            'longitude' => -94.6558,
+            'location_label' => 'Johnson Dr & Nall Ave, Mission',
+            'located_at' => now(),
+        ]);
+    }
 }

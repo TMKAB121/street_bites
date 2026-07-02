@@ -8,6 +8,7 @@ use App\Models\MenuItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
@@ -46,7 +47,11 @@ it('saves the name and upserts today\'s operating hours', function (): void {
         ->assertHasNoErrors()
         ->assertDispatched('toast', message: 'Changes saved', type: 'success');
 
-    expect($truck->fresh()->name)->toBe('Waffle Wagon');
+    $truck->refresh();
+    expect($truck->name)->toBe('Waffle Wagon')
+        // Saving publishes: a new truck (unpublished by default) goes live on
+        // its first save so it appears in discovery.
+        ->and($truck->is_published)->toBeTrue();
 
     $hours = $truck->todayHours;
     expect($hours)->not->toBeNull()
@@ -153,4 +158,75 @@ it('deletes the truck and notifies the parent', function (): void {
         ->assertDispatched('truck-deleted');
 
     expect(FoodTruck::query()->find($truck->id))->toBeNull();
+});
+
+it('pins the truck at the vendor\'s coordinates with a reverse-geocoded label', function (): void {
+    Http::fake([
+        'nominatim.openstreetmap.org/*' => Http::response([
+            'address' => ['road' => 'Johnson Dr', 'city' => 'Mission'],
+        ]),
+    ]);
+
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->call('setLocation', 39.0272, -94.6558)
+        ->assertDispatched('toast', type: 'success');
+
+    $truck->refresh();
+    expect((float) $truck->latitude)->toBe(39.0272)
+        ->and((float) $truck->longitude)->toBe(-94.6558)
+        ->and($truck->location_label)->toBe('Johnson Dr, Mission')
+        ->and($truck->located_at)->not->toBeNull();
+});
+
+it('clears a stale label when the reverse geocode fails', function (): void {
+    Http::fake(['nominatim.openstreetmap.org/*' => Http::response(null, 500)]);
+
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->located()->create();
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->call('setLocation', 39.1, -94.7)
+        ->assertDispatched('toast', type: 'success');
+
+    // The old label described the previous spot — worse than none. The pin
+    // itself must still land.
+    $truck->refresh();
+    expect($truck->location_label)->toBeNull()
+        ->and((float) $truck->latitude)->toBe(39.1);
+});
+
+it('rejects out-of-range coordinates when pinning', function (): void {
+    Http::fake();
+
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->call('setLocation', 999.0, 0.0)
+        ->assertStatus(422);
+
+    expect($truck->fresh()->latitude)->toBeNull();
+    Http::assertNothingSent();
+});
+
+it('forbids pinning another vendor\'s truck via a tampered truckId', function (): void {
+    $user = User::factory()->create();
+    $mine = FoodTruck::factory()->for($user)->create();
+    $theirs = FoodTruck::factory()->create();
+
+    // Mount legitimately with an owned truck, then swap the id client-side —
+    // the ownership re-check (run on every action and render) rejects the very
+    // next roundtrip, so setLocation can never write to the other truck.
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $mine->id, 'lazy' => false])
+        ->set('truckId', $theirs->id)
+        ->assertForbidden();
+
+    expect($theirs->fresh()->latitude)->toBeNull();
 });

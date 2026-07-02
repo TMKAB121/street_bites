@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\GenerateTruckMapImage;
 use App\Livewire\Auth\EmailEntry;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\LoginVerify;
@@ -11,6 +12,7 @@ use App\Livewire\Profile\ProfilePage;
 use App\Models\FoodTruck;
 use App\Models\Tag;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 Route::get('/', function () {
     $trucks = FoodTruck::query()
@@ -26,6 +28,21 @@ Route::get('/', function () {
 
     return view('welcome', compact('trucks', 'tags'));
 })->name('home');
+
+// Public truck detail page — the destination of every truck card's FIND NOW
+// CTA. Unpublished trucks stay invisible (404), matching home-page discovery.
+Route::get('/trucks/{truck}', function (string $truck) {
+    $truck = FoodTruck::query()
+        ->where('is_published', true)
+        ->with(['images', 'tags', 'menuItems', 'todayHours'])
+        ->findOrFail($truck);
+
+    // Cached OSM static map of the pin's surroundings; null hides the section.
+    $mapPath = app(GenerateTruckMapImage::class)($truck);
+    $mapUrl = $mapPath !== null ? Storage::disk('public')->url($mapPath) : null;
+
+    return view('trucks.show', compact('truck', 'mapUrl'));
+})->whereNumber('truck')->name('trucks.show');
 
 // Living style guide — visual reference for the "Urban Vibrant" design tokens.
 Route::view('/styleguide', 'styleguide');
