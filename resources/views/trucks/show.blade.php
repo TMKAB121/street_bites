@@ -80,6 +80,13 @@
                 &ndash;
                 {{ \Illuminate\Support\Carbon::parse($truck->todayHours->closes_at)->format('g:i A') }}
             </p>
+        @elseif ($truck->todayHours?->opens_at)
+            {{-- Vendor tapped "Now Open" but hasn't set a close time — they're
+                 out and serving right now. --}}
+            <p class="truck-page__hours">
+                <strong>Open now</strong>
+                since {{ \Illuminate\Support\Carbon::parse($truck->todayHours->opens_at)->format('g:i A') }}
+            </p>
         @else
             <p class="truck-page__hours truck-page__hours--unposted">
                 No hours posted for today — check back soon.

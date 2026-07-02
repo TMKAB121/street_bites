@@ -59,6 +59,22 @@ it('falls back gracefully when a truck has no hours or menu yet', function (): v
         ->assertSee('Menu coming soon.');
 });
 
+it('shows "open now — since" when only the opening time is set', function (): void {
+    $truck = FoodTruck::factory()->published()->create();
+    $truck->operatingHours()->create([
+        'business_date' => today(),
+        'opens_at' => '10:30',
+        'closes_at' => null,
+    ]);
+
+    $this->withoutVite()
+        ->get(route('trucks.show', $truck))
+        ->assertOk()
+        ->assertSee('Open now')
+        ->assertSee('since 10:30 AM')
+        ->assertDontSee('No hours posted');
+});
+
 it('returns 404 for an unpublished truck', function (): void {
     $truck = FoodTruck::factory()->create();
 

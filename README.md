@@ -17,6 +17,7 @@ All development runs inside Docker containers managed by [Lando](https://lando.d
 | Build Tool | Vite 8 |
 | CSS | Tailwind CSS 4 |
 | Database | MariaDB 10.11 |
+| Maps | Leaflet + OpenStreetMap (keyless: tiles, static maps, Nominatim geocoding) |
 | Cache / Queue / Sessions | Redis 7 |
 | Runtime | PHP 8.3 |
 | Node | 20.x |
@@ -160,7 +161,8 @@ hook — run it on demand and review its diff before committing.
 ```
 steet_bites/
 ├── app/
-│   ├── Actions/                # single-purpose actions (e.g. StoreTruckImage)
+│   ├── Actions/                # single-purpose actions (StoreTruckImage,
+│   │                           #   GenerateTruckMapImage, ReverseGeocodeLabel)
 │   ├── Http/Controllers/
 │   ├── Livewire/               # Livewire components (Auth/, Profile/)
 │   ├── Models/                 # User, FoodTruck, MenuItem, TruckImage, ...
@@ -178,13 +180,16 @@ steet_bites/
 │   │   └── components/         # .btn, .food-truck-card, .mobile-nav, .mobile-header,
 │   │                           #   .card-carousel, .filter-row, .profile, .truck-form, .toast, ...
 │   ├── js/
-│   │   ├── app.js              # imports echo.js (Alpine is bundled & started by Livewire 4)
-│   │   └── echo.js             # Laravel Echo / Reverb client config
+│   │   ├── app.js              # imports echo.js + truck-map.js (Alpine is bundled by Livewire 4)
+│   │   ├── echo.js             # Laravel Echo / Reverb client config
+│   │   └── truck-map.js        # Leaflet home-page map + closest-first card sorting
 │   └── views/
 │       ├── components/         # anonymous Blade components (x-mobile-nav, x-mobile-header,
-│       │                       #   x-food-truck-card, x-card-carousel, x-truck-filters, x-truck-form, x-toast)
+│       │                       #   x-food-truck-card, x-card-carousel, x-truck-filters,
+│       │                       #   x-truck-form, x-truck-map, x-toast)
 │       ├── layouts/            # app.blade.php (centered) + shell.blade.php (mobile chrome)
 │       ├── livewire/           # full-page Livewire views (auth/, profile/)
+│       ├── trucks/show.blade.php # public truck detail page (/trucks/{id})
 │       ├── welcome.blade.php   # home page — assembled mobile shell (/)
 │       └── styleguide.blade.php # living style guide (/styleguide)
 ├── routes/
@@ -281,7 +286,12 @@ authenticated home for two roles in one page:
 - **Vendor on demand** — an "Add a food truck" button registers a food truck
   against the user. Owned trucks list as collapsible cards; expanding one
   **lazy-loads** an editable form for the truck's name, **today's** operating
-  hours, menu items, and photos. Saves confirm with a toast.
+  hours, menu items, photos, and **live location**. Saving a new truck publishes
+  it. Confirmations surface as toasts.
+- **Real-time presence** — a **Set my location** button pins the truck at the
+  vendor's current GPS position (and reverse-geocodes an area label); a **Now Open**
+  button stamps today's opening time. Both capture the browser timezone so times show
+  in the truck's local zone (the app runs in UTC).
 
 Data is persisted in a normalized schema (`food_trucks`, `truck_operating_hours`,
 `menu_items`, `truck_images`, and a `favorites` pivot). Photo uploads are
@@ -289,6 +299,22 @@ normalized to a **250×250 WebP** (centre-cropped, EXIF stripped) via
 [`intervention/image`](https://image.intervention.io/) and stored on the public
 disk — so a fresh environment needs `lando artisan storage:link` once (see setup).
 See `CLAUDE.md` → *Profile & vendor management* for the schema and conventions.
+
+---
+
+## Discovery & Maps
+
+Each published truck has a **detail page** (`/trucks/{id}`) that discovery cards
+link to — its photos, cuisine tags, today's hours ("Open now — since …" when a
+vendor has flipped **Now Open**), location, menu, and a map of the surrounding area.
+The home page shows an **interactive map** of pinned trucks that centres on the
+visitor's location, with pins that filter alongside the cuisine pills and cards that
+re-sort **closest-first** once location is shared.
+
+All mapping uses **OpenStreetMap** with **no API key or billing**: truck pages
+render a cached static map ([`dantsu/php-osm-static-api`](https://github.com/DantSu/php-osm-static-api)),
+the home page uses [Leaflet](https://leafletjs.com/), and area labels come from OSM
+**Nominatim** reverse geocoding. See `CLAUDE.md` → *Maps & geolocation*.
 
 ---
 

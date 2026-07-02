@@ -28,7 +28,12 @@
 
     /* Opens / closes side by side. */
     .truck-form__hours {
-        @apply grid grid-cols-2 gap-3;
+        @apply grid grid-cols-2 items-start gap-3;
+    }
+
+    /* "Opened at …" line under the Now Open button — tight to the button. */
+    .truck-form__opens-status {
+        @apply mt-2;
     }
 
     /* Set-my-location row: the CTA with the pinned-at status beside it. */

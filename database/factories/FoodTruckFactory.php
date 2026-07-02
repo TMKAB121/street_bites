@@ -42,6 +42,7 @@ class FoodTruckFactory extends Factory
             'longitude' => -94.6558,
             'location_label' => 'Johnson Dr & Nall Ave, Mission',
             'located_at' => now(),
+            'timezone' => 'America/Chicago',
         ]);
     }
 }

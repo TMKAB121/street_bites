@@ -225,6 +225,8 @@ class FoodTruckSeeder extends Seeder
                 'longitude' => $lng,
                 'location_label' => $data['label'],
                 'located_at' => now()->subMinutes(random_int(10, 300)),
+                'timezone' => 'America/Chicago', // all dev pins are in the KC metro
+
             ]);
 
             $tagIds = array_map(fn (string $t): int => $tags[$t]->id, $data['tags']);

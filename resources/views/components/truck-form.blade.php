@@ -5,6 +5,8 @@
     'allTags' => collect(),
     'locatedAt' => null,
     'locationLabel' => null,
+    'opensAt' => null,
+    'timezone' => 'UTC',
 ])
 
 {{--
@@ -15,9 +17,11 @@
     - $truckId:   namespaces input ids so several open editors stay unique.
     - $menuItems: repeatable menu rows (for iteration; values are wire:model-bound).
     - $images:    the truck's stored gallery images (collection).
-    - $locatedAt: when the truck's pin was last set (Carbon|null) — shown next
-                  to the Set-my-location CTA.
+    - $locatedAt: when the truck's pin was last set (Carbon|null, UTC) — shown
+                  next to the Set-my-location CTA, in the truck's timezone.
     - $locationLabel: reverse-geocoded area name for the pin (string|null).
+    - $opensAt:   today's opening time as "HH:MM" (truck-local wall clock) or null.
+    - $timezone:  the truck's IANA timezone, for rendering stamped times locally.
 --}}
 <form wire:submit="save" class="truck-form">
     {{-- Identity -------------------------------------------------------------- --}}
@@ -87,9 +91,29 @@
         <p class="truck-form__hint">Set when you’re open today. Leave blank if you’re not out.</p>
 
         <div class="truck-form__hours">
+            {{-- "Now Open" stamps the current truck-local time as today's open
+                 time (browser timezone → TruckEditor::goLiveNow). Replaces a
+                 manual open-time input: vendors flip it when they start serving. --}}
             <div class="field">
-                <label class="field__label" for="opens-{{ $truckId }}">Opens</label>
-                <input id="opens-{{ $truckId }}" type="time" class="field__input" wire:model="opensAt">
+                <span class="field__label" id="opens-label-{{ $truckId }}">Opens</span>
+                <button
+                    type="button"
+                    class="btn btn-mustard"
+                    aria-describedby="opens-label-{{ $truckId }}"
+                    wire:loading.attr="disabled"
+                    wire:target="goLiveNow"
+                    @click="$wire.goLiveNow(Intl.DateTimeFormat().resolvedOptions().timeZone)"
+                >
+                    <span wire:loading.remove wire:target="goLiveNow">Now Open</span>
+                    <span wire:loading wire:target="goLiveNow">Setting…</span>
+                </button>
+                <p class="truck-form__hint truck-form__opens-status">
+                    @if ($opensAt)
+                        Opened at {{ \Illuminate\Support\Carbon::createFromFormat('H:i', $opensAt)->format('g:i A') }}
+                    @else
+                        Not open yet today.
+                    @endif
+                </p>
                 @error('opensAt') <p class="field__error">{{ $message }}</p> @enderror
             </div>
             <div class="field">
@@ -124,7 +148,11 @@
                     locating = true;
                     navigator.geolocation.getCurrentPosition(
                         (position) => $wire
-                            .setLocation(position.coords.latitude, position.coords.longitude)
+                            .setLocation(
+                                position.coords.latitude,
+                                position.coords.longitude,
+                                Intl.DateTimeFormat().resolvedOptions().timeZone
+                            )
                             .finally(() => (locating = false)),
                         () => {
                             locating = false;
@@ -139,7 +167,8 @@
 
             <p class="truck-form__hint truck-form__location-status">
                 @if ($locatedAt)
-                    Pinned {{ $locatedAt->isToday() ? 'today at '.$locatedAt->format('g:i A') : $locatedAt->format('M j \a\t g:i A') }}{{ $locationLabel ? ' · '.$locationLabel : '' }}
+                    @php $pinnedLocal = $locatedAt->copy()->setTimezone($timezone); @endphp
+                    Pinned {{ $pinnedLocal->isToday() ? 'today at '.$pinnedLocal->format('g:i A') : $pinnedLocal->format('M j \a\t g:i A') }}{{ $locationLabel ? ' · '.$locationLabel : '' }}
                 @else
                     No location pinned yet.
                 @endif

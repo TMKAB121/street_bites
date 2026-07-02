@@ -163,7 +163,7 @@ class TruckEditor extends Component
      * (or cleared, if the lookup fails) rather than kept, because a label from
      * a previous spot is worse than none.
      */
-    public function setLocation(ReverseGeocodeLabel $reverseGeocodeLabel, float $latitude, float $longitude): void
+    public function setLocation(ReverseGeocodeLabel $reverseGeocodeLabel, float $latitude, float $longitude, string $timezone = ''): void
     {
         $truck = $this->truck();
 
@@ -177,9 +177,53 @@ class TruckEditor extends Component
             'longitude' => $longitude,
             'location_label' => $reverseGeocodeLabel($latitude, $longitude),
             'located_at' => now(),
+            // The vendor is at the truck, so their browser timezone is the
+            // truck's — remember it for local-time display and "Now Open".
+            'timezone' => $this->resolveTimezone($timezone, $truck),
         ]);
 
         $this->toast('Location pinned — eaters can find you on the map');
+    }
+
+    /**
+     * "Now Open" — stamp today's opening time at the current moment. The vendor
+     * flips this when they start serving, so the open time is the truck-local
+     * wall clock right now (not the app's UTC clock). Persists straight away
+     * like a save; the close time is still set/edited separately.
+     */
+    public function goLiveNow(string $timezone = ''): void
+    {
+        $truck = $this->truck();
+        $tz = $this->resolveTimezone($timezone, $truck);
+
+        if ($tz !== $truck->timezone) {
+            $truck->update(['timezone' => $tz]);
+        }
+
+        $localNow = now()->setTimezone($tz);
+        $this->opensAt = $localNow->format('H:i');
+
+        // Match save()/todayHours: one row per business date, today's window.
+        $truck->operatingHours()->updateOrCreate(
+            ['business_date' => today()],
+            ['opens_at' => $this->opensAt],
+        );
+
+        $this->toast('You’re open — opened at '.$localNow->format('g:i A'));
+    }
+
+    /**
+     * Pick a valid IANA timezone: the browser-supplied one if it's real,
+     * otherwise the truck's stored timezone, otherwise the app default. Guards
+     * against a tampered/garbage `timezone` payload reaching the database.
+     */
+    private function resolveTimezone(string $candidate, FoodTruck $truck): string
+    {
+        if ($candidate !== '' && in_array($candidate, timezone_identifiers_list(), true)) {
+            return $candidate;
+        }
+
+        return $truck->timezone ?? config('app.timezone');
     }
 
     /**
@@ -322,6 +366,7 @@ class TruckEditor extends Component
             'allTags' => Tag::query()->orderBy('name')->get(),
             'locatedAt' => $truck->located_at,
             'locationLabel' => $truck->location_label,
+            'timezone' => $truck->timezone ?? config('app.timezone'),
         ]);
     }
 }
