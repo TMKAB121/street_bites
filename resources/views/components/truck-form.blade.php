@@ -3,6 +3,10 @@
     'menuItems' => [],
     'images' => null,
     'allTags' => collect(),
+    'locatedAt' => null,
+    'locationLabel' => null,
+    'opensAt' => null,
+    'timezone' => 'UTC',
 ])
 
 {{--
@@ -13,6 +17,11 @@
     - $truckId:   namespaces input ids so several open editors stay unique.
     - $menuItems: repeatable menu rows (for iteration; values are wire:model-bound).
     - $images:    the truck's stored gallery images (collection).
+    - $locatedAt: when the truck's pin was last set (Carbon|null, UTC) — shown
+                  next to the Set-my-location CTA, in the truck's timezone.
+    - $locationLabel: reverse-geocoded area name for the pin (string|null).
+    - $opensAt:   today's opening time as "HH:MM" (truck-local wall clock) or null.
+    - $timezone:  the truck's IANA timezone, for rendering stamped times locally.
 --}}
 <form wire:submit="save" class="truck-form">
     {{-- Identity -------------------------------------------------------------- --}}
@@ -82,9 +91,29 @@
         <p class="truck-form__hint">Set when you’re open today. Leave blank if you’re not out.</p>
 
         <div class="truck-form__hours">
+            {{-- "Now Open" stamps the current truck-local time as today's open
+                 time (browser timezone → TruckEditor::goLiveNow). Replaces a
+                 manual open-time input: vendors flip it when they start serving. --}}
             <div class="field">
-                <label class="field__label" for="opens-{{ $truckId }}">Opens</label>
-                <input id="opens-{{ $truckId }}" type="time" class="field__input" wire:model="opensAt">
+                <span class="field__label" id="opens-label-{{ $truckId }}">Opens</span>
+                <button
+                    type="button"
+                    class="btn btn-mustard"
+                    aria-describedby="opens-label-{{ $truckId }}"
+                    wire:loading.attr="disabled"
+                    wire:target="goLiveNow"
+                    @click="$wire.goLiveNow(Intl.DateTimeFormat().resolvedOptions().timeZone)"
+                >
+                    <span wire:loading.remove wire:target="goLiveNow">Now Open</span>
+                    <span wire:loading wire:target="goLiveNow">Setting…</span>
+                </button>
+                <p class="truck-form__hint truck-form__opens-status">
+                    @if ($opensAt)
+                        Opened at {{ \Illuminate\Support\Carbon::createFromFormat('H:i', $opensAt)->format('g:i A') }}
+                    @else
+                        Not open yet today.
+                    @endif
+                </p>
                 @error('opensAt') <p class="field__error">{{ $message }}</p> @enderror
             </div>
             <div class="field">
@@ -92,6 +121,58 @@
                 <input id="closes-{{ $truckId }}" type="time" class="field__input" wire:model="closesAt">
                 @error('closesAt') <p class="field__error">{{ $message }}</p> @enderror
             </div>
+        </div>
+    </fieldset>
+
+    {{-- Today's location -------------------------------------------------------
+         Parked for the day → one tap pins the truck at the vendor's GPS
+         position (browser geolocation feeds TruckEditor::setLocation, which
+         also refreshes the truck-page map). Alpine owns the busy state; errors
+         surface through the app-wide toast stack. --}}
+    <fieldset class="truck-form__section">
+        <legend class="truck-form__legend">Today’s location</legend>
+        <p class="truck-form__hint">
+            Parked for the day? Pin your spot so eaters can find you on the map.
+        </p>
+
+        <div class="truck-form__location" x-data="{ locating: false }">
+            <button
+                type="button"
+                class="btn btn-mustard"
+                :disabled="locating"
+                @click="
+                    if (!navigator.geolocation) {
+                        $dispatch('toast', { message: 'Location isn’t available in this browser.', type: 'error' });
+                        return;
+                    }
+                    locating = true;
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => $wire
+                            .setLocation(
+                                position.coords.latitude,
+                                position.coords.longitude,
+                                Intl.DateTimeFormat().resolvedOptions().timeZone
+                            )
+                            .finally(() => (locating = false)),
+                        () => {
+                            locating = false;
+                            $dispatch('toast', { message: 'We couldn’t get your location — check your browser’s permission.', type: 'error' });
+                        }
+                    );
+                "
+            >
+                <span x-show="!locating">Set my location</span>
+                <span x-show="locating" x-cloak>Locating…</span>
+            </button>
+
+            <p class="truck-form__hint truck-form__location-status">
+                @if ($locatedAt)
+                    @php $pinnedLocal = $locatedAt->copy()->setTimezone($timezone); @endphp
+                    Pinned {{ $pinnedLocal->isToday() ? 'today at '.$pinnedLocal->format('g:i A') : $pinnedLocal->format('M j \a\t g:i A') }}{{ $locationLabel ? ' · '.$locationLabel : '' }}
+                @else
+                    No location pinned yet.
+                @endif
+            </p>
         </div>
     </fieldset>
 

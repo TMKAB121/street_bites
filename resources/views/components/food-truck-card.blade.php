@@ -8,7 +8,7 @@
     Food truck discovery card: image + name + full-width Mustard FIND NOW CTA.
     - $name:  truck name shown as the title.
     - $image: image URL; when null a graceful placeholder is rendered.
-    - $href:  destination for the FIND NOW CTA ('#' placeholder for now).
+    - $href:  destination for the FIND NOW CTA (normally the truck's trucks.show page).
     Width is controlled by the parent (carousel item / results grid).
 --}}
 <article {{ $attributes->class('food-truck-card') }}>

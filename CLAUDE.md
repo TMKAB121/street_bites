@@ -4,6 +4,24 @@ Laravel 13 · Livewire 4 · Reverb 1 · MariaDB 10.11 · Redis 7 · Vite/Node 20
 
 Local dev runs entirely inside Lando (Docker). Do not assume local PHP, Composer, or Node. Prefix all runtime commands with `lando`.
 
+## Nested memory (directory-scoped CLAUDE.md)
+
+Directory-specific conventions live in nested `CLAUDE.md` files. Claude Code loads
+each one **on demand** when it reads or edits a file in that subtree, so this root
+file stays focused on cross-cutting context and the details load only when relevant.
+
+| Path | Scope |
+|---|---|
+| `resources/css/CLAUDE.md` | Tailwind design tokens, the CSS partial map, BEM / contrast rules |
+| `resources/views/CLAUDE.md` | Anonymous Blade components (table + conventions), view layout |
+| `tests/CLAUDE.md` | Pest conventions (RefreshDatabase, lazy components, `Http::fake`, `travelTo`) |
+
+**Maintenance rule:** put a new convention in the *most specific* file that always
+loads for that work. Keep only cross-cutting/global context here in root — Lando,
+the quality gates, Reverb, Vite, the database, and whole-feature narratives (auth,
+profile/vendor, maps & geolocation). When a feature spans many directories, its
+narrative stays in root; directory-local mechanics go in the nested file.
+
 ## Lando tooling
 
 ```bash
@@ -50,84 +68,39 @@ demand and review the diff. Bypass in an emergency with `git commit --no-verify`
 ## Front-end / design system
 
 Styling is **Tailwind CSS 4**, configured CSS-first (there is no
-`tailwind.config.js`). The "Urban Vibrant" design system from the style guide is
-encoded as Tailwind `@theme` tokens, which generate both CSS variables and
-utility classes from one source of truth. Full detail lives in
-`docs_and_archetecture/frontend-framework.md`.
+`tailwind.config.js`). The "Urban Vibrant" design system is encoded as Tailwind
+`@theme` tokens in `resources/css/theme.css`, generating both CSS variables and
+utility classes from one source of truth. Reusable UI is authored as **anonymous
+Blade components** (a CSS partial + a `.blade.php` file) in
+`resources/views/components/`.
 
-CSS is split into partials under `resources/css/`, all imported by `app.css`
-(order matters: tokens → base → components):
+Directory-local detail is in nested memory (loaded on demand — see *Nested memory*):
 
-```
-resources/css/
-├── app.css              # entry — @import 'tailwindcss' + the partials below
-├── theme.css            # @theme: design tokens (colors, type scale, radius, a11y)
-├── base.css             # body, ADA tap targets, focus-visible ring, [x-cloak]
-└── components/
-    ├── button.css       # .btn / .btn-primary / .btn-accent / .btn-mustard
-    ├── card.css         # .food-truck-card (image + title + FIND NOW CTA)
-    ├── nav.css          # .mobile-nav (bottom tab bar)
-    ├── header.css       # .mobile-header + .mobile-search + .mobile-menu
-    ├── carousel.css     # .card-carousel (CSS scroll-snap)
-    ├── filters.css      # .filter-row / .filter-pill
-    ├── auth.css         # .auth-card + .field (login / sign-up form styling)
-    ├── profile.css      # .profile + .truck-disclosure (collapsible owned-truck cards)
-    ├── truck-form.css   # .truck-form + .menu-row + .truck-image (vendor edit form)
-    ├── tag-picker.css   # .tag-picker + .tag-pill (cuisine tag toggles in truck editor)
-    └── toast.css        # .toast / .toast-stack (transient save/upload confirmations)
-```
+- **`resources/css/CLAUDE.md`** — the CSS partial map, design tokens, and the
+  mustard/tangerine dark-text contrast rule.
+- **`resources/views/CLAUDE.md`** — the Blade component table and its conventions
+  (mobile-only positioning, inline-SVG icons, CSS scroll-snap).
 
-- Tokens are the source of truth — edit `theme.css`, never hard-code hex values
-  in components. `--color-accent-chili` auto-generates `bg-accent-chili`,
-  `text-accent-chili`, etc.
-- Mustard (`--color-accent-mustard`) and Tangerine (`--color-accent-tangerine`)
-  must use **dark text only** (both fail contrast with white). On a *dark* surface
-  (e.g. the bottom nav, the header menu) mustard text is fine — the rule is
-  white-bg only. Tangerine is currently used for the active filter pill.
-- Vite compiles both CSS and JS (`resources/js/app.js`). Build: `lando npm run
-  build`. Dev: `lando npm run dev` (HTTPS dev-server settings live in
-  `vite.config.js`; see "Running Vite" below).
-
-### Blade components
-
-Reusable UI lives in `resources/views/components/` as **anonymous Blade
-components**. Each pairs a CSS partial (visuals, BEM, `@layer components`) with a
-`.blade.php` file (markup + `@props`):
-
-| Component | CSS partial | Notes |
-|---|---|---|
-| `<x-mobile-nav>` | `nav.css` | Bottom tab bar (Home/Map/Favorites + auth-aware slot: **Login** when guest, **Profile** when signed in) |
-| `<x-mobile-header>` | `header.css` | Top bar: hamburger + brand + map + search; hamburger opens a full-screen Alpine menu (last link is the same auth-aware Login/Profile slot) |
-| `<x-food-truck-card>` | `card.css` | Image + title + Mustard FIND NOW CTA; `image` prop, graceful placeholder when null |
-| `<x-card-carousel>` | `carousel.css` | Slot-based horizontal scroller; any child card becomes a snap item |
-| `<x-truck-filters>` | `filters.css` | Scrollable cuisine pills driven from the `Tag` DB. Each pill click sets Alpine's local active state **and** dispatches a `tag-filter` window event (`{ tag: slug }`). The results grid listens with `@tag-filter.window` and uses `x-show` to filter cards client-side. Props: `tags` (Collection of Tag models) |
-| `<x-truck-form>` | `truck-form.css` | The vendor edit form. **Nested inside the `TruckEditor` Livewire view** (not a standalone demo): it compiles inline, so its `wire:model` / `wire:click` bind to the component. Props: `truck-id`, `menu-items`, `images`, `all-tags` |
-| `<x-toast>` | `toast.css` | App-wide transient confirmations. Alpine-only; listens for the browser `toast` event Livewire dispatches (`$this->dispatch('toast', message:…, type:…)`). Stacked once in `layouts/shell.blade.php` |
-
-Conventions for these components:
-
-- **Mobile-only:** the header/nav apply `md:hidden`; desktop variants are
-  deferred. Positioning utilities (`fixed`, `top-0`/`bottom-0`, `md:hidden`) live
-  on the component element via `$attributes->class([...])`, **not** in the CSS
-  partial — the partial owns visuals only. A `fixed` prop (default `true`) toggles
-  in-flow rendering for styleguide demos.
-- **Icons are inline SVG** (no icon library) — store path data in a `@php $icons`
-  array and inject with `{!! … !!}`; styling comes from CSS (`stroke: currentcolor`).
-- **Carousels & the filter row use native CSS scroll-snap** (`overflow-x` +
-  `scroll-snap-type`), not a JS slider lib — Livewire-safe and ADA-native. The
-  scroll region is `tabindex="0"` + `role="region"` for keyboard scrolling.
+The cross-cutting Alpine/Livewire rules and the route→view map stay here:
 
 ### JavaScript / Alpine
 
-`resources/js/app.js` imports `echo.js` (Reverb) only. **Do not import or start
-Alpine here.** Livewire 4 bundles its own Alpine and starts it automatically;
-running a second instance (the standalone `alpinejs` package) triggers a
-"multiple instances of Alpine" conflict that silently breaks every `wire:`
-directive. Livewire's bundled Alpine scans the whole document, so plain
-`x-data`/`x-show` markup still works, and it's exposed on `window.Alpine` for any
-custom directives. `[x-cloak]` is globally hidden in `base.css` so collapsed UI
-never flashes on load. Prefer Alpine for pure-UI state; reserve Livewire for
-server-backed interactivity.
+`resources/js/app.js` imports `echo.js` (Reverb) and `truck-map.js` (the Leaflet
+home-page map). **Do not import or start Alpine here.** Livewire 4 bundles its own
+Alpine and starts it automatically; running a second instance (the standalone
+`alpinejs` package) triggers a "multiple instances of Alpine" conflict that
+silently breaks every `wire:` directive. Livewire's bundled Alpine scans the whole
+document, so plain `x-data`/`x-show` markup still works, and it's exposed on
+`window.Alpine` for any custom directives. `[x-cloak]` is globally hidden in
+`base.css` so collapsed UI never flashes on load. Prefer Alpine for pure-UI state;
+reserve Livewire for server-backed interactivity.
+
+`truck-map.js` registers two Alpine components on `alpine:init` (so they use
+Livewire's bundled Alpine — never import Alpine): `truckMap(pins)` renders the
+fixed-zoom (`MAP_ZOOM = 10`) OSM/Leaflet map with custom pin markers and centres on
+the visitor's geolocation, emitting a `user-located` window event; `truckDistanceSort`
+reorders a card list closest-first (real DOM re-append) when that event fires, using
+each card's `data-lat`/`data-lng`. It also imports `leaflet/dist/leaflet.css`.
 
 Because Livewire owns the JS, every full-page view must include `@livewireStyles`
 in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
@@ -141,6 +114,14 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   The route closure queries published `FoodTruck`s (with images + tags eager-loaded)
   and all `Tag`s that have at least one published truck, passing both to the view.
   Client-side tag filtering is Alpine-driven via the `tag-filter` window event.
+  Also renders the `<x-truck-map>` Leaflet map; discovery cards carry `data-lat`/`data-lng`
+  and both card lists opt into `truckDistanceSort` (closest-first once GPS is granted).
+- `/trucks/{truck}` → `trucks/show.blade.php` (`trucks.show`, `whereNumber`) — the
+  **public truck detail page** discovery cards link to. Plain Blade view (no Livewire):
+  cached OSM static map with a centred pin, cuisine tags, today's hours
+  ("Open today …" / "Open now — since …" / unposted), location, and menu. The route
+  eager-loads `images`, `tags`, `menuItems`, `todayHours` and passes `$mapUrl` from
+  `GenerateTruckMapImage`. Unpublished/missing trucks 404. See *Maps & geolocation*.
 - `/profile` → `App\Livewire\Profile\ProfilePage` (`auth` middleware) — the
   signed-in profile (see *Profile & vendor management* below). Uses the
   `layouts/shell.blade.php` layout, which factors the welcome shell's chrome
@@ -222,16 +203,25 @@ home for two roles in one page. Views live in `resources/views/livewire/profile/
 - **Saves are silent → confirmed by toast.** `save`/`uploadImage`/`deleteImage`/
   `deleteTruck` dispatch a `toast` browser event (`<x-toast>`); `save` also
   dispatches `truck-saved`/`truck-deleted` to `ProfilePage` to refresh the list.
+- **Saving publishes.** `save()` sets `is_published = true` — a newly added truck
+  (unpublished by default) goes live on its first save and appears in discovery.
+- **Now Open + pin (real-time presence).** `goLiveNow()` stamps today's `opens_at` at
+  the current truck-local moment (replaces a manual open-time input); `setLocation()`
+  writes `latitude`/`longitude`/`located_at` from the browser's geolocation and
+  reverse-geocodes `location_label`. Both capture the **browser IANA timezone** into
+  `food_trucks.timezone` (validated against `timezone_identifiers_list()`), which the
+  UTC-running app uses to show pin/open times in truck-local time. See *Maps & geolocation*.
 - **Testing lazy components:** pass `['truckId' => …, 'lazy' => false]` to
   `Livewire::test()` so `mount()` runs immediately (see `tests/Feature/Profile/`).
+  Geolocation/geocoding tests fake `Http` (Nominatim) and use `travelTo` for the clock.
 
 ### Normalized schema
 
-Six migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*`), all `cascadeOnDelete` from the truck:
+Six create migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*`), all `cascadeOnDelete` from the truck, plus one alter (`2026_07_01_000001_*` adds `food_trucks.timezone`):
 
 | Table | Shape / decisions |
 |---|---|
-| `food_trucks` | `user_id` owner, `name`, `description`; nullable `latitude`/`longitude`/`location_label`/`located_at` (**geolocation columns are reserved — no pin-setting UI yet**); `is_published` gates discovery |
+| `food_trucks` | `user_id` owner, `name`, `description`; nullable `latitude`/`longitude`/`location_label`/`located_at`/`timezone` (**the pin — set from the editor's Set-my-location CTA; `timezone` is the browser IANA zone captured with it**); `is_published` gates discovery |
 | `truck_operating_hours` | One row **per business date** (`unique(food_truck_id, business_date)`) — vendors operate in real time day-by-day, **not** on a recurring weekly schedule. The editor only upserts **today's** row via `updateOrCreate` |
 | `truck_images` | `path` to a normalized WebP on the public disk + `sort_order` |
 | `menu_items` | `name`, `description`, `price_cents` (**money as integer cents, never float**), `is_available`, `sort_order` |
@@ -254,12 +244,40 @@ EXIF/GPS metadata (privacy) and arbitrary file bytes; the component validates
 > Image uploads need the public-disk symlink — run `lando artisan storage:link`
 > once per environment (a fresh clone has no `public/storage`).
 
+### Maps & geolocation
+
+All mapping is **OpenStreetMap — free, no API key, no billing** (dep
+`dantsu/php-osm-static-api` on PHP, `leaflet` on JS). Two rendering paths by where the
+map centre is known:
+
+- **Truck detail page — cached static PNG.** `App\Actions\GenerateTruckMapImage`
+  renders OSM tiles (zoom 12, ~5-mile view) to a PNG on the **public** disk at
+  `truck-maps/{truck}/{fingerprint}.png`. The **fingerprint** is a `sha1` of
+  `(lat, lng, zoom, size)`, so moving the pin changes the path — the next page view
+  regenerates and deletes the stale sibling (no schema, no cache table). Marker-free;
+  the pin is a **CSS overlay** centred on the image. Failures return `null` and hide
+  the map (never 500). Sends an identifying User-Agent (OSM tile policy).
+- **Home page — interactive Leaflet.** `<x-truck-map>` / `truck-map.js` — centres on the
+  visitor's GPS (unknowable server-side) with filterable pins; fixed zoom so pins don't
+  jump. See *JavaScript / Alpine*.
+
+**Reverse geocoding:** `App\Actions\ReverseGeocodeLabel` calls OSM **Nominatim** (keyless,
+identifying User-Agent) to turn a pin into `location_label` ("Road, City"). Used by
+`setLocation`; returns `null` on failure (a stale label is cleared rather than kept).
+
+**Timezone:** the app runs in UTC. Open/close times are stored as naive truck-local
+wall-clock and shown verbatim, so only the `located_at` timestamp is converted for display
+— using `food_trucks.timezone` (the vendor's browser zone, captured on pin/Now-Open).
+
 ### Dev seed
 
 `database/seeders/FoodTruckSeeder` (called by `DatabaseSeeder`) creates 3 vendor
 users, the full tag taxonomy, and 10 published trucks with menu items and images.
-Fixture images live in `database/seeders/fixtures/images/` and are processed
-through `StoreTruckImage` (same pipeline as live uploads). Re-seed with:
+Every truck is pinned near ZIP 66202 (Mission, KS) — most within ~5 miles, every third
+one an outlier up to 20 miles — with `timezone` `America/Chicago` (maps are **not**
+pre-generated; the first page view renders and caches each). Fixture images live in
+`database/seeders/fixtures/images/` and are processed through `StoreTruckImage` (same
+pipeline as live uploads). Re-seed with:
 
 ```bash
 lando artisan migrate:fresh --seed

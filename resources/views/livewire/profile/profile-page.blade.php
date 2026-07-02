@@ -16,7 +16,7 @@
                     <x-food-truck-card
                         :name="$favorite->name"
                         :image="$favorite->images->first()?->url"
-                        href="#"
+                        :href="route('trucks.show', $favorite)"
                         wire:key="fav-{{ $favorite->id }}"
                     />
                 @endforeach

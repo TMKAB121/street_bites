@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * the profile page hangs off this model: today's operating hours, gallery images,
  * and menu items.
  */
-#[Fillable(['name', 'description', 'latitude', 'longitude', 'location_label', 'located_at', 'is_published'])]
+#[Fillable(['name', 'description', 'latitude', 'longitude', 'location_label', 'located_at', 'timezone', 'is_published'])]
 class FoodTruck extends Model
 {
     /** @use HasFactory<FoodTruckFactory> */

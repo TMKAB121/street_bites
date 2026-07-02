@@ -9,6 +9,13 @@
 import './echo';
 
 /**
+ * The homepage truck map (Leaflet). Registers the `truckMap` Alpine component
+ * on `alpine:init` — safe to import here because it only listens for the event
+ * Livewire's bundled Alpine fires; it never imports Alpine itself.
+ */
+import './truck-map';
+
+/**
  * Alpine powers the design system's client-side interactivity (menu toggles,
  * dropdowns, etc.).
  *

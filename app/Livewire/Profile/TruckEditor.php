@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Profile;
 
+use App\Actions\ReverseGeocodeLabel;
 use App\Actions\StoreTruckImage;
 use App\Models\FoodTruck;
 use App\Models\Tag;
@@ -135,6 +136,9 @@ class TruckEditor extends Component
         $truck->update([
             'name' => $this->name,
             'description' => $this->description ?: null,
+            // Saving is the vendor's "go live": a freshly added truck stays
+            // invisible (is_published = false) until its first save.
+            'is_published' => true,
         ]);
 
         // Upsert today's operating window (the per-day vendor model).
@@ -148,6 +152,78 @@ class TruckEditor extends Component
 
         $this->dispatch('truck-saved', name: $truck->name)->to(ProfilePage::class);
         $this->toast('Changes saved');
+    }
+
+    /**
+     * Pin the truck at the vendor's current position — "I'm parked here for
+     * the day". The coordinates come from the browser's geolocation API via
+     * the Set-my-location button; the truck-page map cache is keyed on
+     * lat/lng, so the next visit renders the map at the new pin automatically.
+     * The pin also refreshes location_label via reverse geocoding — replaced
+     * (or cleared, if the lookup fails) rather than kept, because a label from
+     * a previous spot is worse than none.
+     */
+    public function setLocation(ReverseGeocodeLabel $reverseGeocodeLabel, float $latitude, float $longitude, string $timezone = ''): void
+    {
+        $truck = $this->truck();
+
+        abort_unless(
+            $latitude >= -90 && $latitude <= 90 && $longitude >= -180 && $longitude <= 180,
+            422,
+        );
+
+        $truck->update([
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+            'location_label' => $reverseGeocodeLabel($latitude, $longitude),
+            'located_at' => now(),
+            // The vendor is at the truck, so their browser timezone is the
+            // truck's — remember it for local-time display and "Now Open".
+            'timezone' => $this->resolveTimezone($timezone, $truck),
+        ]);
+
+        $this->toast('Location pinned — eaters can find you on the map');
+    }
+
+    /**
+     * "Now Open" — stamp today's opening time at the current moment. The vendor
+     * flips this when they start serving, so the open time is the truck-local
+     * wall clock right now (not the app's UTC clock). Persists straight away
+     * like a save; the close time is still set/edited separately.
+     */
+    public function goLiveNow(string $timezone = ''): void
+    {
+        $truck = $this->truck();
+        $tz = $this->resolveTimezone($timezone, $truck);
+
+        if ($tz !== $truck->timezone) {
+            $truck->update(['timezone' => $tz]);
+        }
+
+        $localNow = now()->setTimezone($tz);
+        $this->opensAt = $localNow->format('H:i');
+
+        // Match save()/todayHours: one row per business date, today's window.
+        $truck->operatingHours()->updateOrCreate(
+            ['business_date' => today()],
+            ['opens_at' => $this->opensAt],
+        );
+
+        $this->toast('You’re open — opened at '.$localNow->format('g:i A'));
+    }
+
+    /**
+     * Pick a valid IANA timezone: the browser-supplied one if it's real,
+     * otherwise the truck's stored timezone, otherwise the app default. Guards
+     * against a tampered/garbage `timezone` payload reaching the database.
+     */
+    private function resolveTimezone(string $candidate, FoodTruck $truck): string
+    {
+        if ($candidate !== '' && in_array($candidate, timezone_identifiers_list(), true)) {
+            return $candidate;
+        }
+
+        return $truck->timezone ?? config('app.timezone');
     }
 
     /**
@@ -283,9 +359,14 @@ class TruckEditor extends Component
 
     public function render(): View
     {
+        $truck = $this->truck();
+
         return view('livewire.profile.truck-editor', [
-            'images' => $this->truck()->images,
+            'images' => $truck->images,
             'allTags' => Tag::query()->orderBy('name')->get(),
+            'locatedAt' => $truck->located_at,
+            'locationLabel' => $truck->location_label,
+            'timezone' => $truck->timezone ?? config('app.timezone'),
         ]);
     }
 }
