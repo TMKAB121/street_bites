@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\GenerateTruckMapImage;
+use App\Actions\GeocodeSearch;
 use App\Livewire\Auth\EmailEntry;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\LoginVerify;
@@ -11,6 +12,8 @@ use App\Livewire\Auth\VerifyCode;
 use App\Livewire\Profile\ProfilePage;
 use App\Models\FoodTruck;
 use App\Models\Tag;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
@@ -28,6 +31,30 @@ Route::get('/', function () {
 
     return view('welcome', compact('trucks', 'tags'));
 })->name('home');
+
+// ZIP/address → rough coordinates, for visitors who decline browser
+// geolocation (<x-location-search> on the home page). Proxied through the
+// server so the Nominatim usage policy (identifying User-Agent) is honoured;
+// cached a day per normalized query and throttled since each miss is an
+// external request. Lives under /api so validation errors render as JSON
+// (bootstrap/app.php limits shouldRenderJsonWhen to api/*).
+Route::get('/api/geocode', function (Request $request) {
+    $request->validate([
+        'q' => ['required', 'string', 'min:3', 'max:120'],
+    ]);
+
+    $query = mb_strtolower(trim($request->string('q')->toString()));
+
+    $result = Cache::remember(
+        'geocode:'.sha1($query),
+        now()->addDay(),
+        fn (): ?array => app(GeocodeSearch::class)($query),
+    );
+
+    return $result === null
+        ? response()->json(['message' => 'No match for that location.'], 404)
+        : response()->json($result);
+})->middleware('throttle:15,1')->name('geocode');
 
 // Public truck detail page — the destination of every truck card's FIND NOW
 // CTA. Unpublished trucks stay invisible (404), matching home-page discovery.

@@ -9,8 +9,14 @@
  * window `tag-filter` event dispatched by <x-truck-filters> to filterPins(), so
  * the pins follow the same client-side cuisine filtering as the results grid.
  *
- * The map centres on the browser's geolocation when the user grants it and
- * quietly falls back to fitting all pins when they don't.
+ * The visitor's position flows through two window events that decouple the
+ * pieces on the page:
+ *   - `user-located` `{ lat, lng }` — dispatched by the geolocation success
+ *     callback here AND by the `locationSearch` ZIP/address fallback below.
+ *     The map recenters + drops the "you are here" dot; `truckDistanceSort`
+ *     reorders the card lists.
+ *   - `user-location-denied` — dispatched when the visitor declines (or the
+ *     browser lacks) geolocation; `locationSearch` reveals itself on it.
  */
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -45,6 +51,7 @@ document.addEventListener('alpine:init', () => {
     window.Alpine.data('truckMap', (pins) => ({
         map: null,
         markers: [],
+        hereMarker: null,
 
         init() {
             // Fixed-zoom map: min/max pinned to MAP_ZOOM locks every zoom input
@@ -80,30 +87,54 @@ document.addEventListener('alpine:init', () => {
                     : [39.0272, -94.6558];
             this.map.setView(center, MAP_ZOOM);
 
-            navigator.geolocation?.getCurrentPosition(
+            // Recenter on any position the page learns of — browser GPS below
+            // or a ZIP/address search — so both paths behave identically.
+            window.addEventListener('user-located', (event) => this.showVisitor(event.detail));
+
+            if (!navigator.geolocation) {
+                // No geolocation API at all — surface the search fallback.
+                // Deferred so every component's listener is attached first.
+                setTimeout(() => window.dispatchEvent(new CustomEvent('user-location-denied')));
+
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    const here = [position.coords.latitude, position.coords.longitude];
-
-                    L.circleMarker(here, {
-                        className: 'truck-map__here',
-                        radius: 7,
-                    })
-                        .bindTooltip('You are here')
-                        .addTo(this.map);
-
-                    this.map.setView(here, MAP_ZOOM);
-
-                    // Let the rest of the page react to the visitor's position
-                    // (truckDistanceSort reorders the card lists on this).
+                    // truckDistanceSort reorders the card lists on this, and
+                    // showVisitor() above recenters the map.
                     window.dispatchEvent(
                         new CustomEvent('user-located', {
-                            detail: { lat: here[0], lng: here[1] },
+                            detail: {
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude,
+                            },
                         })
                     );
                 },
-                () => {}, // denied/unavailable — keep the pin-centred view
+                // Denied/unavailable — keep the pin-centred view and reveal
+                // the ZIP/address fallback instead.
+                () => window.dispatchEvent(new CustomEvent('user-location-denied')),
                 { maximumAge: 300000 }
             );
+        },
+
+        // Drop (or move) the "you are here" dot and centre the map on it.
+        showVisitor({ lat, lng }) {
+            const here = [lat, lng];
+
+            if (this.hereMarker) {
+                this.hereMarker.setLatLng(here);
+            } else {
+                this.hereMarker = L.circleMarker(here, {
+                    className: 'truck-map__here',
+                    radius: 7,
+                })
+                    .bindTooltip('You are here')
+                    .addTo(this.map);
+            }
+
+            this.map.setView(here, MAP_ZOOM);
         },
 
         // Mirrors the results grid: 'all' shows everything, otherwise a pin
@@ -136,6 +167,62 @@ document.addEventListener('alpine:init', () => {
                 .map((el) => ({ el, score: distanceScore(el.dataset, here) }))
                 .sort((a, b) => a.score - b.score)
                 .forEach(({ el }) => this.$el.appendChild(el));
+        },
+    }));
+
+    // ZIP/address fallback for visitors who decline browser geolocation
+    // (<x-location-search>). Hidden until `user-location-denied` fires; on
+    // submit it asks our /geocode proxy (server-side Nominatim, cached) for
+    // rough coordinates and dispatches the same `user-located` event the GPS
+    // path uses, so the map and the card sorting react identically.
+    window.Alpine.data('locationSearch', (endpoint) => ({
+        visible: false,
+        query: '',
+        busy: false,
+        error: null,
+        label: null,
+
+        init() {
+            window.addEventListener('user-location-denied', () => {
+                this.visible = true;
+            });
+        },
+
+        async search() {
+            const q = this.query.trim();
+
+            if (q.length < 3 || this.busy) {
+                return;
+            }
+
+            this.busy = true;
+            this.error = null;
+
+            try {
+                const response = await fetch(`${endpoint}?q=${encodeURIComponent(q)}`, {
+                    headers: { Accept: 'application/json' },
+                });
+
+                if (!response.ok) {
+                    this.label = null;
+                    this.error =
+                        response.status === 429
+                            ? 'Too many searches — give it a minute and try again.'
+                            : "We couldn't find that spot — try a ZIP code or a street and city.";
+
+                    return;
+                }
+
+                const { lat, lng, label } = await response.json();
+
+                this.label = label;
+                window.dispatchEvent(new CustomEvent('user-located', { detail: { lat, lng } }));
+            } catch {
+                this.label = null;
+                this.error = 'Something went wrong — please try again.';
+            } finally {
+                this.busy = false;
+            }
         },
     }));
 });

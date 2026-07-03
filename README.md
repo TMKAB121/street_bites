@@ -162,7 +162,7 @@ hook — run it on demand and review its diff before committing.
 steet_bites/
 ├── app/
 │   ├── Actions/                # single-purpose actions (StoreTruckImage,
-│   │                           #   GenerateTruckMapImage, ReverseGeocodeLabel)
+│   │                           #   GenerateTruckMapImage, ReverseGeocodeLabel, GeocodeSearch)
 │   ├── Http/Controllers/
 │   ├── Livewire/               # Livewire components (Auth/, Profile/)
 │   ├── Models/                 # User, FoodTruck, MenuItem, TruckImage, ...
@@ -183,10 +183,11 @@ steet_bites/
 │   │   ├── app.js              # imports echo.js + truck-map.js (Alpine is bundled by Livewire 4)
 │   │   ├── echo.js             # Laravel Echo / Reverb client config
 │   │   └── truck-map.js        # Leaflet home-page map + closest-first card sorting
+│   │                           #   + ZIP/address location-search fallback
 │   └── views/
 │       ├── components/         # anonymous Blade components (x-mobile-nav, x-mobile-header,
 │       │                       #   x-food-truck-card, x-card-carousel, x-truck-filters,
-│       │                       #   x-truck-form, x-truck-map, x-toast)
+│       │                       #   x-truck-form, x-truck-map, x-location-search, x-toast)
 │       ├── layouts/            # app.blade.php (centered) + shell.blade.php (mobile chrome)
 │       ├── livewire/           # full-page Livewire views (auth/, profile/)
 │       ├── trucks/show.blade.php # public truck detail page (/trucks/{id})
@@ -309,12 +310,17 @@ link to — its photos, cuisine tags, today's hours ("Open now — since …" wh
 vendor has flipped **Now Open**), location, menu, and a map of the surrounding area.
 The home page shows an **interactive map** of pinned trucks that centres on the
 visitor's location, with pins that filter alongside the cuisine pills and cards that
-re-sort **closest-first** once location is shared.
+re-sort **closest-first** once location is shared. Visitors who **decline the GPS
+prompt** get a fallback instead: a search card appears where they can enter a **ZIP
+code or address**, which is geocoded to rough coordinates — the map recenters and
+the cards re-sort just as if location had been shared.
 
 All mapping uses **OpenStreetMap** with **no API key or billing**: truck pages
 render a cached static map ([`dantsu/php-osm-static-api`](https://github.com/DantSu/php-osm-static-api)),
-the home page uses [Leaflet](https://leafletjs.com/), and area labels come from OSM
-**Nominatim** reverse geocoding. See `CLAUDE.md` → *Maps & geolocation*.
+the home page uses [Leaflet](https://leafletjs.com/), and both geocoding directions
+come from OSM **Nominatim** — reverse (pin → area label) and forward (typed
+ZIP/address → coordinates, proxied through a cached, rate-limited `/api/geocode`
+endpoint). See `CLAUDE.md` → *Maps & geolocation*.
 
 ---
 

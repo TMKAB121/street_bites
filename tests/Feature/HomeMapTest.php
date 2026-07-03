@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\FoodTruck;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Js;
 
 uses(RefreshDatabase::class);
 
@@ -16,6 +17,18 @@ it('shows the map on the homepage wired to the tag filter', function (): void {
         ->assertSee('Map of food trucks near you')
         ->assertSee('truckMap(', escape: false)
         ->assertSee('tag-filter.window', escape: false);
+});
+
+it('offers the ZIP/region fallback for visitors who decline geolocation', function (): void {
+    FoodTruck::factory()->published()->located()->create();
+
+    $this->withoutVite()
+        ->get(route('home'))
+        ->assertOk()
+        ->assertSee('locationSearch(', escape: false)
+        // Js::from JSON-escapes slashes, so match the encoded route URL.
+        ->assertSee(Js::from(route('geocode'))->toHtml(), escape: false)
+        ->assertSee('ZIP code or region');
 });
 
 it('marks the card lists for closest-first sorting with each pin location', function (): void {

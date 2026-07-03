@@ -58,6 +58,11 @@
                     <x-truck-filters :tags="$tags" />
                 </div>
 
+                {{-- ZIP/address fallback — hidden until the visitor declines
+                     the GPS prompt, then geocodes their entry and feeds the
+                     same user-located event the map and card sorting use. --}}
+                <x-location-search class="mt-4" />
+
                 {{-- Live map of pinned trucks — centres on the visitor's GPS
                      when granted; pins follow the active cuisine filter. --}}
                 <x-truck-map :trucks="$trucks" class="mt-4" />

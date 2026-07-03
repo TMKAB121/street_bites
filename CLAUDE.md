@@ -95,12 +95,17 @@ document, so plain `x-data`/`x-show` markup still works, and it's exposed on
 `base.css` so collapsed UI never flashes on load. Prefer Alpine for pure-UI state;
 reserve Livewire for server-backed interactivity.
 
-`truck-map.js` registers two Alpine components on `alpine:init` (so they use
+`truck-map.js` registers three Alpine components on `alpine:init` (so they use
 Livewire's bundled Alpine — never import Alpine): `truckMap(pins)` renders the
-fixed-zoom (`MAP_ZOOM = 10`) OSM/Leaflet map with custom pin markers and centres on
-the visitor's geolocation, emitting a `user-located` window event; `truckDistanceSort`
-reorders a card list closest-first (real DOM re-append) when that event fires, using
-each card's `data-lat`/`data-lng`. It also imports `leaflet/dist/leaflet.css`.
+fixed-zoom (`MAP_ZOOM = 10`) OSM/Leaflet map with custom pin markers; `truckDistanceSort`
+reorders a card list closest-first (real DOM re-append) using each card's
+`data-lat`/`data-lng`; `locationSearch(endpoint)` is the ZIP/address fallback form
+(see *Maps & geolocation*). It also imports `leaflet/dist/leaflet.css`. The visitor's
+position flows through two **window events** that decouple the pieces:
+`user-located` `{ lat, lng }` (dispatched by the GPS success callback **and** by
+`locationSearch` — `truckMap` listens and recenters/moves the "you are here" dot,
+`truckDistanceSort` reorders) and `user-location-denied` (dispatched when GPS is
+declined or missing — `locationSearch` reveals itself on it).
 
 Because Livewire owns the JS, every full-page view must include `@livewireStyles`
 in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
@@ -116,6 +121,8 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   Client-side tag filtering is Alpine-driven via the `tag-filter` window event.
   Also renders the `<x-truck-map>` Leaflet map; discovery cards carry `data-lat`/`data-lng`
   and both card lists opt into `truckDistanceSort` (closest-first once GPS is granted).
+  `<x-location-search>` sits above the map as the ZIP/address fallback when GPS is
+  declined (see *Maps & geolocation*).
 - `/trucks/{truck}` → `trucks/show.blade.php` (`trucks.show`, `whereNumber`) — the
   **public truck detail page** discovery cards link to. Plain Blade view (no Livewire):
   cached OSM static map with a centred pin, cuisine tags, today's hours
@@ -264,6 +271,19 @@ map centre is known:
 **Reverse geocoding:** `App\Actions\ReverseGeocodeLabel` calls OSM **Nominatim** (keyless,
 identifying User-Agent) to turn a pin into `location_label` ("Road, City"). Used by
 `setLocation`; returns `null` on failure (a stale label is cleared rather than kept).
+
+**Forward geocoding (ZIP/address fallback):** when a visitor declines browser
+geolocation, `<x-location-search>` on the home page geocodes a typed ZIP/address via
+`GET /api/geocode` (route name `geocode`), which wraps `App\Actions\GeocodeSearch`
+(Nominatim `/search`, `countrycodes=us` to disambiguate bare ZIPs — widen if the app
+expands abroad). The route caches each normalized query for a day and is throttled
+(`throttle:15,1`) since a miss is an external request; no-match/failure returns 404.
+The browser **never calls Nominatim directly** (it can't send the identifying
+User-Agent the OSM policy requires). On success the form dispatches the same
+`user-located` event the GPS path uses, so the map and card sorting need no special
+casing. The route lives under `/api` because `bootstrap/app.php` limits
+`shouldRenderJsonWhen` to `api/*` — a JSON endpoint elsewhere would render
+validation errors as redirects.
 
 **Timezone:** the app runs in UTC. Open/close times are stored as naive truck-local
 wall-clock and shown verbatim, so only the `located_at` timestamp is converted for display

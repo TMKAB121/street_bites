@@ -11,6 +11,7 @@
 @import './components/filters.css';
 @import './components/map.css';
 @import './components/auth.css';
+@import './components/location-search.css';
 @import './components/profile.css';
 @import './components/truck-form.css';
 @import './components/truck-page.css';
