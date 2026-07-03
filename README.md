@@ -163,7 +163,9 @@ steet_bites/
 ├── app/
 │   ├── Actions/                # single-purpose actions (StoreTruckImage,
 │   │                           #   GenerateTruckMapImage, ReverseGeocodeLabel, GeocodeSearch)
-│   ├── Http/Controllers/
+│   ├── Http/
+│   │   ├── Controllers/
+│   │   └── Middleware/         # RequireCookieConsent (cookie-consent gate on auth/profile)
 │   ├── Livewire/               # Livewire components (Auth/, Profile/)
 │   ├── Models/                 # User, FoodTruck, MenuItem, TruckImage, ...
 │   ├── Jobs/                   # Queued jobs
@@ -187,7 +189,8 @@ steet_bites/
 │   └── views/
 │       ├── components/         # anonymous Blade components (x-mobile-nav, x-mobile-header,
 │       │                       #   x-food-truck-card, x-card-carousel, x-truck-filters,
-│       │                       #   x-truck-form, x-truck-map, x-location-search, x-toast)
+│       │                       #   x-truck-form, x-truck-map, x-location-search, x-toast,
+│       │                       #   x-cookie-consent)
 │       ├── layouts/            # app.blade.php (centered) + shell.blade.php (mobile chrome)
 │       ├── livewire/           # full-page Livewire views (auth/, profile/)
 │       ├── trucks/show.blade.php # public truck detail page (/trucks/{id})
@@ -222,8 +225,8 @@ classes from a single source of truth. A living style guide renders at
 
 Reusable UI is built as **anonymous Blade components** in
 `resources/views/components/` (mobile header, bottom nav, food-truck card, card
-carousel, cuisine filters, the vendor truck form, and a toast), each pairing a CSS
-partial with a Blade template. The home page (`/`) assembles them into a mobile app
+carousel, cuisine filters, the vendor truck form, a toast, and the cookie-consent
+banner), each pairing a CSS partial with a Blade template. The home page (`/`) assembles them into a mobile app
 shell. Client-side interactivity (e.g. the header's hamburger menu and the toast)
 is powered by **Alpine.js**, which **Livewire 4 bundles and starts automatically** —
 do not start a second Alpine instance in `resources/js/app.js`. Carousels and the
@@ -247,6 +250,30 @@ See [`docs_and_archetecture/frontend-framework.md`](../docs_and_archetecture/fro
 for the front-end framework, and
 [`docs_and_archetecture/ui-component-architecture.md`](../docs_and_archetecture/ui-component-architecture.md)
 for the component library and its design decisions.
+
+---
+
+## Cookie Consent (GDPR)
+
+A custom consent banner appears on first visit. The app sets **only essential
+cookies** (session-backed sign-in and favorites — no analytics, ads, or
+tracking), so consent is deliberately **all-or-nothing**: accept, or decline and
+keep browsing anonymously without accounts/favorites.
+
+- **No dark patterns** — Accept and Decline are rendered with identical size,
+  color, and font (one shared CSS class enforces the equal prominence GDPR
+  requires), and nothing is pre-selected.
+- **Easy withdrawal** — a persistent round "cookie preferences" button stays on
+  every page and reopens the banner; withdrawing consent while signed in also
+  signs the user out.
+- **Documented consent** — every accept/decline is logged to a `cookie_consents`
+  audit table (policy version, hashed IP, user agent, user id when signed in).
+- **Enforced server-side** — the `RequireCookieConsent` middleware gates the
+  sign-in/sign-up flows and `/profile`; without consent those routes redirect
+  home, where the banner reopens and explains.
+
+The choice is stored in an encrypted cookie for ~6 months, after which the
+banner re-prompts. See `CLAUDE.md` → *Cookie consent (GDPR)* for conventions.
 
 ---
 

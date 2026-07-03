@@ -1,0 +1,89 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Cookie consent
+ | -----------------------------------------------------------------------------
+ | GDPR consent banner (<x-cookie-consent>) + the persistent round "cookie
+ | preferences" button that reopens it. Sits above the mobile bottom nav.
+ |
+ | Equal prominence is a legal requirement, not a style choice: Accept and
+ | Decline share the single .cookie-consent__btn class so they always match in
+ | size, color, and font. Do not fork the two buttons apart.
+ */
+
+@layer components {
+    .cookie-consent__panel {
+        @apply rounded-md bg-surface p-5;
+
+        border: 1px solid rgb(45 52 54 / 12%);
+        box-shadow:
+            0 2px 6px rgb(30 34 41 / 15%),
+            0 12px 28px rgb(30 34 41 / 25%);
+    }
+
+    .cookie-consent__title {
+        @apply text-md font-semibold text-primary;
+    }
+
+    .cookie-consent__body {
+        @apply text-text-muted mt-1 text-sm;
+    }
+
+    /* Chili on white passes AA — reserved for the "consent required" callout. */
+    .cookie-consent__notice {
+        @apply mt-2 text-sm font-semibold;
+
+        color: var(--color-accent-chili);
+    }
+
+    .cookie-consent__status {
+        @apply text-text-main mt-2 text-sm;
+    }
+
+    .cookie-consent__actions {
+        @apply mt-4 flex gap-3;
+    }
+
+    /* ONE shared style for Accept and Decline (see header note). */
+    .cookie-consent__btn {
+        @apply bg-primary inline-flex flex-1 items-center justify-center rounded-md font-semibold text-white;
+
+        min-height: var(--min-tap-target);
+        padding: 0.75rem 1rem;
+        transition: var(--transition-fast);
+        cursor: pointer;
+    }
+
+    .cookie-consent__btn:hover {
+        @apply bg-primary/90;
+    }
+
+    .cookie-consent__btn:disabled {
+        cursor: wait;
+        opacity: 0.6;
+    }
+
+    /* The persistent preferences widget — a 48px round tap target. */
+    .cookie-consent__fab {
+        @apply bg-primary inline-flex items-center justify-center rounded-full text-white;
+
+        width: var(--min-tap-target);
+        height: var(--min-tap-target);
+        box-shadow: 0 2px 6px rgb(30 34 41 / 25%);
+        transition: var(--transition-fast);
+        cursor: pointer;
+    }
+
+    .cookie-consent__fab:hover {
+        @apply bg-primary/90;
+    }
+
+    .cookie-consent__fab svg {
+        width: 1.5rem;
+        height: 1.5rem;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+}

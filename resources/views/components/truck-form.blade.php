@@ -249,7 +249,7 @@
     <fieldset class="truck-form__section">
         <legend class="truck-form__legend">Photos</legend>
         <p class="truck-form__hint">
-            Square photos look best — we crop and resize each upload to a 250×250 thumbnail.
+            Square photos look best — we crop and resize each upload to a 250×250 thumbnail. <br>For best results, make sure there is plenty of space around the focus point of the photo in the center.
         </p>
 
         @if ($images && $images->isNotEmpty())

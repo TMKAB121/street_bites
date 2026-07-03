@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\LoginVerify;
 use App\Mail\LoginCode;
+use App\Models\CookieConsent;
 use App\Models\EmailVerification;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,7 +17,9 @@ uses(RefreshDatabase::class);
 // --- Entry point ------------------------------------------------------------
 
 it('renders the login form', function (): void {
+    // Auth pages sit behind cookie consent (RequireCookieConsent).
     $this->withoutVite()
+        ->withCookie(CookieConsent::COOKIE_NAME, 'accepted')
         ->get(route('auth.login'))
         ->assertOk()
         ->assertSee('Sign in');

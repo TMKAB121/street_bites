@@ -183,6 +183,36 @@ via the session; the user is logged in only at the final step.
   route('auth.login'))`. Without it the `auth` middleware would error resolving the
   default `login` route.
 
+## Cookie consent (GDPR)
+
+**All-or-nothing by design** — the app sets no analytics/marketing cookies, so
+there are no categories to pick: the visitor either accepts essential cookies
+(session-backed sign-in + favorites) or browses anonymously. This is a product
+decision; don't add a category picker without one.
+
+- `<x-cookie-consent>` (banner + a persistent round "cookie preferences" button
+  that reopens it — withdrawal must stay as easy as consent) is stacked once per
+  full page: both layouts, `welcome`, `styleguide`. The choice lives in the
+  **encrypted** `cookie_consent` cookie (`accepted`/`declined`, ~6 months so
+  consent is re-prompted periodically) and is read **server-side** in the
+  component, so there's no banner flash for returning visitors.
+- **Every decision is documented** (GDPR audit duty): `POST /api/cookie-consent`
+  (`cookie-consent.store`, throttled) appends a `cookie_consents` row —
+  status, policy version (`CookieConsent::POLICY_VERSION`, bump on copy
+  changes), **hashed** IP (data minimisation), user agent, and the user id when
+  signed in. Rows are never updated; withdrawal logs a new row. `user_id` is
+  `nullOnDelete` so the trail outlives the account.
+- **Withdrawing while signed in signs the visitor out** (auth is cookie-backed):
+  the endpoint logs out, invalidates the session, and the banner JS sends them
+  home as a guest.
+- **`RequireCookieConsent` middleware** wraps `/profile` and all five auth
+  routes: anything but an `accepted` cookie redirects home with the
+  `cookie_consent.required` flash, which force-opens the banner with a
+  "sign-in and favorites need cookies" notice.
+- **Equal prominence is a legal rule, not styling:** Accept and Decline share
+  the single `.cookie-consent__btn` class (same size/color/font). Never restyle
+  one of them, hide Decline, or pre-select anything.
+
 ## Profile & vendor management
 
 `/profile` (`App\Livewire\Profile\ProfilePage`, `auth`-guarded) is the signed-in

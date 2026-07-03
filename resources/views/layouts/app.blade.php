@@ -14,6 +14,9 @@
         <main class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
             {{ $slot }}
         </main>
+
+        {{-- GDPR cookie-consent banner + persistent preferences widget. --}}
+        <x-cookie-consent />
         @livewireScripts
     </body>
 </html>

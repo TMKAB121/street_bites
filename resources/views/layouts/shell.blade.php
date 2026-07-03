@@ -31,6 +31,9 @@
 
         {{-- App-wide transient confirmations (save/upload/delete). --}}
         <x-toast />
+
+        {{-- GDPR cookie-consent banner + persistent preferences widget. --}}
+        <x-cookie-consent />
         @livewireScripts
     </body>
 </html>

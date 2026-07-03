@@ -137,6 +137,23 @@
                 </p>
             </section>
 
+            {{-- Cookie consent --}}
+            <section class="mb-12">
+                <h2 class="text-lg font-semibold text-primary mb-4">Cookie consent</h2>
+                {{-- Demo mode: in-flow, always starts open, and choices only
+                     toggle local state (nothing is posted or persisted). --}}
+                <div class="max-w-sm">
+                    <x-cookie-consent :fixed="false" :demo="true" />
+                </div>
+                <p class="text-sm text-text-muted mt-3">
+                    All-or-nothing consent (the app sets only essential cookies).
+                    Accept and Decline share one class — identical size, color, and
+                    font, per GDPR equal prominence. After a choice, the round cookie
+                    button remains as the always-available way to change it. Real usage
+                    pins both above the bottom nav and logs every decision server-side.
+                </p>
+            </section>
+
             {{-- Mobile bottom nav --}}
             <section class="mb-12">
                 <h2 class="text-lg font-semibold text-primary mb-4">Mobile bottom nav</h2>
@@ -155,6 +172,9 @@
             </section>
 
         </div>
+
+        {{-- GDPR cookie-consent banner + persistent preferences widget. --}}
+        <x-cookie-consent />
         @livewireScripts
     </body>
 </html>

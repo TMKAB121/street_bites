@@ -17,6 +17,7 @@
 @import './components/truck-page.css';
 @import './components/tag-picker.css';
 @import './components/toast.css';
+@import './components/cookie-consent.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';

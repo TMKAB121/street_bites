@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Livewire\Profile\ProfilePage;
+use App\Models\CookieConsent;
 use App\Models\FoodTruck;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,7 +20,9 @@ it('redirects guests to the sign-in page', function (): void {
 it('shows the profile to a signed-in user with the add-a-truck CTA', function (): void {
     $user = User::factory()->create();
 
+    // The profile sits behind cookie consent (RequireCookieConsent).
     $this->withoutVite()
+        ->withCookie(CookieConsent::COOKIE_NAME, 'accepted')
         ->actingAs($user)
         ->get(route('profile'))
         ->assertOk()

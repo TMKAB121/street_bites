@@ -93,6 +93,9 @@
 
         {{-- Fixed mobile bottom nav. --}}
         <x-mobile-nav active="home" />
+
+        {{-- GDPR cookie-consent banner + persistent preferences widget. --}}
+        <x-cookie-consent />
         @livewireScripts
     </body>
 </html>

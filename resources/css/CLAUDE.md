@@ -27,7 +27,8 @@ resources/css/
     ├── truck-form.css   # .truck-form + .menu-row + .truck-image (vendor edit form)
     ├── truck-page.css   # .truck-page (public truck detail page: static map + pin, hours, menu)
     ├── tag-picker.css   # .tag-picker + .tag-pill (cuisine tag toggles in truck editor)
-    └── toast.css        # .toast / .toast-stack (transient save/upload confirmations)
+    ├── toast.css        # .toast / .toast-stack (transient save/upload confirmations)
+    └── cookie-consent.css # .cookie-consent (GDPR banner + preferences fab; Accept/Decline share one equal-prominence class)
 ```
 
 - Tokens are the source of truth — edit `theme.css`, never hard-code hex values

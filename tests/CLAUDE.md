@@ -16,6 +16,11 @@ Tests use **Pest** (on PHPUnit). Run: `lando pest` (or `lando composer test`).
   rather than rendering real tiles.
 - **Clock-sensitive tests** use `travelTo(...)` / `travelBack()` — e.g. asserting a
   truck-local `opens_at` is stamped from a fixed UTC "now".
+- **Consent-gated pages:** `/profile` and the auth routes sit behind the
+  `RequireCookieConsent` middleware — page-fetch tests must add
+  `->withCookie(CookieConsent::COOKIE_NAME, 'accepted')` or they get a redirect
+  home. (Test cookies are encrypted automatically; direct `Livewire::test()`
+  calls bypass routing and need no cookie.)
 - **Hashing override:** `phpunit.xml` sets `HASH_DRIVER=bcrypt` (rounds=4) for
   speed — don't assert the Argon2id hash format under the test driver, and the
   Have-I-Been-Pwned breach check is skipped under `runningUnitTests()`.
