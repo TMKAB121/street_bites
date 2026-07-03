@@ -14,6 +14,7 @@ use App\Livewire\Profile\ProfilePage;
 use App\Models\CookieConsent;
 use App\Models\FoodTruck;
 use App\Models\Tag;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
@@ -23,6 +24,14 @@ Route::get('/', function () {
     $trucks = FoodTruck::query()
         ->where('is_published', true)
         ->with(['images', 'tags', 'todayHours'])
+        // How many eaters favourited each truck — drives the Popular carousel.
+        ->withCount('favoritedBy as favorites_count')
+        // Flag each truck the signed-in visitor has favourited (is_favorited),
+        // so the discovery cards can render their star filled. Guests skip the
+        // subquery — their cards render no star at all.
+        ->when(auth()->check(), fn ($query) => $query->withExists([
+            'favoritedBy as is_favorited' => fn ($q) => $q->whereKey(auth()->id()),
+        ]))
         ->orderBy('name')
         ->get()
         // Open-now trucks lead the list, alphabetical within each group. This is
@@ -34,13 +43,85 @@ Route::get('/', function () {
         ->sortByDesc->isOpenNow()
         ->values();
 
+    // The Popular carousel: the ten most-favourited trucks, open-now first,
+    // then by favourite count. Both sorts are stable, so cutting the top ten
+    // by count *before* the open-first pass keeps count as the tie-breaker
+    // within each open/closed group (and name below that, from $trucks above).
+    $popular = $trucks
+        ->sortByDesc('favorites_count')
+        ->take(10)
+        ->sortByDesc->isOpenNow()
+        ->values();
+
     $tags = Tag::query()
         ->whereHas('foodTrucks', fn ($q) => $q->where('is_published', true))
         ->orderBy('name')
         ->get();
 
-    return view('welcome', compact('trucks', 'tags'));
+    return view('welcome', compact('trucks', 'popular', 'tags'));
 })->name('home');
+
+// Search landing page — where the header search bar submits (Enter or the
+// icon button). Lists matching published trucks as discovery cards; matching
+// is by truck name, cuisine tag, or menu item name (FoodTruck::search()).
+Route::get('/search', function (Request $request) {
+    $term = trim($request->string('q')->toString());
+
+    $trucks = $term === ''
+        ? collect()
+        : FoodTruck::query()
+            ->where('is_published', true)
+            ->search($term)
+            ->with(['images', 'tags', 'todayHours'])
+            // Same is_favorited flag as home, so the cards' stars render.
+            ->when(auth()->check(), fn ($query) => $query->withExists([
+                'favoritedBy as is_favorited' => fn ($q) => $q->whereKey(auth()->id()),
+            ]))
+            ->orderBy('name')
+            ->get()
+            // Same pre-geolocation order as home: open-now trucks lead,
+            // alphabetical within each group.
+            ->sortByDesc->isOpenNow()
+            ->values();
+
+    return view('search', compact('trucks', 'term'));
+})->name('search');
+
+// Typeahead suggestions for the header search bar: up to 8 published trucks
+// matching by name, tag, or menu item, each with a link to its detail page
+// and a short "why it matched" context line. Lives under /api so validation
+// errors render as JSON (see /api/geocode).
+Route::get('/api/search', function (Request $request) {
+    $request->validate([
+        'q' => ['required', 'string', 'min:2', 'max:100'],
+    ]);
+
+    $term = trim($request->string('q')->toString());
+    $like = FoodTruck::likePattern($term);
+
+    $trucks = FoodTruck::query()
+        ->where('is_published', true)
+        ->search($term)
+        // Constrained eager loads: only the tags/menu items that themselves
+        // match, so the context line below can explain non-name matches.
+        ->with([
+            'tags' => fn ($q) => $q->where('tags.name', 'like', $like),
+            'menuItems' => fn ($q) => $q->where('name', 'like', $like),
+        ])
+        ->orderBy('name')
+        ->limit(8)
+        ->get();
+
+    return response()->json($trucks->map(fn (FoodTruck $truck) => [
+        'id' => $truck->id,
+        'name' => $truck->name,
+        'url' => route('trucks.show', $truck),
+        // Why this truck matched, when the name alone doesn't show it.
+        'context' => mb_stripos($truck->name, $term) !== false
+            ? null
+            : ($truck->tags->first()?->name ?? $truck->menuItems->first()?->name),
+    ])->values());
+})->middleware('throttle:60,1')->name('search.suggest');
 
 // ZIP/address → rough coordinates, for visitors who decline browser
 // geolocation (<x-location-search> on the home page). Proxied through the
@@ -100,12 +181,36 @@ Route::get('/trucks/{truck}', function (string $truck) {
         ->with(['images', 'tags', 'menuItems', 'todayHours'])
         ->findOrFail($truck);
 
+    // Whether the signed-in visitor has favourited this truck (guests get no
+    // star at all, so false is fine as their placeholder).
+    $isFavorited = auth()->check()
+        && $truck->favoritedBy()->whereKey(auth()->id())->exists();
+
     // Cached OSM static map of the pin's surroundings; null hides the section.
     $mapPath = app(GenerateTruckMapImage::class)($truck);
     $mapUrl = $mapPath !== null ? Storage::disk('public')->url($mapPath) : null;
 
-    return view('trucks.show', compact('truck', 'mapUrl'));
+    return view('trucks.show', compact('truck', 'mapUrl', 'isFavorited'));
 })->whereNumber('truck')->name('trucks.show');
+
+// Favourite/unfavourite toggle for the star buttons (<x-favorite-toggle> →
+// resources/js/favorites.js). One endpoint, idempotent per pair: toggle()
+// attaches or detaches the favorites pivot row and the response reports the
+// resulting state, which the button settles on. Only published trucks can be
+// favourited, matching their visibility everywhere else. Lives under /api so
+// errors render as JSON (see /api/geocode).
+Route::post('/api/favorites/{truck}', function (Request $request, string $truck) {
+    $truck = FoodTruck::query()
+        ->where('is_published', true)
+        ->findOrFail($truck);
+
+    /** @var User $user */
+    $user = $request->user();
+
+    $changes = $user->favorites()->toggle($truck);
+
+    return response()->json(['favorited' => $changes['attached'] !== []]);
+})->whereNumber('truck')->middleware(['auth', 'throttle:60,1'])->name('favorites.toggle');
 
 // Living style guide — visual reference for the "Urban Vibrant" design tokens.
 Route::view('/styleguide', 'styleguide');
@@ -117,6 +222,39 @@ Route::view('/styleguide', 'styleguide');
 Route::middleware(RequireCookieConsent::class)->group(function (): void {
     // Signed-in profile: favourited trucks + on-demand vendor truck management.
     Route::get('/profile', ProfilePage::class)->middleware('auth')->name('profile');
+
+    // Signed-in favorites page — the home page's discovery section
+    // (<x-truck-discovery>: filters, ZIP fallback, map, sorted grid) scoped to
+    // the trucks this user has starred.
+    Route::get('/favorites', function (Request $request) {
+        /** @var User $user */
+        $user = $request->user();
+
+        $trucks = $user->favorites()
+            ->where('is_published', true)
+            ->with(['images', 'tags', 'todayHours'])
+            // Everything here is favourited by definition, but the shared
+            // discovery grid reads is_favorited — flag it the same way the
+            // home page does so the stars render filled.
+            ->withExists(['favoritedBy as is_favorited' => fn ($q) => $q->whereKey($user->id)])
+            ->orderBy('name')
+            ->get()
+            // Same pre-geolocation order as home: open-now trucks lead,
+            // alphabetical within each group (see the home route).
+            ->sortByDesc->isOpenNow()
+            ->values();
+
+        // Only cuisines that appear among the favourites — pills for anything
+        // else would filter down to an empty grid.
+        $tags = Tag::query()
+            ->whereHas('foodTrucks', fn ($q) => $q
+                ->where('is_published', true)
+                ->whereHas('favoritedBy', fn ($fq) => $fq->whereKey($user->id)))
+            ->orderBy('name')
+            ->get();
+
+        return view('favorites', compact('trucks', 'tags'));
+    })->middleware('auth')->name('favorites');
 
     // Email-verified sign-up flow: enter email → verify code → set password.
     Route::get('/auth/email', EmailEntry::class)->name('auth.email');

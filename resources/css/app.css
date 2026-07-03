@@ -5,6 +5,7 @@
 @import './base.css';
 @import './components/button.css';
 @import './components/card.css';
+@import './components/favorite.css';
 @import './components/nav.css';
 @import './components/header.css';
 @import './components/carousel.css';

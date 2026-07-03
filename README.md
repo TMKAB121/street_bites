@@ -186,19 +186,23 @@ steet_bites/
 │   │   └── components/         # .btn, .food-truck-card, .mobile-nav, .mobile-header,
 │   │                           #   .card-carousel, .filter-row, .profile, .truck-form, .toast, ...
 │   ├── js/
-│   │   ├── app.js              # imports echo.js + truck-map.js (Alpine is bundled by Livewire 4)
+│   │   ├── app.js              # imports the JS modules below (Alpine is bundled by Livewire 4)
 │   │   ├── echo.js             # Laravel Echo / Reverb client config
-│   │   └── truck-map.js        # Leaflet home-page map + closest-first card sorting
-│   │                           #   + ZIP/address location-search fallback
+│   │   ├── truck-map.js        # Leaflet home-page map + closest-first card sorting
+│   │   │                       #   + ZIP/address location-search fallback
+│   │   ├── favorites.js        # favourite star toggle (optimistic Alpine + fetch)
+│   │   └── search.js           # header search typeahead dropdown
 │   └── views/
 │       ├── components/         # anonymous Blade components (x-mobile-nav, x-mobile-header,
-│       │                       #   x-food-truck-card, x-card-carousel, x-truck-filters,
-│       │                       #   x-truck-form, x-truck-map, x-location-search, x-toast,
-│       │                       #   x-cookie-consent)
+│       │                       #   x-food-truck-card, x-favorite-toggle, x-truck-discovery,
+│       │                       #   x-card-carousel, x-truck-filters, x-truck-form, x-truck-map,
+│       │                       #   x-location-search, x-toast, x-cookie-consent)
 │       ├── layouts/            # app.blade.php (centered) + shell.blade.php (mobile chrome)
 │       ├── livewire/           # full-page Livewire views (auth/, profile/)
 │       ├── trucks/show.blade.php # public truck detail page (/trucks/{id})
 │       ├── welcome.blade.php   # home page — assembled mobile shell (/)
+│       ├── favorites.blade.php # signed-in favorites page (/favorites)
+│       ├── search.blade.php    # search landing page (/search?q=…)
 │       └── styleguide.blade.php # living style guide (/styleguide)
 ├── routes/
 │   ├── web.php
@@ -232,9 +236,10 @@ SVG in `public/images/` and renders in the app header, and every page links the
 favicon set (`favicon.svg` with `.ico` and apple-touch fallbacks) from `public/`.
 
 Reusable UI is built as **anonymous Blade components** in
-`resources/views/components/` (mobile header, bottom nav, food-truck card, card
-carousel, cuisine filters, the vendor truck form, a toast, and the cookie-consent
-banner), each pairing a CSS partial with a Blade template. The home page (`/`) assembles them into a mobile app
+`resources/views/components/` (mobile header, bottom nav, food-truck card, the
+favourite star, card carousel, cuisine filters, the shared discovery section, the
+vendor truck form, a toast, and the cookie-consent banner), each pairing a CSS
+partial with a Blade template. The home page (`/`) assembles them into a mobile app
 shell. Client-side interactivity (e.g. the header's hamburger menu and the toast)
 is powered by **Alpine.js**, which **Livewire 4 bundles and starts automatically** —
 do not start a second Alpine instance in `resources/js/app.js`. Carousels and the
@@ -358,6 +363,28 @@ the home page uses [Leaflet](https://leafletjs.com/), and both geocoding directi
 come from OSM **Nominatim** — reverse (pin → area label) and forward (typed
 ZIP/address → coordinates, proxied through a cached, rate-limited `/api/geocode`
 endpoint). See `CLAUDE.md` → *Maps & geolocation*.
+
+---
+
+## Favorites & Search
+
+Signed-in eaters can **star any truck** — on its discovery card, on its detail
+page, or from the favourites list on `/profile`. The star toggles instantly
+(optimistic UI backed by a `POST /api/favorites/{truck}` endpoint) and drives
+three things: the **Popular near you** carousel on the home page (the ten
+most-favourited trucks, open-now first), the filled stars across discovery, and
+the **`/favorites` page** — the home page's full discovery section (cuisine
+filters, map, distance-sorted cards) scoped to the trucks you've starred.
+Guests see no stars; favorites are part of the essential-cookie account
+features behind cookie consent.
+
+The **header search bar** works on every page: type two or more characters and
+a dropdown suggests matching trucks — matched by **truck name, cuisine tag
+(e.g. "Burgers"), or menu item name** — each linking straight to its truck
+page, with a hint of *why* it matched when the name alone doesn't show it.
+Pressing **Enter** (or tapping the magnifier) lands on `/search`, which lists
+every matching truck as discovery cards, open-now trucks first. See
+`CLAUDE.md` → *Favorites* and *Search*.
 
 ---
 

@@ -25,9 +25,11 @@ import 'leaflet/dist/leaflet.css';
 const PIN_SVG =
     '<svg viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
 
-// ≈10-mile range around the visitor so plenty of trucks are in view (the truck
-// detail pages keep their tighter ~5-mile static maps, GenerateTruckMapImage::ZOOM).
-const MAP_ZOOM = 10;
+// Initial view: ≈5-mile radius around the visitor (the truck detail pages use
+// tighter ~2.5-mile static maps, GenerateTruckMapImage::ZOOM). The visitor can
+// zoom freely from here; OSM_MAX_ZOOM is the deepest tile level OSM serves.
+const MAP_ZOOM = 12;
+const OSM_MAX_ZOOM = 19;
 
 const truckIcon = L.divIcon({
     html: PIN_SVG,
@@ -54,21 +56,15 @@ document.addEventListener('alpine:init', () => {
         hereMarker: null,
 
         init() {
-            // Fixed-zoom map: min/max pinned to MAP_ZOOM locks every zoom input
-            // (which unsettled the pins), and the zoom UI/gestures are dropped
-            // so it doesn't look interactive. Panning stays enabled — trucks
-            // beyond the view are still reachable by dragging.
+            // Zoomable map: opens at MAP_ZOOM (~5-mile radius) and the visitor
+            // can zoom in/out from there (controls, wheel, pinch, double-click
+            // — Leaflet's defaults). Capped at OSM's deepest tile level.
             this.map = L.map(this.$refs.canvas, {
-                minZoom: MAP_ZOOM,
-                maxZoom: MAP_ZOOM,
-                zoomControl: false,
-                scrollWheelZoom: false,
-                doubleClickZoom: false,
-                touchZoom: false,
-                boxZoom: false,
+                maxZoom: OSM_MAX_ZOOM,
             });
 
             L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: OSM_MAX_ZOOM,
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             }).addTo(this.map);
 
@@ -79,8 +75,9 @@ document.addEventListener('alpine:init', () => {
                     .addTo(this.map),
             }));
 
-            // A fixed ~10-mile view rather than fitting every pin — outliers
-            // shouldn't zoom the whole city out; they stay reachable by panning.
+            // Open at MAP_ZOOM rather than fitting every pin — outliers
+            // shouldn't zoom the whole city out; they stay reachable by
+            // panning or zooming out.
             const center =
                 pins.length > 0
                     ? L.latLngBounds(pins.map((pin) => [pin.lat, pin.lng])).getCenter()
@@ -119,7 +116,8 @@ document.addEventListener('alpine:init', () => {
             );
         },
 
-        // Drop (or move) the "you are here" dot and centre the map on it.
+        // Drop (or move) the "you are here" dot and centre the map on it at
+        // the default zoom — a new location warrants a fresh ~5-mile view.
         showVisitor({ lat, lng }) {
             const here = [lat, lng];
 
@@ -181,24 +179,38 @@ document.addEventListener('alpine:init', () => {
     // (<x-location-search>). Hidden until `user-location-denied` fires; on
     // submit it asks our /geocode proxy (server-side Nominatim, cached) for
     // rough coordinates and dispatches the same `user-located` event the GPS
-    // path uses, so the map and the card sorting react identically.
-    window.Alpine.data('locationSearch', (endpoint) => ({
-        visible: false,
+    // path uses — as a *bubbling* DOM event, so window listeners (the map,
+    // the card sorting) still hear it AND an ancestor can catch its own
+    // instance's result (the truck form's pin fallback does exactly that).
+    // Pass alwaysVisible: true to skip the hidden-until-denied behaviour when
+    // the surrounding markup controls visibility itself.
+    window.Alpine.data('locationSearch', (endpoint, alwaysVisible = false) => ({
+        visible: alwaysVisible,
         query: '',
         busy: false,
         error: null,
         label: null,
 
         init() {
-            window.addEventListener('user-location-denied', () => {
-                this.visible = true;
-            });
+            if (!alwaysVisible) {
+                window.addEventListener('user-location-denied', () => {
+                    this.visible = true;
+                });
+            }
         },
 
         async search() {
             const q = this.query.trim();
 
-            if (q.length < 3 || this.busy) {
+            if (this.busy) {
+                return;
+            }
+
+            // No native form validation (the markup is form-free so it can
+            // nest inside the truck editor's form), so guard here instead.
+            if (q.length < 3) {
+                this.error = 'Enter at least a ZIP code — 3 characters or more.';
+
                 return;
             }
 
@@ -223,7 +235,8 @@ document.addEventListener('alpine:init', () => {
                 const { lat, lng, label } = await response.json();
 
                 this.label = label;
-                window.dispatchEvent(new CustomEvent('user-located', { detail: { lat, lng } }));
+                // $dispatch bubbles from this element up through window.
+                this.$dispatch('user-located', { lat, lng });
             } catch {
                 this.label = null;
                 this.error = 'Something went wrong — please try again.';

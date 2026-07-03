@@ -6,6 +6,8 @@ namespace App\Models;
 
 use Database\Factories\FoodTruckFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -92,6 +94,33 @@ class FoodTruck extends Model
         }
 
         return $hours->closes_at === null || $nowTime < $hours->closes_at;
+    }
+
+    /**
+     * A LIKE pattern that matches the term literally anywhere in a column —
+     * user-typed wildcards (%, _) are escaped, not interpreted.
+     */
+    public static function likePattern(string $term): string
+    {
+        return '%'.addcslashes($term, '\\%_').'%';
+    }
+
+    /**
+     * Trucks whose name, cuisine tag, or menu item name contains the term.
+     * One scope backs both the header typeahead and the /search landing page,
+     * so the two can never drift apart on what "matches".
+     *
+     * @param  Builder<FoodTruck>  $query
+     */
+    #[Scope]
+    protected function search(Builder $query, string $term): void
+    {
+        $like = self::likePattern($term);
+
+        $query->where(fn (Builder $q) => $q
+            ->where('name', 'like', $like)
+            ->orWhereHas('tags', fn (Builder $t) => $t->where('name', 'like', $like))
+            ->orWhereHas('menuItems', fn (Builder $m) => $m->where('name', 'like', $like)));
     }
 
     /**

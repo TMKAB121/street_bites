@@ -73,6 +73,23 @@ it('lists the signed-in user\'s favourited trucks', function (): void {
         ->assertSee('Falafel Express');
 });
 
+it('renders favourites as a slim alphabetical list of links with filled stars', function (): void {
+    $user = User::factory()->create();
+    $zebra = FoodTruck::factory()->create(['name' => 'Zebra Cakes']);
+    $arepa = FoodTruck::factory()->create(['name' => 'Arepa Avenue']);
+    // Attach z-first so alphabetical ordering is doing the work, not insertion.
+    $user->favorites()->attach([$zebra->id, $arepa->id]);
+
+    Livewire::actingAs($user)
+        ->test(ProfilePage::class)
+        ->assertSeeInOrder(['Arepa Avenue', 'Zebra Cakes'])
+        // Each row: a link to the truck page + the filled favourite star.
+        ->assertSeeHtml(route('trucks.show', $arepa))
+        ->assertSeeHtml('class="fav-toggle fav-toggle--active')
+        // No card grid — the list replaced <x-food-truck-card>.
+        ->assertDontSeeHtml('food-truck-card');
+});
+
 it('only shows the user\'s own trucks, not other vendors\'', function (): void {
     $user = User::factory()->create();
     $mine = FoodTruck::factory()->for($user)->create(['name' => 'My Truck']);

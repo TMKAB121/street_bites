@@ -1,8 +1,9 @@
 {{--
-    Public truck detail page (trucks.show). Read-only — a plain Blade view on the
-    shared shell chrome; no Livewire needed until interactive actions (favourite,
-    etc.) land here. The route eager-loads images, tags, menuItems, and todayHours,
-    so this view triggers no queries of its own.
+    Public truck detail page (trucks.show). A plain Blade view on the shared
+    shell chrome — the only interactive control is the favourite star, which is
+    Alpine + fetch (no Livewire needed). The route eager-loads images, tags,
+    menuItems, and todayHours and computes $isFavorited, so this view triggers
+    no queries of its own.
 --}}
 <x-layouts::shell :title="$truck->name.' — Street Bites'" active="home">
     <a href="{{ route('home') }}" class="truck-page__back">&larr; All trucks</a>
@@ -30,7 +31,20 @@
     </div>
 
     <header class="mb-6">
-        <h1 class="text-xl font-semibold text-primary">{{ $truck->name }}</h1>
+        <div class="flex items-start justify-between gap-3">
+            <h1 class="text-xl font-semibold text-primary">{{ $truck->name }}</h1>
+
+            {{-- Same favourite star as the discovery cards; guests have no
+                 favourite state, so the control is signed-in only. --}}
+            @auth
+                <x-favorite-toggle
+                    :truck-id="$truck->id"
+                    :favorited="$isFavorited"
+                    :label="$truck->name"
+                    class="shrink-0"
+                />
+            @endauth
+        </div>
 
         @if ($truck->tags->isNotEmpty())
             <ul class="truck-page__tags" aria-label="Cuisines">

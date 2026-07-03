@@ -11,16 +11,25 @@
         <h2 class="text-lg font-semibold text-primary mb-3 px-1">Favourite trucks</h2>
 
         @if ($favorites->isNotEmpty())
-            <div class="grid grid-cols-2 gap-4">
+            {{-- Slim list, not full cards: name → truck page, star → unfavourite.
+                 The star is the same Alpine <x-favorite-toggle> as everywhere
+                 else, so rows don't vanish on tap — they go hollow and can be
+                 re-tapped, which makes bulk unfavouriting forgiving. --}}
+            <ul class="fav-list">
                 @foreach ($favorites as $favorite)
-                    <x-food-truck-card
-                        :name="$favorite->name"
-                        :image="$favorite->images->first()?->url"
-                        :href="route('trucks.show', $favorite)"
-                        wire:key="fav-{{ $favorite->id }}"
-                    />
+                    <li class="fav-list__item" wire:key="fav-{{ $favorite->id }}">
+                        <a href="{{ route('trucks.show', $favorite) }}" class="fav-list__link">
+                            {{ $favorite->name }}
+                        </a>
+                        <x-favorite-toggle
+                            :truck-id="$favorite->id"
+                            :favorited="true"
+                            :label="$favorite->name"
+                            class="shrink-0"
+                        />
+                    </li>
                 @endforeach
-            </div>
+            </ul>
         @else
             <p class="profile__empty">
                 You haven’t favourited any trucks yet. Tap the star on a truck to save it here.

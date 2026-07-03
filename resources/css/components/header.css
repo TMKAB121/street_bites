@@ -1,9 +1,9 @@
 /*
  | Mobile header
  | Top app bar for the mobile-first app: a Crisp White bar pinned to the top with
- | a left hamburger, a center brand mark, a right map-pin link, and a full-width
- | search field beneath. The hamburger toggles a full-screen Asphalt Dark menu
- | (Alpine x-data). Mobile only; the desktop header is a separate component.
+ | a left hamburger, a center brand mark, and a full-width search field beneath.
+ | The hamburger toggles a full-screen Asphalt Dark menu (Alpine x-data).
+ | Mobile only; the desktop header is a separate component.
  |   <x-mobile-header active="home" />              -- fixed to the viewport top
  |   <x-mobile-header active="home" :fixed="false" />  -- in-flow (styleguide demo)
  |
@@ -28,7 +28,15 @@
         min-height: var(--min-tap-target);
     }
 
-    /* Icon button (hamburger left, map-pin right). */
+    /* Invisible right-side counterweight to the hamburger so justify-between
+       keeps the brand truly centred in the bar (mobile only — the desktop
+       media block below removes it along with the hamburger). */
+    .mobile-header__bar::after {
+        content: '';
+        min-width: var(--min-tap-target);
+    }
+
+    /* Icon button (the hamburger). */
     .mobile-header__action {
         @apply inline-flex items-center justify-center;
         min-height: var(--min-tap-target);
@@ -78,25 +86,68 @@
         @apply relative w-full;
     }
 
-    .mobile-search__icon {
-        @apply pointer-events-none absolute;
-        top: 50%;
-        left: 0.875rem;
-        transform: translateY(-50%);
-        width: 1.25rem;
-        height: 1.25rem;
+    /* The magnifier — a real submit button, overlaid on the input's left edge. */
+    .mobile-search__submit {
+        @apply absolute inline-flex items-center justify-center;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 2.75rem; /* matches the input's left padding */
         color: var(--color-text-muted);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        transition: var(--transition-fast);
     }
 
-    .mobile-search__icon svg {
-        width: 100%;
-        height: 100%;
+    .mobile-search__submit:hover {
+        color: var(--color-accent-chili);
+    }
+
+    .mobile-search__submit svg {
+        width: 1.25rem;
+        height: 1.25rem;
         display: block;
         fill: none;
         stroke: currentcolor;
         stroke-width: 1.75;
         stroke-linecap: round;
         stroke-linejoin: round;
+    }
+
+    /* Typeahead dropdown — anchored under the input (.mobile-search is relative). */
+    .mobile-search__results {
+        @apply absolute inset-x-0 rounded-md;
+        top: calc(100% + 0.25rem);
+        z-index: 50;
+        background: var(--color-surface);
+        border: 1px solid rgb(30 34 41 / 8%);
+        box-shadow: 0 8px 24px rgb(30 34 41 / 12%);
+        list-style: none;
+        margin: 0;
+        padding: 0.25rem;
+    }
+
+    .mobile-search__result {
+        @apply flex flex-col rounded-md;
+        padding: 0.5rem 0.75rem;
+        text-decoration: none;
+        transition: var(--transition-fast);
+    }
+
+    .mobile-search__result:hover {
+        background: var(--color-bg);
+    }
+
+    .mobile-search__result-name {
+        color: var(--color-text-main);
+        font-weight: 500;
+        font-size: var(--text-base);
+    }
+
+    .mobile-search__result-context {
+        color: var(--color-text-muted);
+        font-size: 0.8125rem;
     }
 
     .mobile-search__input {
@@ -237,8 +288,13 @@
         min-height: unset;
     }
 
-    /* Search: fixed width, pushed right by auto left-margin so map pin + account
-       hug the right edge of the header regardless of screen width. */
+    /* The hamburger is hidden on desktop, so drop its counterweight too. */
+    .mobile-header__bar::after {
+        content: none;
+    }
+
+    /* Search: fixed width, pushed right by auto left-margin so the account
+       link hugs the right edge of the header regardless of screen width. */
     .mobile-search {
         flex: 0 0 18rem;
         width: 18rem; /* override @apply w-full */

@@ -16,14 +16,15 @@ resources/css/
 └── components/
     ├── button.css       # .btn / .btn-primary / .btn-accent / .btn-mustard
     ├── card.css         # .food-truck-card (image + title + FIND NOW CTA; __status "Now Open" badge + pulsing dot)
+    ├── favorite.css     # .fav-toggle (favourite star chip — chili when active; passes 3:1 non-text contrast on white, unlike mustard/tangerine)
     ├── nav.css          # .mobile-nav (bottom tab bar)
-    ├── header.css       # .mobile-header + .mobile-search + .mobile-menu
+    ├── header.css       # .mobile-header + .mobile-search (search form, submit magnifier + typeahead dropdown) + .mobile-menu
     ├── carousel.css     # .card-carousel (CSS scroll-snap)
     ├── filters.css      # .filter-row / .filter-pill
     ├── map.css          # .truck-map (Leaflet homepage map + custom pin / "you are here" markers)
     ├── auth.css         # .auth-card + .field (login / sign-up form styling)
     ├── location-search.css # .location-search (home-page ZIP/address fallback; reuses .field__input)
-    ├── profile.css      # .profile + .truck-disclosure (collapsible owned-truck cards)
+    ├── profile.css      # .profile + .fav-list (slim favourites rows) + .truck-disclosure (collapsible owned-truck cards)
     ├── truck-form.css   # .truck-form + .menu-row + .truck-image (vendor edit form)
     ├── truck-page.css   # .truck-page (public truck detail page: static map + pin, hours, menu)
     ├── tag-picker.css   # .tag-picker + .tag-pill (cuisine tag toggles in truck editor)

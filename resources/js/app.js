@@ -16,6 +16,18 @@ import './echo';
 import './truck-map';
 
 /**
+ * The favourite star toggle. Registers the `favoriteToggle` Alpine component
+ * on `alpine:init` — same pattern as truck-map.js, never imports Alpine.
+ */
+import './favorites';
+
+/**
+ * The header search typeahead. Registers the `truckSearch` Alpine component
+ * on `alpine:init` — same pattern as truck-map.js, never imports Alpine.
+ */
+import './search';
+
+/**
  * Alpine powers the design system's client-side interactivity (menu toggles,
  * dropdowns, etc.).
  *

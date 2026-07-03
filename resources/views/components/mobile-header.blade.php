@@ -5,11 +5,11 @@
 
 {{--
     Mobile top header bar.
-    - $active: which menu link is current — 'home' | 'map' | 'favorites' | 'profile'.
+    - $active: which menu link is current — 'home' | 'favorites' | 'profile'.
     - $fixed: pin to the viewport top and hide on >= md (real-app default).
              Pass :fixed="false" to render in-flow (e.g. the styleguide demo).
     The hamburger toggles a full-screen Asphalt Dark menu via Alpine (x-data).
-    Menu links mirror the bottom nav; '#' placeholders until the real routes exist.
+    Menu links mirror the bottom nav.
     The final menu link is auth-aware: Login for guests, Profile once signed in.
 --}}
 @php
@@ -27,8 +27,7 @@
 
     $items = [
         'home' => ['label' => 'Home', 'href' => '/'],
-        'map' => ['label' => 'Map', 'href' => '#'],
-        'favorites' => ['label' => 'Favorites', 'href' => '#'],
+        'favorites' => ['label' => 'Favorites', 'href' => route('favorites')],
         'profile' => $account,
     ];
 
@@ -37,8 +36,6 @@
         'hamburger' => '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>',
         'close' => '<path d="M6 6l12 12"/><path d="M18 6 6 18"/>',
         'search' => '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
-        // Reused from mobile-nav: the Map tab's pin icon.
-        'map' => '<path d="M12 21s7-6.4 7-11a7 7 0 1 0-14 0c0 4.6 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/>',
     ];
 @endphp
 
@@ -68,16 +65,9 @@
                     class="mobile-header__brand-logo"
                 >
             </a>
-
-            {{-- Map pin: mobile only --}}
-            <a href="{{ $items['map']['href'] }}" class="mobile-header__action md:hidden" aria-label="Map">
-                <span class="mobile-header__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">{!! $icons['map'] !!}</svg>
-                </span>
-            </a>
         </div>
 
-        {{-- Desktop nav links (Home / Map / Favorites) — profile handled separately --}}
+        {{-- Desktop nav links (Home / Favorites) — profile handled separately --}}
         <nav class="mobile-header__desktop-nav hidden md:flex" aria-label="Primary">
             @foreach ($items as $key => $item)
                 @if ($key === 'profile') @continue @endif
@@ -94,25 +84,47 @@
             @endforeach
         </nav>
 
-        {{-- Search: full-width second row on mobile; right-aligned on desktop via CSS margin-left:auto --}}
-        <div class="mobile-search">
-            <span class="mobile-search__icon" aria-hidden="true">
+        {{-- Search: full-width second row on mobile; right-aligned on desktop via CSS margin-left:auto.
+             A real GET form to /search, so Enter and the icon button work without JS;
+             the truckSearch Alpine component (resources/js/search.js) layers the
+             typeahead dropdown on top via GET /api/search. --}}
+        <form
+            class="mobile-search"
+            action="{{ route('search') }}"
+            method="get"
+            role="search"
+            x-data="truckSearch('{{ route('search.suggest') }}', {{ Js::from(request()->string('q')->toString()) }})"
+            @click.outside="open = false"
+            @keydown.escape="open = false"
+            @submit="open = false"
+        >
+            <button type="submit" class="mobile-search__submit" aria-label="Search">
                 <svg viewBox="0 0 24 24">{!! $icons['search'] !!}</svg>
-            </span>
+            </button>
             <input
                 type="search"
+                name="q"
                 class="mobile-search__input"
                 placeholder="Search food trucks…"
                 aria-label="Search food trucks"
+                autocomplete="off"
+                x-model="query"
+                @input.debounce.300ms="suggest"
+                @focus="open = results.length > 0"
             >
-        </div>
-
-        {{-- Map pin: right-side action on desktop (hidden on mobile — the bar has one) --}}
-        <a href="{{ $items['map']['href'] }}" class="mobile-header__action hidden md:inline-flex" aria-label="Map">
-            <span class="mobile-header__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">{!! $icons['map'] !!}</svg>
-            </span>
-        </a>
+            <ul class="mobile-search__results" x-show="open" x-cloak>
+                <template x-for="result in results" :key="result.id">
+                    <li>
+                        <a class="mobile-search__result" :href="result.url">
+                            <span class="mobile-search__result-name" x-text="result.name"></span>
+                            <template x-if="result.context">
+                                <span class="mobile-search__result-context" x-text="result.context"></span>
+                            </template>
+                        </a>
+                    </li>
+                </template>
+            </ul>
+        </form>
 
         {{-- Account link: desktop only, far-right --}}
         <a href="{{ $account['href'] }}" class="mobile-header__desktop-account hidden md:inline-flex">

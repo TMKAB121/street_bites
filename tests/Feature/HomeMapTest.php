@@ -36,10 +36,11 @@ it('marks the card lists for closest-first sorting with each pin location', func
 
     $response = $this->withoutVite()->get(route('home'))->assertOk();
 
-    // Both the popular carousel and the filter grid opt in, and the cards
-    // carry the coordinates the client-side sort needs.
-    expect(substr_count($response->getContent(), 'x-data="truckDistanceSort"'))->toBe(2)
-        ->and(substr_count($response->getContent(), 'data-lat="39.0272000"'))->toBe(2);
+    // Only the filter grid opts in (the popular carousel keeps its
+    // favourite-count order), and its cards carry the coordinates the
+    // client-side sort needs.
+    expect(substr_count($response->getContent(), 'x-data="truckDistanceSort"'))->toBe(1)
+        ->and(substr_count($response->getContent(), 'data-lat="39.0272000"'))->toBe(1);
 });
 
 it('pins located trucks and leaves unpinned trucks off the map', function (): void {

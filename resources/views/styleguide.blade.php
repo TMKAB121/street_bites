@@ -73,14 +73,18 @@
             <section class="mb-12">
                 <h2 class="text-lg font-semibold text-primary mb-4">Food truck card</h2>
                 <div class="grid grid-cols-2 gap-4 max-w-md">
-                    <x-food-truck-card name="Smokin' Wheels BBQ" />
-                    <x-food-truck-card name="Taco Libre" :open="true" />
+                    <x-food-truck-card name="Smokin' Wheels BBQ" :truck-id="1" :favorited="false" />
+                    <x-food-truck-card name="Taco Libre" :open="true" :truck-id="2" :favorited="true" />
                 </div>
                 <p class="text-sm text-text-muted mt-3">
                     Image + title + full-width Mustard FIND NOW. The image is a placeholder
                     until real photos land (pass <code>:image</code>). Width is set by the
                     parent. Pass <code>:open="true"</code> to overlay the Chili Red
-                    "Now Open" tag with its pulsing bullet (right).
+                    "Now Open" tag with its pulsing bullet (right). <code>:truck-id</code>
+                    + <code>:favorited</code> overlay the favourite star top-right —
+                    hollow (left) vs filled (right); leave <code>:favorited</code> null
+                    (the guest default) to hide it. Demo ids only — tapping here
+                    won't persist.
                 </p>
             </section>
 
@@ -136,7 +140,7 @@
                 </div>
                 <p class="text-sm text-text-muted mt-3">
                     Mobile only — pinned to the top and hidden at ≥ md in real use.
-                    Hamburger (left), brand (center), Map pin (right), and a full-width
+                    Hamburger (left), brand (center), and a full-width
                     search bar. Tap the hamburger to open the full-screen dark menu;
                     press Escape or the ✕ to close. Tab through to see the Chili-Red
                     focus ring; controls meet the 48px tap target.

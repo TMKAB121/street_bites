@@ -107,7 +107,8 @@ reserve Livewire for server-backed interactivity.
 
 `truck-map.js` registers three Alpine components on `alpine:init` (so they use
 Livewire's bundled Alpine — never import Alpine): `truckMap(pins)` renders the
-fixed-zoom (`MAP_ZOOM = 10`) OSM/Leaflet map with custom pin markers; `truckDistanceSort`
+zoomable OSM/Leaflet map (opens at `MAP_ZOOM = 12`, ~5-mile radius; free zoom up to
+OSM's tile max) with custom pin markers; `truckDistanceSort`
 reorders a card list **open-first, then closest-first** (real DOM re-append) using each
 card's `data-open` + `data-lat`/`data-lng`; `locationSearch(endpoint)` is the ZIP/address fallback form
 (see *Maps & geolocation*). It also imports `leaflet/dist/leaflet.css`. The visitor's
@@ -117,6 +118,13 @@ position flows through two **window events** that decouple the pieces:
 `truckDistanceSort` reorders) and `user-location-denied` (dispatched when GPS is
 declined or missing — `locationSearch` reveals itself on it).
 
+Two more Alpine components follow the same register-on-`alpine:init` pattern:
+`favoriteToggle(endpoint, favorited, csrf)` (`resources/js/favorites.js`) powers the
+`<x-favorite-toggle>` star — optimistic flip, then settles on the JSON answer from
+`POST /api/favorites/{truck}`, rolling back on failure; `truckSearch(endpoint,
+initial)` (`resources/js/search.js`) is the header search typeahead (see *Search*).
+Both are imported by `app.js` alongside `truck-map.js`.
+
 Because Livewire owns the JS, every full-page view must include `@livewireStyles`
 in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
 `styleguide`, and both layouts (`layouts/app.blade.php`, `layouts/shell.blade.php`).
@@ -124,19 +132,26 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
 ### Pages
 
 - `/` → `welcome.blade.php` — the **assembled mobile shell**: `<x-mobile-header>`,
-  a `<x-card-carousel>`, `<x-truck-filters>` + a results grid, and `<x-mobile-nav>`.
+  the **Popular carousel** (`<x-card-carousel>`), the shared `<x-truck-discovery>`
+  section (filters + ZIP fallback + Leaflet map + results grid), and `<x-mobile-nav>`.
   Content uses `pt-32 pb-24 md:pt-8 md:pb-8` to clear the fixed bars on mobile.
   The route closure queries published `FoodTruck`s (with images, tags + `todayHours`
-  eager-loaded) and all `Tag`s that have at least one published truck, passing both to
-  the view. The truck collection is `sortByDesc->isOpenNow()` before rendering so
-  **currently-open trucks lead** (alphabetical within each group) — the pre-geolocation
-  order. Client-side tag filtering is Alpine-driven via the `tag-filter` window event.
-  Also renders the `<x-truck-map>` Leaflet map; discovery cards carry `data-open` +
-  `data-lat`/`data-lng`, show a red **"Now Open"** badge when serving (`FoodTruck::isOpenNow()`),
-  and both card lists opt into `truckDistanceSort` (open-first, then closest-first once
-  GPS is granted).
-  `<x-location-search>` sits above the map as the ZIP/address fallback when GPS is
-  declined (see *Maps & geolocation*).
+  eager-loaded, `withCount('favoritedBy as favorites_count')`, and — signed-in only —
+  `withExists` as `is_favorited` so the cards' stars render) and all `Tag`s that have
+  at least one published truck. The truck collection is `sortByDesc->isOpenNow()`
+  before rendering so **currently-open trucks lead** (alphabetical within each group)
+  — the pre-geolocation order; `truckDistanceSort` re-sorts the grid open-first, then
+  closest-first once GPS is granted. `$popular` is the **ten most-favourited trucks**,
+  open-now first then by favourite count (stable sorts keep count as the tie-breaker)
+  — popularity drives the carousel, so it keeps its server order (no distance sort).
+  Client-side tag filtering is Alpine-driven via the `tag-filter` window event.
+- `/favorites` → `favorites.blade.php` (`favorites`, `auth` + consent middleware) —
+  the home page's discovery section (`<x-truck-discovery>`) scoped to the trucks the
+  user has starred, with the tag pills limited to cuisines that appear among them.
+- `/search` → `search.blade.php` (`search`) — the **search landing page** the header
+  search bar submits to (see *Search*): a plain grid of matching discovery cards,
+  open-now first. Empty query prompts; no map/filters — refining happens by searching
+  again from the still-visible, pre-filled header.
 - `/trucks/{truck}` → `trucks/show.blade.php` (`trucks.show`, `whereNumber`) — the
   **public truck detail page** discovery cards link to. Plain Blade view (no Livewire):
   cached OSM static map with a centred pin, cuisine tags, today's hours
@@ -233,9 +248,12 @@ decision; don't add a category picker without one.
 home for two roles in one page. Views live in `resources/views/livewire/profile/`.
 
 - **Eater by default, vendor on demand.** We never assume a user is a food-truck
-  owner: the page shows their **favourited trucks**, and only an explicit "Add a
-  food truck" CTA (`addTruck()`) creates a `FoodTruck` tied to their user id. A
-  user can own several.
+  owner: the page shows their **favourited trucks** (a slim `.fav-list` of
+  name-link + star rows, alphabetical — no cards, so no images to eager-load;
+  the star is the same `<x-favorite-toggle>`, so rows don't vanish on tap, they
+  go hollow and can be re-tapped), and only an explicit "Add a food truck" CTA
+  (`addTruck()`) creates a `FoodTruck` tied to their user id. A user can own
+  several.
 - **Collapsed list → lazy editor.** Owned trucks render as collapsed
   `.truck-disclosure` cards (stub data: id + name only). Expanding one renders
   `<livewire:profile.truck-editor :truck-id … lazy />` — `TruckEditor` is
@@ -276,7 +294,7 @@ Six create migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*`), all `casc
 | `truck_operating_hours` | One row **per business date** (`unique(food_truck_id, business_date)`) — vendors operate in real time day-by-day, **not** on a recurring weekly schedule. The editor only upserts **today's** row via `updateOrCreate` |
 | `truck_images` | `path` to a normalized WebP on the public disk + `sort_order` |
 | `menu_items` | `name`, `description`, `price_cents` (**money as integer cents, never float**), `is_available`, `sort_order` |
-| `favorites` | `user_id`+`food_truck_id` pivot (`unique`). Reads for display; the favourite/unfavourite action is a follow-up |
+| `favorites` | `user_id`+`food_truck_id` pivot (`unique`). Toggled by `POST /api/favorites/{truck}` (see *Favorites*); read via `withExists`/`withCount` for stars and the Popular carousel |
 | `tags` + `food_truck_tag` | Cuisine taxonomy. `tags`: `name`, `slug` (unique, auto-generated from name via `Str::slug()` on creating). `food_truck_tag`: composite PK pivot — no timestamps, cascade deletes on both FKs |
 
 Models: `FoodTruck` (`user`, `operatingHours`, `todayHours`, `images`,
@@ -304,15 +322,15 @@ All mapping is **OpenStreetMap — free, no API key, no billing** (dep
 map centre is known:
 
 - **Truck detail page — cached static PNG.** `App\Actions\GenerateTruckMapImage`
-  renders OSM tiles (zoom 12, ~5-mile view) to a PNG on the **public** disk at
+  renders OSM tiles (zoom 13, ~2.5-mile view) to a PNG on the **public** disk at
   `truck-maps/{truck}/{fingerprint}.png`. The **fingerprint** is a `sha1` of
   `(lat, lng, zoom, size)`, so moving the pin changes the path — the next page view
   regenerates and deletes the stale sibling (no schema, no cache table). Marker-free;
   the pin is a **CSS overlay** centred on the image. Failures return `null` and hide
   the map (never 500). Sends an identifying User-Agent (OSM tile policy).
 - **Home page — interactive Leaflet.** `<x-truck-map>` / `truck-map.js` — centres on the
-  visitor's GPS (unknowable server-side) with filterable pins; fixed zoom so pins don't
-  jump. See *JavaScript / Alpine*.
+  visitor's GPS (unknowable server-side) with filterable pins; opens at a ~5-mile
+  radius (`MAP_ZOOM = 12`) and the visitor can zoom freely. See *JavaScript / Alpine*.
 
 **Reverse geocoding:** `App\Actions\ReverseGeocodeLabel` calls OSM **Nominatim** (keyless,
 identifying User-Agent) to turn a pin into `location_label` ("Road, City"). Used by
@@ -325,9 +343,13 @@ geolocation, `<x-location-search>` on the home page geocodes a typed ZIP/address
 expands abroad). The route caches each normalized query for a day and is throttled
 (`throttle:15,1`) since a miss is an external request; no-match/failure returns 404.
 The browser **never calls Nominatim directly** (it can't send the identifying
-User-Agent the OSM policy requires). On success the form dispatches the same
-`user-located` event the GPS path uses, so the map and card sorting need no special
-casing. The route lives under `/api` because `bootstrap/app.php` limits
+User-Agent the OSM policy requires). On success the form `$dispatch`es the same
+`user-located` event the GPS path uses — bubbling, so the map and card sorting
+(window listeners) need no special casing. The same component doubles as the truck
+form's pin fallback when the vendor's GPS fails: an ancestor element catches the
+bubbling event and feeds it into `TruckEditor::setLocation` (props override the
+copy/visibility — see `resources/views/CLAUDE.md`). The route lives under `/api`
+because `bootstrap/app.php` limits
 `shouldRenderJsonWhen` to `api/*` — a JSON endpoint elsewhere would render
 validation errors as redirects.
 
@@ -338,16 +360,60 @@ wall-clock and shown verbatim, so only the `located_at` timestamp is converted f
 ### Dev seed
 
 `database/seeders/FoodTruckSeeder` (called by `DatabaseSeeder`) creates 3 vendor
-users, the full tag taxonomy, and 10 published trucks with menu items and images.
-Every truck is pinned near ZIP 66202 (Mission, KS) — most within ~5 miles, every third
-one an outlier up to 20 miles — with `timezone` `America/Chicago` (maps are **not**
-pre-generated; the first page view renders and caches each). Fixture images live in
+users, 8 eater users, the full tag taxonomy, and 10 published trucks with menu items
+and images. Every truck is pinned near ZIP 66202 (Mission, KS) — most within ~5 miles,
+every third one an outlier up to 20 miles — with `timezone` `America/Chicago` (maps are
+**not** pre-generated; the first page view renders and caches each). Each truck draws a
+random crowd of eater favourites so the Popular carousel has a meaningful order out of
+the box, and the smoke-test account (`test@example.com`) always favourites a few so
+`/favorites` and the profile page have content on first sign-in. Fixture images live in
 `database/seeders/fixtures/images/` and are processed through `StoreTruckImage` (same
 pipeline as live uploads). Re-seed with:
 
 ```bash
 lando artisan migrate:fresh --seed
 ```
+
+## Favorites
+
+Eaters star trucks; the pivot rows drive the star state everywhere, the Popular
+carousel ranking, and the `/favorites` page. **Alpine + fetch, not Livewire** —
+discovery pages are plain Blade, so the star is the anonymous `<x-favorite-toggle>`
+component (rendered **only for signed-in users**; guests get no star at all).
+
+- **One idempotent endpoint:** `POST /api/favorites/{truck}` (`favorites.toggle`,
+  `auth` + throttled) does `$user->favorites()->toggle($truck)` and returns
+  `{ favorited: bool }` — the button settles on that answer. Published trucks only
+  (404 otherwise), matching their visibility everywhere else. Lives under `/api`
+  so errors render as JSON (see the `/api/geocode` note).
+- **Optimistic UI:** `favoriteToggle` (`resources/js/favorites.js`) flips the star
+  on tap, then rolls back if the request fails — the UI never lies about persisted
+  state. Initial state is server-rendered (`is_favorited` via `withExists`) so
+  there's no flash before Alpine boots.
+- **Surfaces:** discovery cards (star overlaid top-right — `<x-food-truck-card>`'s
+  `truck-id` + `favorited` props; `favorited` null hides it), the truck detail
+  page (in-flow beside the title, `@auth`-only), and the profile page's slim
+  favourites list. Tests live in `tests/Feature/Favorites/`.
+
+## Search
+
+The header search bar (`<x-mobile-header>`) is a **plain GET form to `/search`**,
+so Enter and the magnifier submit button work without JS; the `truckSearch` Alpine
+component (`resources/js/search.js`) layers a **typeahead dropdown** on top.
+
+- **One matching rule:** the `FoodTruck::search()` scope — truck **name**, cuisine
+  **tag name**, or **menu item name** contains the term, published trucks only.
+  Both the landing page and the typeahead use it, so they can never drift apart.
+  `FoodTruck::likePattern()` escapes user-typed `%`/`_` so they match literally.
+- **Typeahead:** `GET /api/search` (`search.suggest`, `min:2`, throttled) returns
+  up to 8 trucks as `{ id, name, url, context }` — `url` links straight to the
+  detail page; `context` is the matching tag or menu item when the truck's own
+  name doesn't contain the term (null otherwise). The JS debounces input (300ms)
+  and discards stale in-flight responses.
+- **Landing page:** `/search?q=…` renders matching discovery cards, open-now first
+  (same ordering as home); the header input stays pre-filled with the term.
+
+Tests live in `tests/Feature/SearchTest.php`.
 
 ## Internal Docker hostnames
 
