@@ -6,12 +6,18 @@ Full-page views live here (`welcome.blade.php`, `trucks/show.blade.php`,
 (`resources/css/components/`, visuals only) with a `.blade.php` file (markup +
 `@props`). CSS/token conventions live in `resources/css/CLAUDE.md`.
 
+Every full-page `<head>` (both layouts, `welcome`, `styleguide`) carries the
+favicon links — `/favicon.svg` (`type="image/svg+xml"`), `/favicon.ico`
+(`sizes="48x48"` fallback), and `/apple-touch-icon.png` — right after `<title>`.
+Include all three in any new full-page view (brand-asset detail is in the root
+`CLAUDE.md`, *Front-end / design system*).
+
 ## Blade components
 
 | Component | CSS partial | Notes |
 |---|---|---|
 | `<x-mobile-nav>` | `nav.css` | Bottom tab bar (Home/Map/Favorites + auth-aware slot: **Login** when guest, **Profile** when signed in) |
-| `<x-mobile-header>` | `header.css` | Top bar: hamburger + brand + map + search; hamburger opens a full-screen Alpine menu (last link is the same auth-aware Login/Profile slot) |
+| `<x-mobile-header>` | `header.css` | Top bar: hamburger + brand + map + search; hamburger opens a full-screen Alpine menu (last link is the same auth-aware Login/Profile slot). The brand is the SVG logo (`/images/street-bites-logo.svg`, sized by `.mobile-header__brand-logo`), not text — keep `alt="Street Bites"` on the `<img>` |
 | `<x-food-truck-card>` | `card.css` | Image + title + Mustard FIND NOW CTA; `image` prop, graceful placeholder when null. Discovery cards link to `/trucks/{id}` |
 | `<x-card-carousel>` | `carousel.css` | Slot-based horizontal scroller; any child card becomes a snap item |
 | `<x-truck-filters>` | `filters.css` | Scrollable cuisine pills driven from the `Tag` DB. Each pill click sets Alpine's local active state **and** dispatches a `tag-filter` window event (`{ tag: slug }`). The results grid listens with `@tag-filter.window` and uses `x-show` to filter cards client-side. Props: `tags` (Collection of Tag models) |

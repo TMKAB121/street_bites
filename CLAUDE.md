@@ -74,6 +74,16 @@ utility classes from one source of truth. Reusable UI is authored as **anonymous
 Blade components** (a CSS partial + a `.blade.php` file) in
 `resources/views/components/`.
 
+**Brand assets** live in `public/`: `favicon.svg` (vector icon — the traced pin
+mark), `favicon.ico` (16/32/48 fallback), `apple-touch-icon.png` (180², opaque),
+and `public/images/` (`street-bites-logo.svg` — the master pin + wordmark used in
+the header — plus transparent `street-bites-logo.png` / `street-bites-icon.png`
+rasters). The SVGs are the masters (traced from the original art with potrace);
+their fill is the logo's own brand red `#C72F2E` — close to but deliberately
+**not** the `--color-accent-chili` token, so don't "fix" either to match the
+other. Every full-page view links the favicon set in `<head>` (see
+`resources/views/CLAUDE.md`).
+
 Directory-local detail is in nested memory (loaded on demand — see *Nested memory*):
 
 - **`resources/css/CLAUDE.md`** — the CSS partial map, design tokens, and the

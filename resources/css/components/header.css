@@ -46,8 +46,8 @@
     }
 
     .mobile-header__icon {
-        width: 1.5rem;
-        height: 1.5rem;
+        width: 1.75rem;
+        height: 1.75rem;
     }
 
     .mobile-header__icon svg {
@@ -62,10 +62,15 @@
     }
 
     .mobile-header__brand {
-        @apply text-md font-semibold;
-        color: var(--color-primary);
+        @apply inline-flex items-center;
+        min-height: var(--min-tap-target);
         text-decoration: none;
-        white-space: nowrap;
+    }
+
+    .mobile-header__brand-logo {
+        display: block;
+        height: 3rem;
+        width: auto;
     }
 
     /* --- Search ---------------------------------------------------------- */

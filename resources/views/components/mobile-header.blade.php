@@ -60,8 +60,14 @@
                 </span>
             </button>
 
-            {{-- Brand wordmark — placeholder until the real Street Bites logo exists. --}}
-            <a href="/" class="mobile-header__brand">Street Bites</a>
+            {{-- Brand logo (pin + wordmark) — /public/images, vector so it stays crisp. --}}
+            <a href="/" class="mobile-header__brand">
+                <img
+                    src="/images/street-bites-logo.svg"
+                    alt="Street Bites"
+                    class="mobile-header__brand-logo"
+                >
+            </a>
 
             {{-- Map pin: mobile only --}}
             <a href="{{ $items['map']['href'] }}" class="mobile-header__action md:hidden" aria-label="Map">

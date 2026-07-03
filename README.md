@@ -174,6 +174,10 @@ steet_bites/
 │   ├── migrations/
 │   ├── factories/
 │   └── seeders/
+├── public/
+│   ├── favicon.svg             # vector icon (pin mark) + favicon.ico / apple-touch-icon.png
+│   └── images/                 # brand assets: street-bites-logo.svg (header logo),
+│                               #   transparent logo/icon PNGs
 ├── resources/
 │   ├── css/                    # Tailwind 4 CSS-first design system
 │   │   ├── app.css             # entry: @import 'tailwindcss' + partials
@@ -222,6 +226,10 @@ The "Urban Vibrant" design system is encoded as Tailwind `@theme` tokens in
 `resources/css/theme.css` — each token generates both a CSS variable and utility
 classes from a single source of truth. A living style guide renders at
 [`/styleguide`](https://steet-bites.lndo.site/styleguide).
+
+Branding is vector-first: the Street Bites logo (map pin + wordmark) ships as an
+SVG in `public/images/` and renders in the app header, and every page links the
+favicon set (`favicon.svg` with `.ico` and apple-touch fallbacks) from `public/`.
 
 Reusable UI is built as **anonymous Blade components** in
 `resources/views/components/` (mobile header, bottom nav, food-truck card, card
