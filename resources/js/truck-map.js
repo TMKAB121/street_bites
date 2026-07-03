@@ -150,13 +150,15 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
-    // Closest-first ordering for a list of truck cards. Attach to a container
-    // whose direct children carry data-lat/data-lng; when the map above obtains
-    // the visitor's position (the `user-located` event), the children are
-    // re-appended closest→furthest. Real DOM order (not CSS `order`) so screen
-    // readers and keyboard focus follow the visual order; Alpine bindings on
-    // the children (e.g. the grid's x-show filters) survive the moves. Without
-    // geolocation the server-rendered alphabetical order simply stands.
+    // Open-first, then closest-first ordering for a list of truck cards. Attach
+    // to a container whose direct children carry data-open + data-lat/data-lng;
+    // when the map above obtains the visitor's position (the `user-located`
+    // event), the children are re-appended open→closed, closest→furthest within
+    // each group — so the nearest open truck always leads. Real DOM order (not
+    // CSS `order`) so screen readers and keyboard focus follow the visual order;
+    // Alpine bindings on the children (e.g. the grid's x-show filters) survive
+    // the moves. Without geolocation the server-rendered order (already
+    // open-first, then alphabetical) simply stands.
     window.Alpine.data('truckDistanceSort', () => ({
         init() {
             window.addEventListener('user-located', (event) => this.reorder(event.detail));
@@ -164,8 +166,13 @@ document.addEventListener('alpine:init', () => {
 
         reorder(here) {
             [...this.$el.children]
-                .map((el) => ({ el, score: distanceScore(el.dataset, here) }))
-                .sort((a, b) => a.score - b.score)
+                // openRank 0 for open trucks so they sort ahead of closed ones.
+                .map((el) => ({
+                    el,
+                    openRank: el.dataset.open === '1' ? 0 : 1,
+                    score: distanceScore(el.dataset, here),
+                }))
+                .sort((a, b) => a.openRank - b.openRank || a.score - b.score)
                 .forEach(({ el }) => this.$el.appendChild(el));
         },
     }));

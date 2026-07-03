@@ -72,13 +72,15 @@
             {{-- Card component --}}
             <section class="mb-12">
                 <h2 class="text-lg font-semibold text-primary mb-4">Food truck card</h2>
-                <div class="max-w-xs">
+                <div class="grid grid-cols-2 gap-4 max-w-md">
                     <x-food-truck-card name="Smokin' Wheels BBQ" />
+                    <x-food-truck-card name="Taco Libre" :open="true" />
                 </div>
                 <p class="text-sm text-text-muted mt-3">
                     Image + title + full-width Mustard FIND NOW. The image is a placeholder
                     until real photos land (pass <code>:image</code>). Width is set by the
-                    parent — here a <code>max-w-xs</code> wrapper.
+                    parent. Pass <code>:open="true"</code> to overlay the Chili Red
+                    "Now Open" tag with its pulsing bullet (right).
                 </p>
             </section>
 

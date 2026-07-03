@@ -22,9 +22,17 @@ use Illuminate\Support\Facades\Storage;
 Route::get('/', function () {
     $trucks = FoodTruck::query()
         ->where('is_published', true)
-        ->with(['images', 'tags'])
+        ->with(['images', 'tags', 'todayHours'])
         ->orderBy('name')
-        ->get();
+        ->get()
+        // Open-now trucks lead the list, alphabetical within each group. This is
+        // the pre-geolocation order; once the visitor shares a location the
+        // client-side truckDistanceSort re-sorts to closest-first, still
+        // open-first (see resources/js/truck-map.js). isOpenNow() reads the
+        // eager-loaded todayHours, so this adds no queries. sortByDesc is stable
+        // (PHP 8), preserving the alphabetical order above within each group.
+        ->sortByDesc->isOpenNow()
+        ->values();
 
     $tags = Tag::query()
         ->whereHas('foodTrucks', fn ($q) => $q->where('is_published', true))

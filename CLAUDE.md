@@ -108,8 +108,8 @@ reserve Livewire for server-backed interactivity.
 `truck-map.js` registers three Alpine components on `alpine:init` (so they use
 Livewire's bundled Alpine — never import Alpine): `truckMap(pins)` renders the
 fixed-zoom (`MAP_ZOOM = 10`) OSM/Leaflet map with custom pin markers; `truckDistanceSort`
-reorders a card list closest-first (real DOM re-append) using each card's
-`data-lat`/`data-lng`; `locationSearch(endpoint)` is the ZIP/address fallback form
+reorders a card list **open-first, then closest-first** (real DOM re-append) using each
+card's `data-open` + `data-lat`/`data-lng`; `locationSearch(endpoint)` is the ZIP/address fallback form
 (see *Maps & geolocation*). It also imports `leaflet/dist/leaflet.css`. The visitor's
 position flows through two **window events** that decouple the pieces:
 `user-located` `{ lat, lng }` (dispatched by the GPS success callback **and** by
@@ -126,11 +126,15 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
 - `/` → `welcome.blade.php` — the **assembled mobile shell**: `<x-mobile-header>`,
   a `<x-card-carousel>`, `<x-truck-filters>` + a results grid, and `<x-mobile-nav>`.
   Content uses `pt-32 pb-24 md:pt-8 md:pb-8` to clear the fixed bars on mobile.
-  The route closure queries published `FoodTruck`s (with images + tags eager-loaded)
-  and all `Tag`s that have at least one published truck, passing both to the view.
-  Client-side tag filtering is Alpine-driven via the `tag-filter` window event.
-  Also renders the `<x-truck-map>` Leaflet map; discovery cards carry `data-lat`/`data-lng`
-  and both card lists opt into `truckDistanceSort` (closest-first once GPS is granted).
+  The route closure queries published `FoodTruck`s (with images, tags + `todayHours`
+  eager-loaded) and all `Tag`s that have at least one published truck, passing both to
+  the view. The truck collection is `sortByDesc->isOpenNow()` before rendering so
+  **currently-open trucks lead** (alphabetical within each group) — the pre-geolocation
+  order. Client-side tag filtering is Alpine-driven via the `tag-filter` window event.
+  Also renders the `<x-truck-map>` Leaflet map; discovery cards carry `data-open` +
+  `data-lat`/`data-lng`, show a red **"Now Open"** badge when serving (`FoodTruck::isOpenNow()`),
+  and both card lists opt into `truckDistanceSort` (open-first, then closest-first once
+  GPS is granted).
   `<x-location-search>` sits above the map as the ZIP/address fallback when GPS is
   declined (see *Maps & geolocation*).
 - `/trucks/{truck}` → `trucks/show.blade.php` (`trucks.show`, `whereNumber`) — the
@@ -276,7 +280,9 @@ Six create migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*`), all `casc
 | `tags` + `food_truck_tag` | Cuisine taxonomy. `tags`: `name`, `slug` (unique, auto-generated from name via `Str::slug()` on creating). `food_truck_tag`: composite PK pivot — no timestamps, cascade deletes on both FKs |
 
 Models: `FoodTruck` (`user`, `operatingHours`, `todayHours`, `images`,
-`menuItems`, `favoritedBy`, `tags`), `TruckOperatingHour`, `TruckImage` (`url` accessor),
+`menuItems`, `favoritedBy`, `tags`; plus `isOpenNow()` — true when now is within
+today's window in the truck's timezone, or past an open time with no close set),
+`TruckOperatingHour`, `TruckImage` (`url` accessor),
 `MenuItem` (`price` accessor), `Tag` (`foodTrucks`); `User` gained `foodTrucks()` and `favorites()`.
 
 ### Image pipeline

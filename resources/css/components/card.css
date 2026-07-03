@@ -27,6 +27,40 @@
         object-fit: cover;
     }
 
+    /* "Now Open" badge — overlaid top-left on the image while the truck is
+       serving. Chili Red with white text (chili passes contrast on white text,
+       unlike mustard/tangerine). The dot pulses to draw the eye. */
+    .food-truck-card__status {
+        @apply absolute left-2 top-2 z-10 inline-flex items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-xs font-semibold uppercase tracking-wide text-white;
+        background: var(--color-accent-chili);
+        box-shadow: 0 2px 6px rgb(30 34 41 / 20%);
+    }
+
+    .food-truck-card__status-dot {
+        @apply inline-block h-2 w-2 rounded-full bg-white;
+        animation: food-truck-card-pulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes food-truck-card-pulse {
+        0%,
+        100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        50% {
+            opacity: 0.4;
+            transform: scale(0.7);
+        }
+    }
+
+    /* Respect reduced-motion preferences — hold the dot steady. */
+    @media (prefers-reduced-motion: reduce) {
+        .food-truck-card__status-dot {
+            animation: none;
+        }
+    }
+
     /* Shown until a real image is provided. */
     .food-truck-card__placeholder {
         @apply flex h-full w-full items-center justify-center;

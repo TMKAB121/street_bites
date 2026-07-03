@@ -36,10 +36,13 @@
                 <div class="-mx-4">
                     <x-card-carousel label="Popular trucks" x-data="truckDistanceSort">
                         @forelse ($trucks->take(8) as $truck)
+                            @php($isOpen = $truck->isOpenNow())
                             <x-food-truck-card
                                 :name="$truck->name"
                                 :image="$truck->images->first()?->url"
                                 :href="route('trucks.show', $truck)"
+                                :open="$isOpen"
+                                data-open="{{ $isOpen ? '1' : '0' }}"
                                 data-lat="{{ $truck->latitude }}"
                                 data-lng="{{ $truck->longitude }}"
                             />
@@ -76,9 +79,11 @@
                      through the parent Alpine scope. --}}
                 <div class="grid grid-cols-2 gap-4 mt-4 md:grid-cols-3" x-data="truckDistanceSort">
                     @forelse ($trucks as $truck)
+                        @php($isOpen = $truck->isOpenNow())
                         <div
                             x-show="activeTag === 'all' || {{ Js::from($truck->tags->pluck('slug')) }}.includes(activeTag)"
                             x-transition
+                            data-open="{{ $isOpen ? '1' : '0' }}"
                             data-lat="{{ $truck->latitude }}"
                             data-lng="{{ $truck->longitude }}"
                         >
@@ -86,6 +91,7 @@
                                 :name="$truck->name"
                                 :image="$truck->images->first()?->url"
                                 :href="route('trucks.show', $truck)"
+                                :open="$isOpen"
                             />
                         </div>
                     @empty

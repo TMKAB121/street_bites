@@ -15,7 +15,7 @@ resources/css/
 ├── base.css             # body, ADA tap targets, focus-visible ring, [x-cloak]
 └── components/
     ├── button.css       # .btn / .btn-primary / .btn-accent / .btn-mustard
-    ├── card.css         # .food-truck-card (image + title + FIND NOW CTA)
+    ├── card.css         # .food-truck-card (image + title + FIND NOW CTA; __status "Now Open" badge + pulsing dot)
     ├── nav.css          # .mobile-nav (bottom tab bar)
     ├── header.css       # .mobile-header + .mobile-search + .mobile-menu
     ├── carousel.css     # .card-carousel (CSS scroll-snap)

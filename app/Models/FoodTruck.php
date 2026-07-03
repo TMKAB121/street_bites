@@ -68,6 +68,33 @@ class FoodTruck extends Model
     }
 
     /**
+     * Whether the truck is serving right now, per today's operating hours.
+     *
+     * Open/close times are naive truck-local wall-clock (see the timezone note in
+     * the root CLAUDE.md), so we compare against the current wall-clock time in
+     * the truck's own timezone. A row with an open time but no close time means
+     * the vendor tapped "Now Open" and is still out — treated as open. Requires
+     * `todayHours` to be loaded (eager-load it or this fires a query per truck).
+     */
+    public function isOpenNow(): bool
+    {
+        $hours = $this->todayHours;
+
+        if ($hours?->opens_at === null) {
+            return false;
+        }
+
+        $tz = $this->timezone ?? config('app.timezone');
+        $nowTime = now()->setTimezone($tz)->format('H:i:s');
+
+        if ($nowTime < $hours->opens_at) {
+            return false;
+        }
+
+        return $hours->closes_at === null || $nowTime < $hours->closes_at;
+    }
+
+    /**
      * @return HasMany<TruckImage, $this>
      */
     public function images(): HasMany
