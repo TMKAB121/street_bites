@@ -16,10 +16,10 @@ terraform {
   # lock_table_name) — backend blocks can't reference variables, so fill
   # these in by hand after running the bootstrap apply once.
   backend "s3" {
-    bucket         = "REPLACE-WITH-bootstrap-output-state_bucket_name"
+    bucket         = "streetbites-terraform-state"
     key            = "environments/prod/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "REPLACE-WITH-bootstrap-output-lock_table_name"
+    dynamodb_table = "street-bites-terraform-locks"
     encrypt        = true
   }
 }
