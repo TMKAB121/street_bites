@@ -31,6 +31,13 @@ resource "aws_iam_role_policy" "gha_terraform" {
         Resource = aws_dynamodb_table.terraform_locks.arn
       },
       {
+        # iam:* and s3:* here, not a hand-picked action list: the AWS
+        # provider's refresh step calls many more Get/List/Describe actions
+        # than any curated list anticipates (e.g. iam:ListRolePolicies,
+        # s3:GetAccelerateConfiguration) — trying to enumerate them
+        # individually just produces a slow trickle of new AccessDenied
+        # errors as the provider version changes. Matches the same
+        # philosophy already applied to ec2/ecs/rds/elasticache below.
         Sid    = "InfrastructureLifecycle"
         Effect = "Allow"
         Action = [
@@ -43,24 +50,8 @@ resource "aws_iam_role_policy" "gha_terraform" {
           "application-autoscaling:*",
           "logs:*",
           "secretsmanager:*",
-          "s3:CreateBucket",
-          "s3:PutBucketPolicy",
-          "s3:PutBucketPublicAccessBlock",
-          "s3:PutBucketVersioning",
-          "s3:PutBucketTagging",
-          "s3:GetBucket*",
-          "s3:ListBucket",
-          "iam:CreateRole",
-          "iam:DeleteRole",
-          "iam:GetRole",
-          "iam:PutRolePolicy",
-          "iam:DeleteRolePolicy",
-          "iam:GetRolePolicy",
-          "iam:AttachRolePolicy",
-          "iam:DetachRolePolicy",
-          "iam:PassRole",
-          "iam:TagRole",
-          "iam:ListInstanceProfilesForRole",
+          "s3:*",
+          "iam:*",
         ]
         Resource = "*"
       }
