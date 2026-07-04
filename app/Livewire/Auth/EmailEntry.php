@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\Auth;
 
+use App\Livewire\Auth\Concerns\ThrottlesAttempts;
 use App\Mail\EmailVerificationCode;
 use App\Models\EmailVerification;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -18,6 +18,8 @@ use Livewire\Component;
  */
 class EmailEntry extends Component
 {
+    use ThrottlesAttempts;
+
     #[Validate('required|email:rfc|max:255')]
     public string $email = '';
 
@@ -27,13 +29,11 @@ class EmailEntry extends Component
 
         $key = 'verify-email:'.mb_strtolower($this->email);
 
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            $this->addError('email', 'Too many requests. Please wait a moment and try again.');
-
+        if ($this->throttled($key, 'email', 'requests')) {
             return;
         }
 
-        RateLimiter::hit($key, 60);
+        $this->recordAttempt($key);
 
         $code = EmailVerification::issueFor($this->email);
         Mail::to($this->email)->send(new EmailVerificationCode($code, $this->email));

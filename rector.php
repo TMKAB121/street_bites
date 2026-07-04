@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Rector\Config\RectorConfig;
+use RectorLaravel\Rector\ArrayDimFetch\ServerVariableToRequestFacadeRector;
 use RectorLaravel\Set\LaravelSetList;
 
 /*
@@ -32,4 +33,12 @@ return RectorConfig::configure()
     // Laravel-aware refactors (e.g. modern facade/helper usage).
     ->withSets([
         LaravelSetList::LARAVEL_CODE_QUALITY,
+    ])
+    // GenerateTruckMapImage backfills $_SERVER keys on purpose (the OSM tile
+    // fetcher reads the superglobals directly); rewriting the assignments to
+    // Request::server() ??= … doesn't parse as an assignable expression.
+    ->withSkip([
+        ServerVariableToRequestFacadeRector::class => [
+            __DIR__.'/app/Actions/GenerateTruckMapImage.php',
+        ],
     ]);

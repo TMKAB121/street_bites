@@ -30,7 +30,7 @@
     }
 
     .mobile-nav__item:hover {
-        color: #fff;
+        color: var(--color-surface);
     }
 
     /* Neon Mustard reads cleanly on the dark bar; the dark-text-only rule only

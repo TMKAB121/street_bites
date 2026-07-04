@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Auth;
 
+use App\Livewire\Auth\Concerns\ThrottlesAttempts;
 use App\Mail\LoginCode;
 use App\Models\EmailVerification;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -23,6 +23,8 @@ use Livewire\Component;
  */
 class LoginVerify extends Component
 {
+    use ThrottlesAttempts;
+
     public string $email = '';
 
     #[Validate('required|digits:6')]
@@ -55,20 +57,18 @@ class LoginVerify extends Component
 
         $key = 'login-verify:'.$user->id;
 
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            $this->addError('code', 'Too many attempts. Please wait a moment and try again.');
-
+        if ($this->throttled($key, 'code')) {
             return;
         }
 
         if (! EmailVerification::check($user->email, $this->code)) {
-            RateLimiter::hit($key, 60);
+            $this->recordAttempt($key);
             $this->addError('code', 'That code is invalid or has expired.');
 
             return;
         }
 
-        RateLimiter::clear($key);
+        $this->clearAttempts($key);
 
         Auth::login($user);
 
@@ -91,13 +91,11 @@ class LoginVerify extends Component
 
         $key = 'login-resend:'.$user->id;
 
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            $this->addError('code', 'Too many requests. Please wait a moment and try again.');
-
+        if ($this->throttled($key, 'code', 'requests')) {
             return;
         }
 
-        RateLimiter::hit($key, 60);
+        $this->recordAttempt($key);
 
         $code = EmailVerification::issueFor($user->email);
         Mail::to($user->email)->send(new LoginCode($code, $user->email));

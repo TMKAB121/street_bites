@@ -34,15 +34,15 @@ use Illuminate\Support\Str;
 class FoodTruckSeeder extends Seeder
 {
     /** ZIP 66202 (Mission, KS) — the centre of the dev-data map area. */
-    private const BASE_LAT = 39.0272;
+    private const float BASE_LAT = 39.0272;
 
-    private const BASE_LNG = -94.6558;
+    private const float BASE_LNG = -94.6558;
 
     /** 5 miles in meters — most pins land inside the maps' ~5-mile default view. */
-    private const NEAR_OFFSET_METERS = 8047;
+    private const int NEAR_OFFSET_METERS = 8047;
 
     /** 20 miles in meters — a few outliers land beyond it (reachable by panning). */
-    private const FAR_OFFSET_METERS = 32187;
+    private const int FAR_OFFSET_METERS = 32187;
 
     public function run(): void
     {
@@ -334,7 +334,6 @@ class FoodTruckSeeder extends Seeder
             path: $path,
             originalName: basename($path),
             mimeType: $mimeType,
-            error: null,
             test: true,
         );
 

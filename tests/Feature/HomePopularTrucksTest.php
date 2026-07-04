@@ -61,7 +61,7 @@ it('limits the popular carousel to the ten most-favourited trucks', function ():
     // Eleven trucks with favourite counts 11..1 — the 1-favourite truck
     // misses the cut.
     $trucks = collect(range(11, 1))
-        ->map(fn (int $count) => favorite(FoodTruck::factory()->published()->create(), $count));
+        ->map(fn (int $count): FoodTruck => favorite(FoodTruck::factory()->published()->create(), $count));
 
     $response = $this->withoutVite()->get(route('home'))->assertOk();
 

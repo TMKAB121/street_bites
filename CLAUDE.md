@@ -208,8 +208,10 @@ via the session; the user is logged in only at the final step.
   TOTP/SMS) to limit PII and complexity. Don't swap it without a product decision.
 - **Stepped auth + anti-enumeration:** `Login` validates the password first, then
   hands off; a single generic error covers both unknown email and wrong password,
-  and the code step gives a generic "invalid or expired" error. Both steps are
-  rate-limited via `RateLimiter`. Pending sign-in is tracked by
+  and the code step gives a generic "invalid or expired" error. Every auth step
+  is rate-limited through the shared `ThrottlesAttempts` trait
+  (`app/Livewire/Auth/Concerns/`) — one policy (5 attempts / rolling minute) and
+  one generic "slow down" error for all flows. Pending sign-in is tracked by
   `session('auth.login.pending')` = the user id only — never the password.
 
 ### Password & session security (NIST SP 800-63B / OWASP)
@@ -322,7 +324,9 @@ Six create migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*`), all `casc
 
 Models: `FoodTruck` (`user`, `operatingHours`, `todayHours`, `images`,
 `menuItems`, `favoritedBy`, `tags`; plus `isOpenNow()` — true when now is within
-today's window in the truck's timezone, or past an open time with no close set),
+today's window in the truck's timezone, or past an open time with no close set —
+and `favoritedState()` — the card star's `favorited` prop: bool for a signed-in
+user from the `is_favorited` withExists flag, null for guests),
 `TruckOperatingHour`, `TruckImage` (`url` accessor),
 `MenuItem` (`price` accessor), `Tag` (`foodTrucks`); `User` gained `foodTrucks()` and `favorites()`.
 
@@ -333,7 +337,7 @@ GD/Imagick both available in the container): `cover(250, 250)` (centre-crop to a
 1:1 square) → `WebpEncoder(quality: 80)` → stored at
 `truck-images/{truck}/{uuid}.webp` on the **public** disk. Re-encoding strips
 EXIF/GPS metadata (privacy) and arbitrary file bytes; the component validates
-`image|mimes:jpeg,png,webp|max:5120`.
+`image|mimes:jpeg,png,webp` with the size cap in `TruckEditor::MAX_UPLOAD_KB` (5120).
 
 > Image uploads need the public-disk symlink — run `lando artisan storage:link`
 > once per environment (a fresh clone has no `public/storage`).

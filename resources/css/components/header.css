@@ -178,7 +178,7 @@
         right: 0.75rem;
         min-height: var(--min-tap-target);
         min-width: var(--min-tap-target);
-        color: #fff;
+        color: var(--color-surface);
         background: transparent;
         border: none;
         cursor: pointer;
@@ -202,7 +202,7 @@
     }
 
     .mobile-menu__link:hover {
-        color: #fff;
+        color: var(--color-surface);
     }
 
     /* Optional leading icon (e.g. the auth-aware Login / Profile link). */

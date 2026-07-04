@@ -64,7 +64,7 @@
     /* Shown until a real image is provided. */
     .food-truck-card__placeholder {
         @apply flex h-full w-full items-center justify-center;
-        background: linear-gradient(135deg, #eef0f2, #dfe3e6);
+        background: var(--gradient-placeholder);
         color: var(--color-text-muted);
     }
 

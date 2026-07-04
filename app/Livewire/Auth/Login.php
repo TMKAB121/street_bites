@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Auth;
 
+use App\Livewire\Auth\Concerns\ThrottlesAttempts;
 use App\Mail\LoginCode;
 use App\Models\EmailVerification;
 use App\Models\User;
@@ -11,7 +12,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -22,6 +22,8 @@ use Livewire\Component;
  */
 class Login extends Component
 {
+    use ThrottlesAttempts;
+
     #[Validate('required|email:rfc|max:255')]
     public string $email = '';
 
@@ -41,9 +43,7 @@ class Login extends Component
 
         $key = 'login:'.request()->ip().'|'.mb_strtolower($this->email);
 
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            $this->addError('email', 'Too many attempts. Please wait a moment and try again.');
-
+        if ($this->throttled($key, 'email')) {
             return;
         }
 
@@ -52,14 +52,14 @@ class Login extends Component
         // A single generic error for both an unknown email and a wrong password
         // avoids leaking which accounts exist (credential-stuffing defence).
         if (! $user instanceof User || ! Hash::check($this->password, $user->password)) {
-            RateLimiter::hit($key, 60);
+            $this->recordAttempt($key);
             $this->addError('email', 'These credentials do not match our records.');
             $this->reset('password');
 
             return;
         }
 
-        RateLimiter::clear($key);
+        $this->clearAttempts($key);
 
         // Honour rehash_on_login: upgrade a legacy bcrypt hash to Argon2id now
         // that we hold the plaintext. The 'hashed' cast re-hashes on assignment.

@@ -39,16 +39,7 @@
                 <div class="-mx-4">
                     <x-card-carousel label="Popular trucks">
                         @forelse ($popular as $truck)
-                            <div data-lat="{{ $truck->latitude }}" data-lng="{{ $truck->longitude }}">
-                                <x-food-truck-card
-                                    :name="$truck->name"
-                                    :image="$truck->images->first()?->url"
-                                    :href="route('trucks.show', $truck)"
-                                    :open="$truck->isOpenNow()"
-                                    :truck-id="$truck->id"
-                                    :favorited="auth()->check() ? (bool) ($truck->is_favorited ?? false) : null"
-                                />
-                            </div>
+                            <x-discovery-card :truck="$truck" :open="$truck->isOpenNow()" />
                         @empty
                             <p class="px-4 text-sm text-text-muted">No trucks yet — check back soon!</p>
                         @endforelse

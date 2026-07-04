@@ -40,9 +40,9 @@ it('marks the card lists for closest-first sorting with each pin location', func
     // keeps its favourite-count order behind the radius-only filter), but both
     // lists carry the coordinates the client-side radius cap needs — one
     // data-lat per surface for this single truck.
-    expect(substr_count($response->getContent(), 'x-data="truckDistanceSort"'))->toBe(1)
-        ->and(substr_count($response->getContent(), 'x-data="truckRadiusFilter"'))->toBe(1)
-        ->and(substr_count($response->getContent(), 'data-lat="39.0272000"'))->toBe(2);
+    expect(substr_count((string) $response->getContent(), 'x-data="truckDistanceSort"'))->toBe(1)
+        ->and(substr_count((string) $response->getContent(), 'x-data="truckRadiusFilter"'))->toBe(1)
+        ->and(substr_count((string) $response->getContent(), 'data-lat="39.0272000"'))->toBe(2);
 });
 
 it('pins located trucks and leaves unpinned trucks off the map', function (): void {

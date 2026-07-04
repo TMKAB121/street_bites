@@ -25,6 +25,6 @@ class RequireCookieConsent
             return $next($request);
         }
 
-        return redirect()->route('home')->with('cookie_consent.required', true);
+        return to_route('home')->with('cookie_consent.required', true);
     }
 }

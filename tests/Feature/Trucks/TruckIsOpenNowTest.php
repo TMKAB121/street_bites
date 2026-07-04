@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\FoodTruck;
-use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Date;
 
 uses(RefreshDatabase::class);
 
@@ -25,7 +25,7 @@ function stampHours(FoodTruck $truck, ?string $opensAt, ?string $closesAt = null
 
 it('is open when the local wall-clock is inside the posted window', function (): void {
     // 15:30 UTC == 10:30 America/Chicago (CDT), inside 09:00–17:00.
-    $this->travelTo(Carbon::parse('2026-07-01 15:30:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-07-01 15:30:00', 'UTC'));
 
     $truck = FoodTruck::factory()->located()->create();
 
@@ -36,20 +36,20 @@ it('is closed before opening and after closing', function (): void {
     $truck = FoodTruck::factory()->located()->create();
 
     // 12:30 UTC == 07:30 Chicago — before a 09:00 open.
-    $this->travelTo(Carbon::parse('2026-07-01 12:30:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-07-01 12:30:00', 'UTC'));
     expect(stampHours($truck, '09:00:00', '17:00:00')->isOpenNow())->toBeFalse();
 
     // 23:30 UTC == 18:30 Chicago — after a 17:00 close.
-    $this->travelTo(Carbon::parse('2026-07-01 23:30:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-07-01 23:30:00', 'UTC'));
     expect($truck->fresh(['todayHours'])->isOpenNow())->toBeFalse();
 });
 
 it('treats an open time with no close time as still serving', function (): void {
-    $this->travelTo(Carbon::parse('2026-07-01 20:00:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-07-01 20:00:00', 'UTC'));
 
     $truck = FoodTruck::factory()->located()->create();
 
-    expect(stampHours($truck, '09:00:00', null)->isOpenNow())->toBeTrue();
+    expect(stampHours($truck, '09:00:00')->isOpenNow())->toBeTrue();
 });
 
 it('is closed with no hours posted for today', function (): void {
@@ -59,7 +59,7 @@ it('is closed with no hours posted for today', function (): void {
 });
 
 it('orders open trucks ahead of closed ones on the home page, alphabetical within each group', function (): void {
-    $this->travelTo(Carbon::parse('2026-07-01 15:30:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-07-01 15:30:00', 'UTC'));
 
     // Names deliberately out of open-order so a pure alphabetical sort would fail.
     FoodTruck::factory()->published()->located()->create(['name' => 'Alpha (closed)']);
@@ -72,16 +72,16 @@ it('orders open trucks ahead of closed ones on the home page, alphabetical withi
 
     // Open trucks first (Mike then Zulu — alphabetical), then the closed Alpha.
     expect($content)->toContain('Mike (open)');
-    $mikePos = strpos($content, 'Mike (open)');
-    $zuluPos = strpos($content, 'Zulu (open)');
-    $alphaPos = strpos($content, 'Alpha (closed)');
+    $mikePos = strpos((string) $content, 'Mike (open)');
+    $zuluPos = strpos((string) $content, 'Zulu (open)');
+    $alphaPos = strpos((string) $content, 'Alpha (closed)');
 
     expect($mikePos)->toBeLessThan($zuluPos)
         ->and($zuluPos)->toBeLessThan($alphaPos);
 });
 
 it('renders the Now Open badge on the home page only for open trucks', function (): void {
-    $this->travelTo(Carbon::parse('2026-07-01 15:30:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-07-01 15:30:00', 'UTC'));
 
     $open = FoodTruck::factory()->published()->located()->create(['name' => 'Open Truck']);
     stampHours($open, '09:00:00', '17:00:00');
@@ -92,6 +92,6 @@ it('renders the Now Open badge on the home page only for open trucks', function 
 
     // The open truck shows the badge; the badge appears once per card list
     // (carousel + grid), so twice for the single open truck.
-    expect(substr_count($content, 'Now Open'))->toBe(2)
+    expect(substr_count((string) $content, 'Now Open'))->toBe(2)
         ->and($content)->toContain('food-truck-card__status-dot');
 });

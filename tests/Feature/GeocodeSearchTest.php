@@ -25,7 +25,7 @@ it('geocodes a ZIP or address into rough coordinates', function () use ($nominat
 
     // The server proxies Nominatim with the identifying User-Agent the OSM
     // usage policy requires — the browser never calls Nominatim directly.
-    Http::assertSent(fn ($request) => str_contains($request->header('User-Agent')[0], 'StreetBites'));
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->header('User-Agent')[0], 'StreetBites'));
 });
 
 it('returns 404 when nothing matches', function (): void {
