@@ -36,7 +36,7 @@ final class StoreTruckImage
         $encoded = $image->encode(new WebpEncoder(quality: self::QUALITY));
 
         $path = "truck-images/{$truck->id}/".Str::uuid()->toString().'.webp';
-        Storage::disk('public')->put($path, (string) $encoded);
+        Storage::disk(config('filesystems.public_disk'))->put($path, (string) $encoded);
 
         return $truck->images()->create([
             'path' => $path,

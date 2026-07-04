@@ -12,6 +12,7 @@
         "laravel/framework": "^13.8",
         "laravel/reverb": "^1.0",
         "laravel/tinker": "^3.0",
+        "league/flysystem-aws-s3-v3": "^3.35",
         "livewire/livewire": "^4.3"
     },
     "require-dev": {

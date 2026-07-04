@@ -212,6 +212,10 @@ steet_bites/
 │   ├── broadcasting.php        # Reverb configured as default broadcaster
 │   └── reverb.php
 ├── tests/                      # Pest tests (Feature + Unit)
+├── .github/workflows/          # CI + Terraform plan/apply + release-deploy (see Deployment)
+├── docker/                     # nginx/php-fpm/supervisord config for the production image
+├── terraform/                  # AWS infrastructure (bootstrap/, modules/, environments/prod/)
+├── Dockerfile                  # production image (see Deployment)
 ├── .githooks/pre-commit        # quality gate (Pint, Larastan, ESLint, ...)
 ├── .stylelintrc.json           # Stylelint config (Tailwind-aware)
 ├── eslint.config.js            # ESLint flat config
@@ -432,6 +436,24 @@ Services communicate by Docker service name, not `localhost`:
 | MariaDB | `database` | `127.0.0.1:3306` |
 | Redis | `cache` | `127.0.0.1:6379` |
 | Reverb | `reverb` | `localhost:8080` |
+
+---
+
+## Deployment (AWS)
+
+Production runs on **ECS Fargate** — three services from one Docker image
+(`web`, `reverb`, `queue-worker`), RDS MariaDB, ElastiCache Redis, and S3 for
+truck images/map caches. Infrastructure is defined in `terraform/` and rolled
+out via GitHub Actions (`.github/workflows/`): a PR quality gate, Terraform
+plan/apply on infra changes, and a release-triggered build-and-deploy
+pipeline. This is entirely separate from local dev (no Lando involved).
+
+See [`terraform/bootstrap/README.md`](terraform/bootstrap/README.md) for
+one-time AWS/GitHub setup,
+[`terraform/environments/prod/README.md`](terraform/environments/prod/README.md)
+for provisioning the environment, and
+[`docs_and_archetecture/deployment-infrastructure.md`](../docs_and_archetecture/deployment-infrastructure.md)
+for the full architecture writeup.
 
 ---
 

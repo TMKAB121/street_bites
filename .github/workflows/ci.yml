@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: steet_bites_testing
+          MARIADB_USER: steet_bites
+          MARIADB_PASSWORD: steet_bites
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, gd, redis, zip, intl, bcmath, pcntl, exif
+          coverage: none
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Build assets
+        run: npm run build
+
+      - name: Pint (style)
+        run: ./vendor/bin/pint --test
+
+      - name: Larastan (static analysis)
+        run: composer stan
+
+      - name: Pest (tests)
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USERNAME: steet_bites
+          DB_PASSWORD: steet_bites
+        run: ./vendor/bin/pest tests/Feature
+
+      - name: ESLint / Stylelint / Prettier
+        run: npm run lint

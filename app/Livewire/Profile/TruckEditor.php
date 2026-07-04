@@ -336,7 +336,7 @@ class TruckEditor extends Component
     {
         $image = $this->truck()->images()->whereKey($imageId)->firstOrFail();
 
-        Storage::disk('public')->delete($image->path);
+        Storage::disk(config('filesystems.public_disk'))->delete($image->path);
         $image->delete();
 
         $this->toast('Photo removed');
