@@ -33,3 +33,9 @@ variable "reverb_port" {
   type    = number
   default = 8080
 }
+
+variable "domain" {
+  description = "The site's domain (DNS hosted at Cloudflare — see domain.tf). Drives APP_URL (https://www.<domain>), the ACM cert, the ws.<domain> Reverb host, and the SES domain identity mail sends from (noreply@<domain>). Not sensitive, so the prod value is the default — no tfvars/CI variable needed."
+  type        = string
+  default     = "street-bites.org"
+}

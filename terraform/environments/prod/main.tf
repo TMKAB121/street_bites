@@ -18,11 +18,15 @@ module "ecs_cluster" {
   project = var.project
 }
 
+# Both LBs take the cert through aws_acm_certificate_validation (domain.tf)
+# rather than the certificate resource directly, so their TLS listeners can't
+# be created before ACM has actually issued the cert.
 module "alb" {
   source            = "../../modules/alb"
   project           = var.project
   vpc_id            = module.vpc.vpc_id
   public_subnet_ids = module.vpc.public_subnet_ids
+  certificate_arn   = aws_acm_certificate_validation.this.certificate_arn
 }
 
 module "reverb_lb" {
@@ -31,13 +35,20 @@ module "reverb_lb" {
   vpc_id            = module.vpc.vpc_id
   public_subnet_ids = module.vpc.public_subnet_ids
   target_port       = var.reverb_port
+  certificate_arn   = aws_acm_certificate_validation.this.certificate_arn
+}
+
+module "ses" {
+  source = "../../modules/ses"
+  domain = var.domain
 }
 
 module "iam_task_roles" {
-  source        = "../../modules/iam-task-roles"
-  project       = var.project
-  s3_bucket_arn = module.s3_public.bucket_arn
-  secrets_arns  = local.secrets_arns
+  source           = "../../modules/iam-task-roles"
+  project          = var.project
+  s3_bucket_arn    = module.s3_public.bucket_arn
+  ses_identity_arn = module.ses.identity_arn
+  secrets_arns     = local.secrets_arns
 }
 
 # --- Per-service security groups, created here (not inside modules/ecs-service)
@@ -69,7 +80,8 @@ resource "aws_security_group" "web" {
 
 # NLBs don't carry their own security group (see modules/reverb-lb), so the
 # reverb task itself is opened to 0.0.0.0/0 on its port — an accepted
-# simplification for this no-TLS, no-custom-domain first cut.
+# simplification (browsers use the NLB's TLS:443 listener; this port also
+# carries the server-side broadcast hairpin).
 resource "aws_security_group" "reverb" {
   name_prefix = "${var.project}-reverb-"
   vpc_id      = module.vpc.vpc_id
@@ -140,7 +152,7 @@ locals {
     { name = "APP_NAME", value = "Street Bites" },
     { name = "APP_ENV", value = "production" },
     { name = "APP_DEBUG", value = "false" },
-    { name = "APP_URL", value = "http://${module.alb.dns_name}" },
+    { name = "APP_URL", value = "https://www.${var.domain}" },
     { name = "LOG_CHANNEL", value = "stack" },
     { name = "DB_CONNECTION", value = "mariadb" },
     { name = "DB_HOST", value = module.rds.endpoint },
@@ -152,8 +164,10 @@ locals {
     { name = "REDIS_PORT", value = tostring(module.elasticache.port) },
     { name = "CACHE_STORE", value = "redis" },
     { name = "SESSION_DRIVER", value = "redis" },
-    { name = "SESSION_SECURE_COOKIE", value = "false" }, # no TLS on the ALB yet — flip true once HTTPS is wired up
+    { name = "SESSION_SECURE_COOKIE", value = "true" }, # the ALB serves HTTPS-only (HTTP:80 just redirects)
     { name = "QUEUE_CONNECTION", value = "redis" },
+    { name = "MAIL_MAILER", value = "ses" }, # config/services.php `ses` leaves the key/secret blank → SDK falls through to the ECS task role
+    { name = "MAIL_FROM_ADDRESS", value = local.mail_from_address },
     { name = "BROADCAST_CONNECTION", value = "reverb" },
     { name = "REVERB_HOST", value = module.reverb_lb.dns_name },
     { name = "REVERB_PORT", value = tostring(var.reverb_port) },

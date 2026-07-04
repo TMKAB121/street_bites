@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.6"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.0"
+    }
   }
 
   # Values come from terraform/bootstrap's outputs (state_bucket_name,
@@ -23,6 +27,13 @@ terraform {
     encrypt        = true
   }
 }
+
+# DNS for street-bites.org lives at Cloudflare, not Route 53. The provider
+# authenticates via the CLOUDFLARE_API_TOKEN env var (a token scoped to
+# Zone:Read + DNS:Edit on this one zone) — export it locally; CI supplies it
+# as a repo *secret* (terraform-plan.yml / terraform-apply.yml). No argument
+# here on purpose: the token must never land in state or a tfvars file.
+provider "cloudflare" {}
 
 provider "aws" {
   region = var.aws_region

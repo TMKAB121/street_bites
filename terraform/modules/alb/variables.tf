@@ -21,3 +21,8 @@ variable "health_check_path" {
   type        = string
   default     = "/up"
 }
+
+variable "certificate_arn" {
+  description = "ACM certificate (same region as the ALB) for the HTTPS:443 listener — issued/validated in environments/prod/domain.tf."
+  type        = string
+}

@@ -16,6 +16,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // The sign-in route is named auth.login (there is no 'login' route), so
         // point the auth middleware's guest redirect at it.
         $middleware->redirectGuestsTo(fn (): string => route('auth.login'));
+
+        // TLS terminates upstream (the ALB in prod, Lando's traefik locally),
+        // so PHP sees plain HTTP — trust the proxy's X-Forwarded-* headers or
+        // every generated absolute URL (redirects, the signed magic link in
+        // the sign-up email) comes out http:// on an https page. The AWS_ELB
+        // header set deliberately excludes X-Forwarded-Host: the ALB forwards
+        // a client-supplied one untouched, and trusting it would let requests
+        // poison generated URLs.
+        $middleware->trustProxies(at: '*', headers: Request::HEADER_X_FORWARDED_AWS_ELB);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
