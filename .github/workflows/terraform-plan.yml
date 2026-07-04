@@ -17,8 +17,11 @@ jobs:
       # terraform.tfvars is gitignored (holds no secrets, just the bucket
       # name, but isn't committed) — CI supplies it via TF_VAR_* instead.
       # Add S3_BUCKET_NAME as a repository variable (Settings → Secrets and
-      # variables → Actions → Variables).
+      # variables → Actions → Variables). CLOUDFLARE_API_TOKEN is a repo
+      # *secret* (Zone:Read + DNS:Edit on the street-bites.org zone) — the
+      # cloudflare provider reads it from the environment (see backend.tf).
       TF_VAR_s3_bucket_name: ${{ vars.S3_BUCKET_NAME }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     defaults:
       run:
         working-directory: terraform/environments/prod

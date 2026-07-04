@@ -1,6 +1,6 @@
-# HTTP:80 only — no ACM cert / custom domain in this first cut (see plan's
-# "Domain/TLS" decision). Revisit with a Route 53 record + ACM cert + a 443
-# listener as a fast-follow; don't let this listener silently stay the only one.
+# HTTPS:443 terminates TLS with the ACM cert (validated via Cloudflare DNS —
+# see environments/prod/domain.tf); HTTP:80 stays open only to 301-redirect
+# onto https, so old links and bare-hostname typing still land somewhere.
 resource "aws_security_group" "this" {
   name_prefix = "${var.project}-alb-"
   vpc_id      = var.vpc_id
@@ -8,6 +8,13 @@ resource "aws_security_group" "this" {
   ingress {
     from_port   = 80
     to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -49,13 +56,31 @@ resource "aws_lb_target_group" "this" {
   }
 }
 
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.this.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = var.certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.this.arn
+  }
+}
+
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.this.arn
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
   }
 }

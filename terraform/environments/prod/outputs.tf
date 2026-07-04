@@ -1,10 +1,20 @@
+output "app_url" {
+  description = "Canonical public URL (APP_URL) — https on the ALB's ACM cert; the apex and plain-HTTP both redirect/resolve here via Cloudflare DNS (domain.tf)."
+  value       = "https://www.${var.domain}"
+}
+
 output "alb_dns_name" {
-  description = "Public URL for the app (plain HTTP — no custom domain/TLS in this first cut)."
+  description = "The ALB's own DNS name — what the Cloudflare apex/www CNAMEs point at. Not for browsers (the cert only covers the domain)."
   value       = module.alb.dns_name
 }
 
+output "reverb_browser_host" {
+  description = "Browser-facing WebSocket host: set the VITE_REVERB_HOST repo variable to this (with VITE_REVERB_PORT=443, VITE_REVERB_SCHEME=https) and publish a release to rebake the JS bundle."
+  value       = "ws.${var.domain}"
+}
+
 output "reverb_dns_name" {
-  description = "Browser-facing WebSocket host, the prod equivalent of local VITE_REVERB_HOST."
+  description = "The Reverb NLB's own DNS name — the server-side broadcast hairpin target (REVERB_HOST) and what the Cloudflare ws CNAME points at."
   value       = module.reverb_lb.dns_name
 }
 

@@ -18,8 +18,10 @@ jobs:
     # repo's environment settings) must approve before it actually runs.
     environment: production-infra
     env:
-      # See terraform-plan.yml's comment — same repo variable, same reason.
+      # See terraform-plan.yml's comment — same repo variable + secret,
+      # same reason.
       TF_VAR_s3_bucket_name: ${{ vars.S3_BUCKET_NAME }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     defaults:
       run:
         working-directory: terraform/environments/prod
