@@ -5,6 +5,10 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Street Bites — Find food trucks near you</title>
 
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+        <link rel="icon" href="/favicon.ico" sizes="48x48">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
         @fonts
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @livewireStyles
@@ -24,21 +28,27 @@
                 </p>
             </section>
 
-            {{-- Carousel of featured trucks (unfiltered — always shows all published).
-                 truckDistanceSort reorders the cards closest-first once the
-                 visitor shares their location (data-lat/lng on each card). --}}
-            <section class="mb-8">
+            {{-- Popular carousel — the ten most-favourited trucks, open-now
+                 first (ordering computed in the home route). Popularity drives
+                 this list, so it keeps its server order — no truckDistanceSort;
+                 truckRadiusFilter still hides any card beyond the 100-mile
+                 radius once the visitor's location is known, and the whole
+                 section steps aside when none remain in range. --}}
+            <section class="mb-8" x-data="truckRadiusFilter" x-show="anyInRange">
                 <h2 class="text-lg font-semibold text-primary mb-3 px-1">Popular near you</h2>
                 <div class="-mx-4">
-                    <x-card-carousel label="Popular trucks" x-data="truckDistanceSort">
-                        @forelse ($trucks->take(8) as $truck)
-                            <x-food-truck-card
-                                :name="$truck->name"
-                                :image="$truck->images->first()?->url"
-                                :href="route('trucks.show', $truck)"
-                                data-lat="{{ $truck->latitude }}"
-                                data-lng="{{ $truck->longitude }}"
-                            />
+                    <x-card-carousel label="Popular trucks">
+                        @forelse ($popular as $truck)
+                            <div data-lat="{{ $truck->latitude }}" data-lng="{{ $truck->longitude }}">
+                                <x-food-truck-card
+                                    :name="$truck->name"
+                                    :image="$truck->images->first()?->url"
+                                    :href="route('trucks.show', $truck)"
+                                    :open="$truck->isOpenNow()"
+                                    :truck-id="$truck->id"
+                                    :favorited="auth()->check() ? (bool) ($truck->is_favorited ?? false) : null"
+                                />
+                            </div>
                         @empty
                             <p class="px-4 text-sm text-text-muted">No trucks yet — check back soon!</p>
                         @endforelse
@@ -46,48 +56,16 @@
                 </div>
             </section>
 
-            {{-- Cuisine filters + results grid. The Alpine scope here is the
-                 single source of truth for which tag is active. The filter row
-                 dispatches `tag-filter` events; the grid x-shows cards that match. --}}
-            <section
-                x-data="{ activeTag: 'all' }"
-                @tag-filter.window="activeTag = $event.detail.tag"
-            >
-                <h2 class="text-lg font-semibold text-primary mb-3 px-1">Browse by cuisine</h2>
-                <div class="-mx-4">
-                    <x-truck-filters :tags="$tags" />
-                </div>
-
-                {{-- Live map of pinned trucks — centres on the visitor's GPS
-                     when granted; pins follow the active cuisine filter. --}}
-                <x-truck-map :trucks="$trucks" class="mt-4" />
-
-                {{-- truckDistanceSort reorders the cards closest-first once the
-                     visitor shares their location; activeTag still resolves
-                     through the parent Alpine scope. --}}
-                <div class="grid grid-cols-2 gap-4 mt-4 md:grid-cols-3" x-data="truckDistanceSort">
-                    @forelse ($trucks as $truck)
-                        <div
-                            x-show="activeTag === 'all' || {{ Js::from($truck->tags->pluck('slug')) }}.includes(activeTag)"
-                            x-transition
-                            data-lat="{{ $truck->latitude }}"
-                            data-lng="{{ $truck->longitude }}"
-                        >
-                            <x-food-truck-card
-                                :name="$truck->name"
-                                :image="$truck->images->first()?->url"
-                                :href="route('trucks.show', $truck)"
-                            />
-                        </div>
-                    @empty
-                        <p class="col-span-2 text-sm text-text-muted">No trucks yet.</p>
-                    @endforelse
-                </div>
-            </section>
+            {{-- Cuisine filters + ZIP fallback + live map + results grid —
+                 the shared discovery section, also used by /favorites. --}}
+            <x-truck-discovery :trucks="$trucks" :tags="$tags" />
         </main>
 
         {{-- Fixed mobile bottom nav. --}}
         <x-mobile-nav active="home" />
+
+        {{-- GDPR cookie-consent banner + persistent preferences widget. --}}
+        <x-cookie-consent />
         @livewireScripts
     </body>
 </html>

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Livewire\Profile\ProfilePage;
+use App\Models\CookieConsent;
 use App\Models\FoodTruck;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,7 +20,9 @@ it('redirects guests to the sign-in page', function (): void {
 it('shows the profile to a signed-in user with the add-a-truck CTA', function (): void {
     $user = User::factory()->create();
 
+    // The profile sits behind cookie consent (RequireCookieConsent).
     $this->withoutVite()
+        ->withCookie(CookieConsent::COOKIE_NAME, 'accepted')
         ->actingAs($user)
         ->get(route('profile'))
         ->assertOk()
@@ -68,6 +71,23 @@ it('lists the signed-in user\'s favourited trucks', function (): void {
     Livewire::actingAs($user)
         ->test(ProfilePage::class)
         ->assertSee('Falafel Express');
+});
+
+it('renders favourites as a slim alphabetical list of links with filled stars', function (): void {
+    $user = User::factory()->create();
+    $zebra = FoodTruck::factory()->create(['name' => 'Zebra Cakes']);
+    $arepa = FoodTruck::factory()->create(['name' => 'Arepa Avenue']);
+    // Attach z-first so alphabetical ordering is doing the work, not insertion.
+    $user->favorites()->attach([$zebra->id, $arepa->id]);
+
+    Livewire::actingAs($user)
+        ->test(ProfilePage::class)
+        ->assertSeeInOrder(['Arepa Avenue', 'Zebra Cakes'])
+        // Each row: a link to the truck page + the filled favourite star.
+        ->assertSeeHtml(route('trucks.show', $arepa))
+        ->assertSeeHtml('class="fav-toggle fav-toggle--active')
+        // No card grid — the list replaced <x-food-truck-card>.
+        ->assertDontSeeHtml('food-truck-card');
 });
 
 it('only shows the user\'s own trucks, not other vendors\'', function (): void {

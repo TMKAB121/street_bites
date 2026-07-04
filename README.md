@@ -162,8 +162,10 @@ hook — run it on demand and review its diff before committing.
 steet_bites/
 ├── app/
 │   ├── Actions/                # single-purpose actions (StoreTruckImage,
-│   │                           #   GenerateTruckMapImage, ReverseGeocodeLabel)
-│   ├── Http/Controllers/
+│   │                           #   GenerateTruckMapImage, ReverseGeocodeLabel, GeocodeSearch)
+│   ├── Http/
+│   │   ├── Controllers/
+│   │   └── Middleware/         # RequireCookieConsent (cookie-consent gate on auth/profile)
 │   ├── Livewire/               # Livewire components (Auth/, Profile/)
 │   ├── Models/                 # User, FoodTruck, MenuItem, TruckImage, ...
 │   ├── Jobs/                   # Queued jobs
@@ -172,6 +174,10 @@ steet_bites/
 │   ├── migrations/
 │   ├── factories/
 │   └── seeders/
+├── public/
+│   ├── favicon.svg             # vector icon (pin mark) + favicon.ico / apple-touch-icon.png
+│   └── images/                 # brand assets: street-bites-logo.svg (header logo),
+│                               #   transparent logo/icon PNGs
 ├── resources/
 │   ├── css/                    # Tailwind 4 CSS-first design system
 │   │   ├── app.css             # entry: @import 'tailwindcss' + partials
@@ -180,17 +186,24 @@ steet_bites/
 │   │   └── components/         # .btn, .food-truck-card, .mobile-nav, .mobile-header,
 │   │                           #   .card-carousel, .filter-row, .profile, .truck-form, .toast, ...
 │   ├── js/
-│   │   ├── app.js              # imports echo.js + truck-map.js (Alpine is bundled by Livewire 4)
+│   │   ├── app.js              # imports the JS modules below (Alpine is bundled by Livewire 4)
 │   │   ├── echo.js             # Laravel Echo / Reverb client config
-│   │   └── truck-map.js        # Leaflet home-page map + closest-first card sorting
+│   │   ├── truck-map.js        # Leaflet home-page map + closest-first card sorting
+│   │   │                       #   + 100-mile radius cap + ZIP/address location-search fallback
+│   │   ├── favorites.js        # favourite star toggle (optimistic Alpine + fetch)
+│   │   └── search.js           # header search typeahead dropdown
 │   └── views/
 │       ├── components/         # anonymous Blade components (x-mobile-nav, x-mobile-header,
-│       │                       #   x-food-truck-card, x-card-carousel, x-truck-filters,
-│       │                       #   x-truck-form, x-truck-map, x-toast)
+│       │                       #   x-food-truck-card, x-favorite-toggle, x-truck-discovery,
+│       │                       #   x-card-carousel, x-truck-filters, x-truck-form, x-truck-map,
+│       │                       #   x-location-search, x-toast, x-cookie-consent)
 │       ├── layouts/            # app.blade.php (centered) + shell.blade.php (mobile chrome)
 │       ├── livewire/           # full-page Livewire views (auth/, profile/)
 │       ├── trucks/show.blade.php # public truck detail page (/trucks/{id})
 │       ├── welcome.blade.php   # home page — assembled mobile shell (/)
+│       ├── favorites.blade.php # signed-in favorites page (/favorites)
+│       ├── search.blade.php    # search landing page (/search?q=…)
+│       ├── about.blade.php     # public "About us" page (/about)
 │       └── styleguide.blade.php # living style guide (/styleguide)
 ├── routes/
 │   ├── web.php
@@ -219,9 +232,14 @@ The "Urban Vibrant" design system is encoded as Tailwind `@theme` tokens in
 classes from a single source of truth. A living style guide renders at
 [`/styleguide`](https://steet-bites.lndo.site/styleguide).
 
+Branding is vector-first: the Street Bites logo (map pin + wordmark) ships as an
+SVG in `public/images/` and renders in the app header, and every page links the
+favicon set (`favicon.svg` with `.ico` and apple-touch fallbacks) from `public/`.
+
 Reusable UI is built as **anonymous Blade components** in
-`resources/views/components/` (mobile header, bottom nav, food-truck card, card
-carousel, cuisine filters, the vendor truck form, and a toast), each pairing a CSS
+`resources/views/components/` (mobile header, bottom nav, food-truck card, the
+favourite star, card carousel, cuisine filters, the shared discovery section, the
+vendor truck form, a toast, and the cookie-consent banner), each pairing a CSS
 partial with a Blade template. The home page (`/`) assembles them into a mobile app
 shell. Client-side interactivity (e.g. the header's hamburger menu and the toast)
 is powered by **Alpine.js**, which **Livewire 4 bundles and starts automatically** —
@@ -246,6 +264,30 @@ See [`docs_and_archetecture/frontend-framework.md`](../docs_and_archetecture/fro
 for the front-end framework, and
 [`docs_and_archetecture/ui-component-architecture.md`](../docs_and_archetecture/ui-component-architecture.md)
 for the component library and its design decisions.
+
+---
+
+## Cookie Consent (GDPR)
+
+A custom consent banner appears on first visit. The app sets **only essential
+cookies** (session-backed sign-in and favorites — no analytics, ads, or
+tracking), so consent is deliberately **all-or-nothing**: accept, or decline and
+keep browsing anonymously without accounts/favorites.
+
+- **No dark patterns** — Accept and Decline are rendered with identical size,
+  color, and font (one shared CSS class enforces the equal prominence GDPR
+  requires), and nothing is pre-selected.
+- **Easy withdrawal** — a persistent round "cookie preferences" button stays on
+  every page and reopens the banner; withdrawing consent while signed in also
+  signs the user out.
+- **Documented consent** — every accept/decline is logged to a `cookie_consents`
+  audit table (policy version, hashed IP, user agent, user id when signed in).
+- **Enforced server-side** — the `RequireCookieConsent` middleware gates the
+  sign-in/sign-up flows and `/profile`; without consent those routes redirect
+  home, where the banner reopens and explains.
+
+The choice is stored in an encrypted cookie for ~6 months, after which the
+banner re-prompts. See `CLAUDE.md` → *Cookie consent (GDPR)* for conventions.
 
 ---
 
@@ -307,14 +349,49 @@ See `CLAUDE.md` → *Profile & vendor management* for the schema and conventions
 Each published truck has a **detail page** (`/trucks/{id}`) that discovery cards
 link to — its photos, cuisine tags, today's hours ("Open now — since …" when a
 vendor has flipped **Now Open**), location, menu, and a map of the surrounding area.
-The home page shows an **interactive map** of pinned trucks that centres on the
-visitor's location, with pins that filter alongside the cuisine pills and cards that
-re-sort **closest-first** once location is shared.
+Trucks that are **serving right now** carry a red **"Now Open"** badge on their card
+and are listed **first** — the home page leads with open trucks (alphabetical), and once
+location is shared the cards re-sort to the **nearest open truck first**. The home page
+also shows an **interactive map** of pinned trucks that centres on the visitor's location,
+with pins that filter alongside the cuisine pills. Visitors who **decline the GPS
+prompt** get a fallback instead: a search card appears where they can enter a **ZIP
+code or address**, which is geocoded to rough coordinates — the map recenters and
+the cards re-sort just as if location had been shared.
+
+Once a location is known (either way), every result surface applies a **100-mile
+radius cap**: trucks further out are hidden from the discovery grids, the Popular
+carousel, the search results, and the map's pins, so visitors only ever see trucks
+they could realistically reach. The location is remembered for the browser session,
+so it keeps working across pages without re-prompting.
 
 All mapping uses **OpenStreetMap** with **no API key or billing**: truck pages
 render a cached static map ([`dantsu/php-osm-static-api`](https://github.com/DantSu/php-osm-static-api)),
-the home page uses [Leaflet](https://leafletjs.com/), and area labels come from OSM
-**Nominatim** reverse geocoding. See `CLAUDE.md` → *Maps & geolocation*.
+the home page uses [Leaflet](https://leafletjs.com/), and both geocoding directions
+come from OSM **Nominatim** — reverse (pin → area label) and forward (typed
+ZIP/address → coordinates, proxied through a cached, rate-limited `/api/geocode`
+endpoint). See `CLAUDE.md` → *Maps & geolocation*.
+
+---
+
+## Favorites & Search
+
+Signed-in eaters can **star any truck** — on its discovery card, on its detail
+page, or from the favourites list on `/profile`. The star toggles instantly
+(optimistic UI backed by a `POST /api/favorites/{truck}` endpoint) and drives
+three things: the **Popular near you** carousel on the home page (the ten
+most-favourited trucks, open-now first), the filled stars across discovery, and
+the **`/favorites` page** — the home page's full discovery section (cuisine
+filters, map, distance-sorted cards) scoped to the trucks you've starred.
+Guests see no stars; favorites are part of the essential-cookie account
+features behind cookie consent.
+
+The **header search bar** works on every page: type two or more characters and
+a dropdown suggests matching trucks — matched by **truck name, cuisine tag
+(e.g. "Burgers"), or menu item name** — each linking straight to its truck
+page, with a hint of *why* it matched when the name alone doesn't show it.
+Pressing **Enter** (or tapping the magnifier) lands on `/search`, which lists
+every matching truck as discovery cards, open-now trucks first. See
+`CLAUDE.md` → *Favorites* and *Search*.
 
 ---
 
@@ -363,3 +440,7 @@ Services communicate by Docker service name, not `localhost`:
 This project is built live across a YouTube series. Each commit maps to a video episode — follow along to see every decision made from scratch.
 
 https://www.youtube.com/playlist?list=PLCFAvrjCdis-mdDgzj3wAYA6wXjzgml9z
+
+The app itself tells this story on its public **About page** (`/about`, linked from
+the menu) — the mission, the developer, and follow-along links to the YouTube
+series, the GitHub repo, and LinkedIn.

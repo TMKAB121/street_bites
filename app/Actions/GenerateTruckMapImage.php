@@ -24,8 +24,8 @@ use Throwable;
  */
 final class GenerateTruckMapImage
 {
-    /** ~30 m/px at lat 39° → a 640px-wide image spans ~6 miles each side of the pin. */
-    public const ZOOM = 12;
+    /** ~15 m/px at lat 39° → a 640px-wide image spans ~3 miles each side of the pin. */
+    public const ZOOM = 13;
 
     public const WIDTH = 640;
 

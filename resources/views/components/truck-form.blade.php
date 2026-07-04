@@ -128,21 +128,29 @@
          Parked for the day → one tap pins the truck at the vendor's GPS
          position (browser geolocation feeds TruckEditor::setLocation, which
          also refreshes the truck-page map). Alpine owns the busy state; errors
-         surface through the app-wide toast stack. --}}
+         surface through the app-wide toast stack. When GPS fails (denied,
+         unavailable, or no API), a <x-location-search> fallback appears so the
+         vendor can pin by ZIP/address instead — its bubbling `user-located`
+         event is caught here and fed into the same setLocation call. --}}
     <fieldset class="truck-form__section">
         <legend class="truck-form__legend">Today’s location</legend>
         <p class="truck-form__hint">
             Parked for the day? Pin your spot so eaters can find you on the map.
         </p>
 
-        <div class="truck-form__location" x-data="{ locating: false }">
+        <div
+            class="truck-form__location"
+            x-data="{ locating: false, gpsFailed: false }"
+            @user-located="$wire.setLocation($event.detail.lat, $event.detail.lng, Intl.DateTimeFormat().resolvedOptions().timeZone)"
+        >
             <button
                 type="button"
                 class="btn btn-mustard"
                 :disabled="locating"
                 @click="
                     if (!navigator.geolocation) {
-                        $dispatch('toast', { message: 'Location isn’t available in this browser.', type: 'error' });
+                        gpsFailed = true;
+                        $dispatch('toast', { message: 'Location isn’t available in this browser — enter your spot below instead.', type: 'error' });
                         return;
                     }
                     locating = true;
@@ -156,7 +164,8 @@
                             .finally(() => (locating = false)),
                         () => {
                             locating = false;
-                            $dispatch('toast', { message: 'We couldn’t get your location — check your browser’s permission.', type: 'error' });
+                            gpsFailed = true;
+                            $dispatch('toast', { message: 'We couldn’t get your location — enter your spot below instead.', type: 'error' });
                         }
                     );
                 "
@@ -173,6 +182,20 @@
                     No location pinned yet.
                 @endif
             </p>
+
+            {{-- GPS-failure fallback: same geocoding form as the home page.
+                 Stays visible after a successful pin so a misgeocoded entry
+                 can be corrected; the status line above confirms the result. --}}
+            <div x-show="gpsFailed" x-cloak>
+                <x-location-search
+                    class="mt-3"
+                    :always-visible="true"
+                    input-id="truck-location-search-{{ $truckId }}"
+                    label="Enter the address or ZIP code of your spot and we’ll pin it there."
+                    cta="Pin this spot"
+                    :result-prefix="null"
+                />
+            </div>
         </div>
     </fieldset>
 
@@ -249,7 +272,7 @@
     <fieldset class="truck-form__section">
         <legend class="truck-form__legend">Photos</legend>
         <p class="truck-form__hint">
-            Square photos look best — we crop and resize each upload to a 250×250 thumbnail.
+            Square photos look best — we crop and resize each upload to a 250×250 thumbnail. <br>For best results, make sure there is plenty of space around the focus point of the photo in the center.
         </p>
 
         @if ($images && $images->isNotEmpty())

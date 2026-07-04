@@ -3,31 +3,175 @@
 declare(strict_types=1);
 
 use App\Actions\GenerateTruckMapImage;
+use App\Actions\GeocodeSearch;
+use App\Http\Middleware\RequireCookieConsent;
 use App\Livewire\Auth\EmailEntry;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\LoginVerify;
 use App\Livewire\Auth\SetPassword;
 use App\Livewire\Auth\VerifyCode;
 use App\Livewire\Profile\ProfilePage;
+use App\Models\CookieConsent;
 use App\Models\FoodTruck;
 use App\Models\Tag;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
 Route::get('/', function () {
     $trucks = FoodTruck::query()
         ->where('is_published', true)
-        ->with(['images', 'tags'])
+        ->with(['images', 'tags', 'todayHours'])
+        // How many eaters favourited each truck — drives the Popular carousel.
+        ->withCount('favoritedBy as favorites_count')
+        // Flag each truck the signed-in visitor has favourited (is_favorited),
+        // so the discovery cards can render their star filled. Guests skip the
+        // subquery — their cards render no star at all.
+        ->when(auth()->check(), fn ($query) => $query->withExists([
+            'favoritedBy as is_favorited' => fn ($q) => $q->whereKey(auth()->id()),
+        ]))
         ->orderBy('name')
-        ->get();
+        ->get()
+        // Open-now trucks lead the list, alphabetical within each group. This is
+        // the pre-geolocation order; once the visitor shares a location the
+        // client-side truckDistanceSort re-sorts to closest-first, still
+        // open-first (see resources/js/truck-map.js). isOpenNow() reads the
+        // eager-loaded todayHours, so this adds no queries. sortByDesc is stable
+        // (PHP 8), preserving the alphabetical order above within each group.
+        ->sortByDesc->isOpenNow()
+        ->values();
+
+    // The Popular carousel: the ten most-favourited trucks, open-now first,
+    // then by favourite count. Both sorts are stable, so cutting the top ten
+    // by count *before* the open-first pass keeps count as the tie-breaker
+    // within each open/closed group (and name below that, from $trucks above).
+    $popular = $trucks
+        ->sortByDesc('favorites_count')
+        ->take(10)
+        ->sortByDesc->isOpenNow()
+        ->values();
 
     $tags = Tag::query()
         ->whereHas('foodTrucks', fn ($q) => $q->where('is_published', true))
         ->orderBy('name')
         ->get();
 
-    return view('welcome', compact('trucks', 'tags'));
+    return view('welcome', compact('trucks', 'popular', 'tags'));
 })->name('home');
+
+// Search landing page — where the header search bar submits (Enter or the
+// icon button). Lists matching published trucks as discovery cards; matching
+// is by truck name, cuisine tag, or menu item name (FoodTruck::search()).
+Route::get('/search', function (Request $request) {
+    $term = trim($request->string('q')->toString());
+
+    $trucks = $term === ''
+        ? collect()
+        : FoodTruck::query()
+            ->where('is_published', true)
+            ->search($term)
+            ->with(['images', 'tags', 'todayHours'])
+            // Same is_favorited flag as home, so the cards' stars render.
+            ->when(auth()->check(), fn ($query) => $query->withExists([
+                'favoritedBy as is_favorited' => fn ($q) => $q->whereKey(auth()->id()),
+            ]))
+            ->orderBy('name')
+            ->get()
+            // Same pre-geolocation order as home: open-now trucks lead,
+            // alphabetical within each group.
+            ->sortByDesc->isOpenNow()
+            ->values();
+
+    return view('search', compact('trucks', 'term'));
+})->name('search');
+
+// Typeahead suggestions for the header search bar: up to 8 published trucks
+// matching by name, tag, or menu item, each with a link to its detail page
+// and a short "why it matched" context line. Lives under /api so validation
+// errors render as JSON (see /api/geocode).
+Route::get('/api/search', function (Request $request) {
+    $request->validate([
+        'q' => ['required', 'string', 'min:2', 'max:100'],
+    ]);
+
+    $term = trim($request->string('q')->toString());
+    $like = FoodTruck::likePattern($term);
+
+    $trucks = FoodTruck::query()
+        ->where('is_published', true)
+        ->search($term)
+        // Constrained eager loads: only the tags/menu items that themselves
+        // match, so the context line below can explain non-name matches.
+        ->with([
+            'tags' => fn ($q) => $q->where('tags.name', 'like', $like),
+            'menuItems' => fn ($q) => $q->where('name', 'like', $like),
+        ])
+        ->orderBy('name')
+        ->limit(8)
+        ->get();
+
+    return response()->json($trucks->map(fn (FoodTruck $truck) => [
+        'id' => $truck->id,
+        'name' => $truck->name,
+        'url' => route('trucks.show', $truck),
+        // Why this truck matched, when the name alone doesn't show it.
+        'context' => mb_stripos($truck->name, $term) !== false
+            ? null
+            : ($truck->tags->first()?->name ?? $truck->menuItems->first()?->name),
+    ])->values());
+})->middleware('throttle:60,1')->name('search.suggest');
+
+// ZIP/address → rough coordinates, for visitors who decline browser
+// geolocation (<x-location-search> on the home page). Proxied through the
+// server so the Nominatim usage policy (identifying User-Agent) is honoured;
+// cached a day per normalized query and throttled since each miss is an
+// external request. Lives under /api so validation errors render as JSON
+// (bootstrap/app.php limits shouldRenderJsonWhen to api/*).
+Route::get('/api/geocode', function (Request $request) {
+    $request->validate([
+        'q' => ['required', 'string', 'min:3', 'max:120'],
+    ]);
+
+    $query = mb_strtolower(trim($request->string('q')->toString()));
+
+    $result = Cache::remember(
+        'geocode:'.sha1($query),
+        now()->addDay(),
+        fn (): ?array => app(GeocodeSearch::class)($query),
+    );
+
+    return $result === null
+        ? response()->json(['message' => 'No match for that location.'], 404)
+        : response()->json($result);
+})->middleware('throttle:15,1')->name('geocode');
+
+// Records a cookie-consent decision from <x-cookie-consent>: documents it in
+// cookie_consents (GDPR audit trail), then sets the consent cookie. Withdrawing
+// consent while signed in also signs the visitor out (all-or-nothing — auth is
+// cookie-backed), and the banner sends them home for a consistent guest view.
+// Lives under /api so validation errors render as JSON (see /api/geocode).
+Route::post('/api/cookie-consent', function (Request $request) {
+    $data = $request->validate([
+        'status' => ['required', 'string', 'in:accepted,declined'],
+    ]);
+
+    // Log first so a signed-in withdrawal is still attributed to the user.
+    CookieConsent::log($data['status'], $request);
+
+    $signedOut = $data['status'] === CookieConsent::STATUS_DECLINED && auth()->check();
+
+    if ($signedOut) {
+        auth()->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+    }
+
+    return response()
+        ->json(['status' => $data['status'], 'signedOut' => $signedOut])
+        ->cookie(cookie(CookieConsent::COOKIE_NAME, $data['status'], CookieConsent::COOKIE_MINUTES));
+})->middleware('throttle:30,1')->name('cookie-consent.store');
 
 // Public truck detail page — the destination of every truck card's FIND NOW
 // CTA. Unpublished trucks stay invisible (404), matching home-page discovery.
@@ -37,24 +181,92 @@ Route::get('/trucks/{truck}', function (string $truck) {
         ->with(['images', 'tags', 'menuItems', 'todayHours'])
         ->findOrFail($truck);
 
+    // Whether the signed-in visitor has favourited this truck (guests get no
+    // star at all, so false is fine as their placeholder).
+    $isFavorited = auth()->check()
+        && $truck->favoritedBy()->whereKey(auth()->id())->exists();
+
     // Cached OSM static map of the pin's surroundings; null hides the section.
     $mapPath = app(GenerateTruckMapImage::class)($truck);
     $mapUrl = $mapPath !== null ? Storage::disk('public')->url($mapPath) : null;
 
-    return view('trucks.show', compact('truck', 'mapUrl'));
+    return view('trucks.show', compact('truck', 'mapUrl', 'isFavorited'));
 })->whereNumber('truck')->name('trucks.show');
+
+// Favourite/unfavourite toggle for the star buttons (<x-favorite-toggle> →
+// resources/js/favorites.js). One endpoint, idempotent per pair: toggle()
+// attaches or detaches the favorites pivot row and the response reports the
+// resulting state, which the button settles on. Only published trucks can be
+// favourited, matching their visibility everywhere else. Lives under /api so
+// errors render as JSON (see /api/geocode).
+Route::post('/api/favorites/{truck}', function (Request $request, string $truck) {
+    $truck = FoodTruck::query()
+        ->where('is_published', true)
+        ->findOrFail($truck);
+
+    /** @var User $user */
+    $user = $request->user();
+
+    $changes = $user->favorites()->toggle($truck);
+
+    return response()->json(['favorited' => $changes['attached'] !== []]);
+})->whereNumber('truck')->middleware(['auth', 'throttle:60,1'])->name('favorites.toggle');
+
+// Public "About us" page — the mission, the developer, and where to follow the
+// build. Static Blade view on the shared shell chrome, linked from the
+// hamburger menu (and the desktop header nav).
+Route::view('/about', 'about')->name('about');
 
 // Living style guide — visual reference for the "Urban Vibrant" design tokens.
 Route::view('/styleguide', 'styleguide');
 
-// Signed-in profile: favourited trucks + on-demand vendor truck management.
-Route::get('/profile', ProfilePage::class)->middleware('auth')->name('profile');
+// Everything cookie-backed sits behind explicit consent (all-or-nothing: the
+// app has no non-essential cookies, so declining simply forgoes accounts and
+// favorites). Visitors without an 'accepted' consent cookie are sent home,
+// where the banner reopens and explains.
+Route::middleware(RequireCookieConsent::class)->group(function (): void {
+    // Signed-in profile: favourited trucks + on-demand vendor truck management.
+    Route::get('/profile', ProfilePage::class)->middleware('auth')->name('profile');
 
-// Email-verified sign-up flow: enter email → verify code → set password.
-Route::get('/auth/email', EmailEntry::class)->name('auth.email');
-Route::get('/auth/verify', VerifyCode::class)->name('auth.verify');
-Route::get('/auth/password', SetPassword::class)->name('auth.password');
+    // Signed-in favorites page — the home page's discovery section
+    // (<x-truck-discovery>: filters, ZIP fallback, map, sorted grid) scoped to
+    // the trucks this user has starred.
+    Route::get('/favorites', function (Request $request) {
+        /** @var User $user */
+        $user = $request->user();
 
-// Sign-in flow: password (primary factor) → emailed one-time code (second factor).
-Route::get('/auth/login', Login::class)->name('auth.login');
-Route::get('/auth/login/verify', LoginVerify::class)->name('auth.login.verify');
+        $trucks = $user->favorites()
+            ->where('is_published', true)
+            ->with(['images', 'tags', 'todayHours'])
+            // Everything here is favourited by definition, but the shared
+            // discovery grid reads is_favorited — flag it the same way the
+            // home page does so the stars render filled.
+            ->withExists(['favoritedBy as is_favorited' => fn ($q) => $q->whereKey($user->id)])
+            ->orderBy('name')
+            ->get()
+            // Same pre-geolocation order as home: open-now trucks lead,
+            // alphabetical within each group (see the home route).
+            ->sortByDesc->isOpenNow()
+            ->values();
+
+        // Only cuisines that appear among the favourites — pills for anything
+        // else would filter down to an empty grid.
+        $tags = Tag::query()
+            ->whereHas('foodTrucks', fn ($q) => $q
+                ->where('is_published', true)
+                ->whereHas('favoritedBy', fn ($fq) => $fq->whereKey($user->id)))
+            ->orderBy('name')
+            ->get();
+
+        return view('favorites', compact('trucks', 'tags'));
+    })->middleware('auth')->name('favorites');
+
+    // Email-verified sign-up flow: enter email → verify code → set password.
+    Route::get('/auth/email', EmailEntry::class)->name('auth.email');
+    Route::get('/auth/verify', VerifyCode::class)->name('auth.verify');
+    Route::get('/auth/password', SetPassword::class)->name('auth.password');
+
+    // Sign-in flow: password (primary factor) → emailed one-time code (second factor).
+    Route::get('/auth/login', Login::class)->name('auth.login');
+    Route::get('/auth/login/verify', LoginVerify::class)->name('auth.login.verify');
+});

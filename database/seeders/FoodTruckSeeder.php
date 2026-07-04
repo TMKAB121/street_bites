@@ -13,14 +13,19 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
 /**
- * Seeds 3 vendor users, the full cuisine tag taxonomy, and ~10 published food
- * trucks across those tags. Fixture images from database/seeders/fixtures/images/
- * are processed through StoreTruckImage (resize → 250×250 WebP) so the seeded
- * data exercises the full image pipeline. Every truck gets a GPS pin near ZIP
- * 66202 (Mission, KS) — most within the maps' ~5-mile default view, every third
- * one an outlier up to 20 miles out; maps themselves are NOT pre-generated
- * (seeding must work offline — the first page view renders and caches each
- * one). Re-running is idempotent
+ * Seeds 3 vendor users, 8 eater users, the full cuisine tag taxonomy, and ~10
+ * published food trucks across those tags. Fixture images from
+ * database/seeders/fixtures/images/ are processed through StoreTruckImage
+ * (resize → 250×250 WebP) so the seeded data exercises the full image pipeline.
+ * Every truck gets a GPS pin near ZIP 66202 (Mission, KS) — most within the
+ * maps' ~5-mile default view, every third one an outlier up to 20 miles out;
+ * maps themselves are NOT pre-generated (seeding must work offline — the first
+ * page view renders and caches each one). Each truck also draws a random crowd
+ * of eater favourites, so the home page's Popular carousel (ranked by favourite
+ * count) has a meaningful order out of the box; the DatabaseSeeder smoke-test
+ * account (test@example.com) always favourites a few so /favorites has content
+ * on first sign-in. All seeded accounts use the UserFactory default password
+ * ("password"); sign-in codes arrive in Mailpit. Re-running is idempotent
  * for tags (firstOrCreate by slug); it will create duplicate trucks/users
  * unless you run migrate:fresh --seed instead.
  *
@@ -65,6 +70,22 @@ class FoodTruckSeeder extends Seeder
         $vendor1 = User::factory()->create(['name' => 'Marco Rossi',  'email' => 'marco@streetbites.test']);
         $vendor2 = User::factory()->create(['name' => 'Priya Nair',   'email' => 'priya@streetbites.test']);
         $vendor3 = User::factory()->create(['name' => 'Jamie Okafor', 'email' => 'jamie@streetbites.test']);
+
+        // Eater accounts — the crowd whose favourites rank the Popular carousel,
+        // and ready-made sign-ins for testing the eater side of the app.
+        $eaters = collect([
+            ['Ava Chen', 'ava@streetbites.test'],
+            ['Ben Ortiz', 'ben@streetbites.test'],
+            ['Chloe Dubois', 'chloe@streetbites.test'],
+            ['Dev Patel', 'dev@streetbites.test'],
+            ['Elena Petrova', 'elena@streetbites.test'],
+            ['Farid Hassan', 'farid@streetbites.test'],
+            ['Grace Kim', 'grace@streetbites.test'],
+            ['Hugo Silva', 'hugo@streetbites.test'],
+        ])->map(fn (array $eater): User => User::factory()->create([
+            'name' => $eater[0],
+            'email' => $eater[1],
+        ]));
 
         // Truck definitions: [vendor, name, description, location label, tag keys, menu items].
         $truckData = [
@@ -209,6 +230,9 @@ class FoodTruckSeeder extends Seeder
 
         $storeTruckImage = new StoreTruckImage;
 
+        /** @var list<FoodTruck> $trucks */
+        $trucks = [];
+
         foreach ($truckData as $i => $data) {
             // Every third truck is an outlier (up to 20 miles out); the rest
             // cluster within the maps' default ~5-mile view.
@@ -253,7 +277,28 @@ class FoodTruckSeeder extends Seeder
                     $this->attachImage($storeTruckImage, $truck, $imagePaths[($i + intdiv($imageCount, 2)) % $imageCount]);
                 }
             }
+
+            $trucks[] = $truck;
         }
+
+        // Favorites — the datapoint that ranks the Popular carousel. Each truck
+        // draws a random crowd (0 up to every eater), so counts vary enough to
+        // give the carousel a real order, ties and zero-favourite stragglers
+        // included.
+        foreach ($trucks as $truck) {
+            $fanCount = random_int(0, $eaters->count());
+
+            if ($fanCount > 0) {
+                $truck->favoritedBy()->attach($eaters->random($fanCount)->pluck('id'));
+            }
+        }
+
+        // The DatabaseSeeder smoke-test account always favourites a few trucks,
+        // so /favorites and the profile page have content on first sign-in.
+        $testUser = User::query()->where('email', 'test@example.com')->first();
+        $testUser?->favorites()->syncWithoutDetaching(
+            collect($trucks)->random(min(3, count($trucks)))->pluck('id'),
+        );
     }
 
     /**

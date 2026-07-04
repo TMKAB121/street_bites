@@ -6,6 +6,7 @@ use App\Livewire\Auth\EmailEntry;
 use App\Livewire\Auth\SetPassword;
 use App\Livewire\Auth\VerifyCode;
 use App\Mail\EmailVerificationCode;
+use App\Models\CookieConsent;
 use App\Models\EmailVerification;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,7 +21,9 @@ uses(RefreshDatabase::class);
 
 it('exposes the sign-up flow from the login page', function (): void {
     // Guests reach Login from the home nav; sign-up is offered from there.
+    // Auth pages sit behind cookie consent (RequireCookieConsent).
     $this->withoutVite()
+        ->withCookie(CookieConsent::COOKIE_NAME, 'accepted')
         ->get(route('auth.login'))
         ->assertOk()
         ->assertSee(route('auth.email'));
@@ -28,6 +31,7 @@ it('exposes the sign-up flow from the login page', function (): void {
 
 it('renders the email entry form', function (): void {
     $this->withoutVite()
+        ->withCookie(CookieConsent::COOKIE_NAME, 'accepted')
         ->get(route('auth.email'))
         ->assertOk()
         ->assertSee('Send code');
@@ -122,7 +126,11 @@ it('auto-verifies via a valid signed magic link', function (): void {
         'code' => $code,
     ]);
 
-    $this->get($url)->assertRedirect(route('auth.password'));
+    // The magic link lands on the consent-gated auth.verify route, so the
+    // browser needs the consent cookie (set when sign-up began there).
+    $this->withCookie(CookieConsent::COOKIE_NAME, 'accepted')
+        ->get($url)
+        ->assertRedirect(route('auth.password'));
 
     expect(session('auth.verified'))->toBe('diner@example.com');
 });

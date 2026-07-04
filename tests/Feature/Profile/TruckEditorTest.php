@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Js;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
 use Livewire\Livewire;
@@ -228,6 +229,21 @@ it('rejects out-of-range coordinates when pinning', function (): void {
 
     expect($truck->fresh()->latitude)->toBeNull();
     Http::assertNothingSent();
+});
+
+it('offers the ZIP/address pin fallback for vendors whose GPS fails', function (): void {
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        // The same locationSearch component the home page uses, pointed at the
+        // /geocode proxy, with a per-truck input id (several editors can render
+        // on the profile page at once).
+        ->assertSee('locationSearch(', escape: false)
+        ->assertSee(Js::from(route('geocode'))->toHtml(), escape: false)
+        ->assertSee("truck-location-search-{$truck->id}")
+        ->assertSee('Pin this spot');
 });
 
 it('stamps today\'s opening time in the truck timezone when going live', function (): void {

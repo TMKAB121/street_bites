@@ -5,6 +5,10 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Street Bites — Style Guide</title>
 
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+        <link rel="icon" href="/favicon.ico" sizes="48x48">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
         @fonts
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @livewireStyles
@@ -68,13 +72,19 @@
             {{-- Card component --}}
             <section class="mb-12">
                 <h2 class="text-lg font-semibold text-primary mb-4">Food truck card</h2>
-                <div class="max-w-xs">
-                    <x-food-truck-card name="Smokin' Wheels BBQ" />
+                <div class="grid grid-cols-2 gap-4 max-w-md">
+                    <x-food-truck-card name="Smokin' Wheels BBQ" :truck-id="1" :favorited="false" />
+                    <x-food-truck-card name="Taco Libre" :open="true" :truck-id="2" :favorited="true" />
                 </div>
                 <p class="text-sm text-text-muted mt-3">
                     Image + title + full-width Mustard FIND NOW. The image is a placeholder
                     until real photos land (pass <code>:image</code>). Width is set by the
-                    parent — here a <code>max-w-xs</code> wrapper.
+                    parent. Pass <code>:open="true"</code> to overlay the Chili Red
+                    "Now Open" tag with its pulsing bullet (right). <code>:truck-id</code>
+                    + <code>:favorited</code> overlay the favourite star top-right —
+                    hollow (left) vs filled (right); leave <code>:favorited</code> null
+                    (the guest default) to hide it. Demo ids only — tapping here
+                    won't persist.
                 </p>
             </section>
 
@@ -130,10 +140,27 @@
                 </div>
                 <p class="text-sm text-text-muted mt-3">
                     Mobile only — pinned to the top and hidden at ≥ md in real use.
-                    Hamburger (left), brand (center), Map pin (right), and a full-width
+                    Hamburger (left), brand (center), and a full-width
                     search bar. Tap the hamburger to open the full-screen dark menu;
                     press Escape or the ✕ to close. Tab through to see the Chili-Red
                     focus ring; controls meet the 48px tap target.
+                </p>
+            </section>
+
+            {{-- Cookie consent --}}
+            <section class="mb-12">
+                <h2 class="text-lg font-semibold text-primary mb-4">Cookie consent</h2>
+                {{-- Demo mode: in-flow, always starts open, and choices only
+                     toggle local state (nothing is posted or persisted). --}}
+                <div class="max-w-sm">
+                    <x-cookie-consent :fixed="false" :demo="true" />
+                </div>
+                <p class="text-sm text-text-muted mt-3">
+                    All-or-nothing consent (the app sets only essential cookies).
+                    Accept and Decline share one class — identical size, color, and
+                    font, per GDPR equal prominence. After a choice, the round cookie
+                    button remains as the always-available way to change it. Real usage
+                    pins both above the bottom nav and logs every decision server-side.
                 </p>
             </section>
 
@@ -155,6 +182,9 @@
             </section>
 
         </div>
+
+        {{-- GDPR cookie-consent banner + persistent preferences widget. --}}
+        <x-cookie-consent />
         @livewireScripts
     </body>
 </html>

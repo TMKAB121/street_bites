@@ -1,0 +1,48 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Location search
+ | -----------------------------------------------------------------------------
+ | The ZIP/address fallback shown when a visitor declines browser geolocation
+ | (<x-location-search>, Alpine logic in resources/js/truck-map.js). Visuals
+ | only — positioning lives on the markup. Reuses .field__input from auth.css
+ | for the text input; only the layout and messaging are styled here.
+ |
+ |   <div class="location-search">
+ |       <form class="location-search__form"> … </form>
+ |   </div>
+ */
+
+@layer components {
+    .location-search {
+        @apply rounded-2xl bg-white p-4 shadow-sm;
+    }
+
+    .location-search__label {
+        @apply mb-2 block text-sm font-medium text-text-main;
+    }
+
+    .location-search__controls {
+        @apply flex gap-2;
+    }
+
+    .location-search__input {
+        @apply flex-1;
+    }
+
+    .location-search__submit {
+        @apply flex-none;
+    }
+
+    .location-search__error {
+        @apply mt-2 text-sm;
+        color: var(--color-accent-chili);
+    }
+
+    .location-search__hint {
+        @apply mt-2 text-sm text-text-muted;
+    }
+
+    .location-search__place {
+        @apply font-medium text-text-main;
+    }
+}

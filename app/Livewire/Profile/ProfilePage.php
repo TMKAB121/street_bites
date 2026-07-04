@@ -87,13 +87,15 @@ class ProfilePage extends Component
     }
 
     /**
+     * The slim favourites list: rendered as link + star rows (no cards, so no
+     * images to eager-load), alphabetical for easy scanning.
+     *
      * @return Collection<int, FoodTruck>
      */
     private function favorites(): Collection
     {
         return $this->user()->favorites()
-            ->with('images')
-            ->orderByPivot('created_at', 'desc')
+            ->orderBy('name')
             ->get();
     }
 

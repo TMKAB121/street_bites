@@ -5,17 +5,21 @@
 @import './base.css';
 @import './components/button.css';
 @import './components/card.css';
+@import './components/favorite.css';
 @import './components/nav.css';
 @import './components/header.css';
 @import './components/carousel.css';
 @import './components/filters.css';
 @import './components/map.css';
 @import './components/auth.css';
+@import './components/location-search.css';
 @import './components/profile.css';
 @import './components/truck-form.css';
 @import './components/truck-page.css';
+@import './components/about.css';
 @import './components/tag-picker.css';
 @import './components/toast.css';
+@import './components/cookie-consent.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';

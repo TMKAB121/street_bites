@@ -12,6 +12,30 @@
         @apply rounded-2xl bg-white p-5 text-sm text-text-muted shadow-sm;
     }
 
+    /* Slim favourites list: one row per truck — name link + favourite star.
+       Rows stay in place when a star is toggled off, so unfavouriting in bulk
+       is a string of taps and an accidental one is undoable in place. */
+    .fav-list {
+        @apply overflow-hidden rounded-2xl bg-white shadow-sm;
+    }
+
+    .fav-list__item {
+        @apply flex items-center justify-between gap-3 px-4 py-1;
+    }
+
+    .fav-list__item + .fav-list__item {
+        border-top: 1px solid color-mix(in srgb, var(--color-text-muted) 20%, transparent);
+    }
+
+    /* The name is the tap target for the truck page — stretch it so the whole
+       row (minus the star) is clickable. */
+    .fav-list__link {
+        @apply flex-1 py-2 font-semibold text-primary;
+        min-height: var(--min-tap-target);
+        display: inline-flex;
+        align-items: center;
+    }
+
     /* Collapsible owned-truck card. */
     .truck-disclosure {
         @apply mb-3 overflow-hidden rounded-2xl bg-white shadow-sm;
