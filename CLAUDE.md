@@ -579,5 +579,19 @@ that matter while touching app code:
   GitHub Release, migrating before rolling `web`).
 - This repo's **main/default branch is `develop`, not `main`** — the OIDC
   trust policies and `terraform-apply.yml` are scoped to `develop` accordingly.
-- No custom domain/TLS yet (plain HTTP on the ALB's `*.elb.amazonaws.com`
-  name) — a known, documented gap, not an oversight.
+- **Mail is SES in production** (`MAIL_MAILER=ses` in `main.tf`'s
+  `base_environment`; Mailpit is dev-only). `street-bites.org` is a DKIM-
+  verified SES **domain identity** (`terraform/modules/ses`; sends as
+  `noreply@street-bites.org`); the ECS task role sends via the SDK credential
+  chain — no mail credentials in env. Auth (sign-up verification + 2FA codes)
+  depends on it.
+- **The production site is `https://www.street-bites.org`.** DNS is hosted at
+  **Cloudflare** (records managed by Terraform via the `CLOUDFLARE_API_TOKEN`
+  env var / CI secret, all DNS-only — no proxying); TLS terminates at the
+  ALB (HTTPS:443, port 80 redirects) and at the Reverb NLB's TLS:443 listener
+  (`ws.street-bites.org`, the browser's `VITE_REVERB_HOST` baked in by
+  release-deploy.yml) with one ACM cert — see
+  `terraform/environments/prod/domain.tf`. Because TLS ends at the load
+  balancer, `bootstrap/app.php` trusts proxy `X-Forwarded-*` headers
+  (`trustProxies`, AWS_ELB header set) — don't remove it, or generated URLs
+  fall back to `http://`.
