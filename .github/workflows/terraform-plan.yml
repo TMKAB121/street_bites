@@ -13,6 +13,12 @@ permissions:
 jobs:
   plan:
     runs-on: ubuntu-latest
+    env:
+      # terraform.tfvars is gitignored (holds no secrets, just the bucket
+      # name, but isn't committed) — CI supplies it via TF_VAR_* instead.
+      # Add S3_BUCKET_NAME as a repository variable (Settings → Secrets and
+      # variables → Actions → Variables).
+      TF_VAR_s3_bucket_name: ${{ vars.S3_BUCKET_NAME }}
     defaults:
       run:
         working-directory: terraform/environments/prod

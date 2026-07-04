@@ -17,6 +17,9 @@ jobs:
     # develop queues the apply, but a required reviewer (configure this in the
     # repo's environment settings) must approve before it actually runs.
     environment: production-infra
+    env:
+      # See terraform-plan.yml's comment — same repo variable, same reason.
+      TF_VAR_s3_bucket_name: ${{ vars.S3_BUCKET_NAME }}
     defaults:
       run:
         working-directory: terraform/environments/prod
