@@ -1,12 +1,65 @@
 name: CI
 
+# PR-only by design: these jobs exist to be consumed as required status checks
+# in the branch ruleset (Settings → Rules → Rulesets → require status checks),
+# which blocks merging until they pass — a push run to develop would only
+# duplicate the PR run that already gated the merge. Each tool is its own job
+# so a red X identifies the failing tool at a glance and each can be required
+# (or not) independently in the ruleset.
 on:
   pull_request:
-  push:
-    branches: [develop]
+
+# A force-push to a PR branch supersedes the in-flight run — cancel it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  quality:
+  pint:
+    name: Pint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, gd, redis, zip, intl, bcmath, pcntl, exif
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Pint (style)
+        run: ./vendor/bin/pint --test
+
+  larastan:
+    name: Larastan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, gd, redis, zip, intl, bcmath, pcntl, exif
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Larastan (static analysis)
+        run: composer stan
+
+  pest:
+    name: Pest
     runs-on: ubuntu-latest
 
     services:
@@ -52,14 +105,9 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
+      # Feature tests render full Blade pages — @vite needs a built manifest.
       - name: Build assets
         run: npm run build
-
-      - name: Pint (style)
-        run: ./vendor/bin/pint --test
-
-      - name: Larastan (static analysis)
-        run: composer stan
 
       - name: Pest (tests)
         env:
@@ -68,5 +116,56 @@ jobs:
           DB_PASSWORD: steet_bites
         run: ./vendor/bin/pest tests/Feature
 
-      - name: ESLint / Stylelint / Prettier
-        run: npm run lint
+  eslint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint:js
+
+  stylelint:
+    name: Stylelint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Stylelint
+        run: npm run lint:css
+
+  prettier:
+    name: Prettier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Prettier
+        run: npm run format:check
