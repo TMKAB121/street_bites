@@ -226,7 +226,6 @@
                             type="number"
                             step="0.01"
                             min="0"
-                            inputmode="decimal"
                             class="field__input"
                             wire:model="menuItems.{{ $i }}.price"
                             placeholder="0.00"

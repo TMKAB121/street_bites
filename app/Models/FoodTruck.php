@@ -29,6 +29,7 @@ class FoodTruck extends Model
     /**
      * @return array<string, string>
      */
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -94,6 +95,16 @@ class FoodTruck extends Model
         }
 
         return $hours->closes_at === null || $nowTime < $hours->closes_at;
+    }
+
+    /**
+     * The `favorited` prop for <x-favorite-toggle>: true/false for a signed-in
+     * user (reading the `is_favorited` withExists flag the discovery queries
+     * add), null for a guest — null hides the star entirely.
+     */
+    public function favoritedState(): ?bool
+    {
+        return auth()->check() ? (bool) $this->getAttribute('is_favorited') : null;
     }
 
     /**

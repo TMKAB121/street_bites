@@ -29,16 +29,7 @@
          server-side match count above honest about what's hidden. --}}
     <div class="grid grid-cols-2 gap-4 md:grid-cols-3" x-data="truckRadiusFilter">
         @forelse ($trucks as $truck)
-            <div data-lat="{{ $truck->latitude }}" data-lng="{{ $truck->longitude }}">
-                <x-food-truck-card
-                    :name="$truck->name"
-                    :image="$truck->images->first()?->url"
-                    :href="route('trucks.show', $truck)"
-                    :open="$truck->isOpenNow()"
-                    :truck-id="$truck->id"
-                    :favorited="auth()->check() ? (bool) ($truck->is_favorited ?? false) : null"
-                />
-            </div>
+            <x-discovery-card :truck="$truck" :open="$truck->isOpenNow()" />
         @empty
             @if ($term !== '')
                 <p class="col-span-2 text-sm text-text-muted md:col-span-3">

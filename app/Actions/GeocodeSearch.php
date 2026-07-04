@@ -20,9 +20,9 @@ use Throwable;
  */
 final class GeocodeSearch
 {
-    private const ENDPOINT = 'https://nominatim.openstreetmap.org/search';
+    private const string ENDPOINT = 'https://nominatim.openstreetmap.org/search';
 
-    private const USER_AGENT = 'StreetBites/1.0 (Laravel food-truck app; local dev)';
+    private const string USER_AGENT = 'StreetBites/1.0 (Laravel food-truck app; local dev)';
 
     /**
      * @return array{lat: float, lng: float, label: string}|null

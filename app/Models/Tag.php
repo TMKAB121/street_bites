@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 #[Fillable(['name', 'slug'])]
 class Tag extends Model
 {
+    #[\Override]
     protected static function booted(): void
     {
         static::creating(static function (Tag $tag): void {

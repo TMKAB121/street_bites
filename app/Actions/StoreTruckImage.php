@@ -23,9 +23,9 @@ use Intervention\Image\ImageManager;
  */
 final class StoreTruckImage
 {
-    private const SIZE = 250;
+    private const int SIZE = 250;
 
-    private const QUALITY = 80;
+    private const int QUALITY = 80;
 
     public function __invoke(FoodTruck $truck, UploadedFile $file): TruckImage
     {

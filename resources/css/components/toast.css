@@ -30,7 +30,7 @@
 
     .toast--success {
         background: var(--color-primary);
-        color: #fff;
+        color: var(--color-surface);
     }
 
     /* Mustard tick is fine here — the surface is dark (the white-bg rule only). */
@@ -40,7 +40,7 @@
 
     .toast--error {
         background: var(--color-accent-chili);
-        color: #fff;
+        color: var(--color-surface);
     }
 
     .toast__icon {

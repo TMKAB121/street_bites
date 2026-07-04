@@ -122,7 +122,7 @@ it('rejects suggestion queries under two characters', function (): void {
 
 it('caps suggestions at eight trucks', function (): void {
     FoodTruck::factory()->published()->count(10)->sequence(
-        fn ($sequence) => ['name' => 'Taco Truck '.$sequence->index],
+        fn ($sequence): array => ['name' => 'Taco Truck '.$sequence->index],
     )->create();
 
     $this->getJson(route('search.suggest', ['q' => 'taco']))

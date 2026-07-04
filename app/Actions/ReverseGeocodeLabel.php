@@ -18,9 +18,9 @@ use Throwable;
  */
 final class ReverseGeocodeLabel
 {
-    private const ENDPOINT = 'https://nominatim.openstreetmap.org/reverse';
+    private const string ENDPOINT = 'https://nominatim.openstreetmap.org/reverse';
 
-    private const USER_AGENT = 'StreetBites/1.0 (Laravel food-truck app; local dev)';
+    private const string USER_AGENT = 'StreetBites/1.0 (Laravel food-truck app; local dev)';
 
     public function __invoke(float $latitude, float $longitude): ?string
     {

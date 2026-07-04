@@ -45,23 +45,12 @@
 
     <div class="grid grid-cols-2 gap-4 mt-4 md:grid-cols-3" x-data="truckDistanceSort">
         @forelse ($trucks as $truck)
-            @php($isOpen = $truck->isOpenNow())
-            <div
+            <x-discovery-card
+                :truck="$truck"
+                :open="$truck->isOpenNow()"
                 x-show="activeTag === 'all' || {{ Js::from($truck->tags->pluck('slug')) }}.includes(activeTag)"
                 x-transition
-                data-open="{{ $isOpen ? '1' : '0' }}"
-                data-lat="{{ $truck->latitude }}"
-                data-lng="{{ $truck->longitude }}"
-            >
-                <x-food-truck-card
-                    :name="$truck->name"
-                    :image="$truck->images->first()?->url"
-                    :href="route('trucks.show', $truck)"
-                    :open="$isOpen"
-                    :truck-id="$truck->id"
-                    :favorited="auth()->check() ? (bool) ($truck->is_favorited ?? false) : null"
-                />
-            </div>
+            />
         @empty
             <p class="col-span-2 text-sm text-text-muted md:col-span-3">{{ $empty }}</p>
         @endforelse

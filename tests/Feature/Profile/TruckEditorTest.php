@@ -8,6 +8,7 @@ use App\Models\MenuItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Js;
@@ -251,7 +252,7 @@ it('stamps today\'s opening time in the truck timezone when going live', functio
     $truck = FoodTruck::factory()->for($user)->create();
 
     // 15:30 UTC is 10:30 Central — the stamped open time must be the local one.
-    $this->travelTo(Carbon\Carbon::parse('2026-07-01 15:30:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-07-01 15:30:00', 'UTC'));
 
     Livewire::actingAs($user)
         ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
@@ -270,7 +271,7 @@ it('reuses the stored timezone when going live without a valid one', function ()
     $user = User::factory()->create();
     $truck = FoodTruck::factory()->for($user)->create(['timezone' => 'America/Chicago']);
 
-    $this->travelTo(Carbon\Carbon::parse('2026-07-01 15:30:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-07-01 15:30:00', 'UTC'));
 
     Livewire::actingAs($user)
         ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])

@@ -9,7 +9,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\URL;
 
 /**
@@ -51,7 +51,7 @@ class EmailVerificationCode extends Mailable
     {
         return URL::temporarySignedRoute(
             'auth.verify',
-            Carbon::now()->addMinutes(10),
+            Date::now()->addMinutes(10),
             ['email' => $this->email, 'code' => $this->code],
         );
     }

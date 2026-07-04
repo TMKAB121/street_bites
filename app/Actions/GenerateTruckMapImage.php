@@ -25,14 +25,14 @@ use Throwable;
 final class GenerateTruckMapImage
 {
     /** ~15 m/px at lat 39° → a 640px-wide image spans ~3 miles each side of the pin. */
-    public const ZOOM = 13;
+    public const int ZOOM = 13;
 
-    public const WIDTH = 640;
+    public const int WIDTH = 640;
 
-    public const HEIGHT = 320;
+    public const int HEIGHT = 320;
 
     /** OSM tile policy requires an identifying User-Agent (no browser impersonation). */
-    private const USER_AGENT = 'StreetBites/1.0 (Laravel food-truck app; local dev)';
+    private const string USER_AGENT = 'StreetBites/1.0 (Laravel food-truck app; local dev)';
 
     /**
      * Return the public-disk path of the truck's map, rendering and storing it

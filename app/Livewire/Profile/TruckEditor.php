@@ -28,6 +28,9 @@ class TruckEditor extends Component
 {
     use WithFileUploads;
 
+    /** Upload cap for truck photos, in kilobytes (validation `max:` rule). */
+    private const int MAX_UPLOAD_KB = 5120;
+
     public int $truckId;
 
     public string $name = '';
@@ -127,8 +130,8 @@ class TruckEditor extends Component
 
     public function save(): void
     {
-        // Coerce checkbox values to int before validation (Livewire sends strings).
-        $this->selectedTagIds = array_map('intval', $this->selectedTagIds);
+        // Livewire sends checkbox values as strings.
+        $this->selectedTagIds = array_map(intval(...), $this->selectedTagIds);
 
         $this->validate($this->rules());
 
@@ -286,7 +289,6 @@ class TruckEditor extends Component
 
         $truck->tags()->sync($ids);
 
-        // Refresh so the re-render shows any newly-created tag as checked.
         $this->selectedTagIds = $truck->tags()->pluck('id')->map(fn ($id): int => (int) $id)->all();
     }
 
@@ -321,7 +323,7 @@ class TruckEditor extends Component
     public function uploadImage(StoreTruckImage $storeTruckImage): void
     {
         $this->validate([
-            'upload' => 'required|image|mimes:jpeg,png,webp|max:5120',
+            'upload' => 'required|image|mimes:jpeg,png,webp|max:'.self::MAX_UPLOAD_KB,
         ]);
 
         $storeTruckImage($this->truck(), $this->upload);

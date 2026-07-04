@@ -24,7 +24,7 @@
 
     .truck-page__photo--placeholder {
         @apply flex items-center justify-center;
-        background: linear-gradient(135deg, #eef0f2, #dfe3e6);
+        background: var(--gradient-placeholder);
         color: var(--color-text-muted);
     }
 

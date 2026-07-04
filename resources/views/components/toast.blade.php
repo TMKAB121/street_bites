@@ -9,10 +9,11 @@
 <div
     x-data="{
         toasts: [],
+        durationMs: 3500,
         add(detail) {
             const id = Date.now() + Math.random();
             this.toasts.push({ id, message: detail.message, type: detail.type || 'success' });
-            setTimeout(() => this.remove(id), 3500);
+            setTimeout(() => this.remove(id), this.durationMs);
         },
         remove(id) {
             this.toasts = this.toasts.filter((toast) => toast.id !== id);

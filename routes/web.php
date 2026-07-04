@@ -15,12 +15,14 @@ use App\Models\CookieConsent;
 use App\Models\FoodTruck;
 use App\Models\Tag;
 use App\Models\User;
+use Illuminate\Contracts\View\Factory;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
-Route::get('/', function () {
+Route::get('/', function (): Factory|View {
     $trucks = FoodTruck::query()
         ->where('is_published', true)
         ->with(['images', 'tags', 'todayHours'])
@@ -58,13 +60,13 @@ Route::get('/', function () {
         ->orderBy('name')
         ->get();
 
-    return view('welcome', compact('trucks', 'popular', 'tags'));
+    return view('welcome', ['trucks' => $trucks, 'popular' => $popular, 'tags' => $tags]);
 })->name('home');
 
 // Search landing page — where the header search bar submits (Enter or the
 // icon button). Lists matching published trucks as discovery cards; matching
 // is by truck name, cuisine tag, or menu item name (FoodTruck::search()).
-Route::get('/search', function (Request $request) {
+Route::get('/search', function (Request $request): Factory|View {
     $term = trim($request->string('q')->toString());
 
     $trucks = $term === ''
@@ -84,7 +86,7 @@ Route::get('/search', function (Request $request) {
             ->sortByDesc->isOpenNow()
             ->values();
 
-    return view('search', compact('trucks', 'term'));
+    return view('search', ['trucks' => $trucks, 'term' => $term]);
 })->name('search');
 
 // Typeahead suggestions for the header search bar: up to 8 published trucks
@@ -112,7 +114,7 @@ Route::get('/api/search', function (Request $request) {
         ->limit(8)
         ->get();
 
-    return response()->json($trucks->map(fn (FoodTruck $truck) => [
+    return response()->json($trucks->map(fn (FoodTruck $truck): array => [
         'id' => $truck->id,
         'name' => $truck->name,
         'url' => route('trucks.show', $truck),
@@ -139,7 +141,7 @@ Route::get('/api/geocode', function (Request $request) {
     $result = Cache::remember(
         'geocode:'.sha1($query),
         now()->addDay(),
-        fn (): ?array => app(GeocodeSearch::class)($query),
+        fn (): ?array => resolve(GeocodeSearch::class)($query),
     );
 
     return $result === null
@@ -175,7 +177,7 @@ Route::post('/api/cookie-consent', function (Request $request) {
 
 // Public truck detail page — the destination of every truck card's FIND NOW
 // CTA. Unpublished trucks stay invisible (404), matching home-page discovery.
-Route::get('/trucks/{truck}', function (string $truck) {
+Route::get('/trucks/{truck}', function (string $truck): Factory|View {
     $truck = FoodTruck::query()
         ->where('is_published', true)
         ->with(['images', 'tags', 'menuItems', 'todayHours'])
@@ -187,10 +189,10 @@ Route::get('/trucks/{truck}', function (string $truck) {
         && $truck->favoritedBy()->whereKey(auth()->id())->exists();
 
     // Cached OSM static map of the pin's surroundings; null hides the section.
-    $mapPath = app(GenerateTruckMapImage::class)($truck);
+    $mapPath = resolve(GenerateTruckMapImage::class)($truck);
     $mapUrl = $mapPath !== null ? Storage::disk('public')->url($mapPath) : null;
 
-    return view('trucks.show', compact('truck', 'mapUrl', 'isFavorited'));
+    return view('trucks.show', ['truck' => $truck, 'mapUrl' => $mapUrl, 'isFavorited' => $isFavorited]);
 })->whereNumber('truck')->name('trucks.show');
 
 // Favourite/unfavourite toggle for the star buttons (<x-favorite-toggle> →
@@ -231,7 +233,7 @@ Route::middleware(RequireCookieConsent::class)->group(function (): void {
     // Signed-in favorites page — the home page's discovery section
     // (<x-truck-discovery>: filters, ZIP fallback, map, sorted grid) scoped to
     // the trucks this user has starred.
-    Route::get('/favorites', function (Request $request) {
+    Route::get('/favorites', function (Request $request): Factory|View {
         /** @var User $user */
         $user = $request->user();
 
@@ -258,7 +260,7 @@ Route::middleware(RequireCookieConsent::class)->group(function (): void {
             ->orderBy('name')
             ->get();
 
-        return view('favorites', compact('trucks', 'tags'));
+        return view('favorites', ['trucks' => $trucks, 'tags' => $tags]);
     })->middleware('auth')->name('favorites');
 
     // Email-verified sign-up flow: enter email → verify code → set password.

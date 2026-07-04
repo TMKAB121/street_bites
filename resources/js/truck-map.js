@@ -42,6 +42,12 @@ const OSM_MAX_ZOOM = 19;
 // 100+ miles away isn't somewhere they'll actually eat.
 const MAX_RADIUS_MILES = 100;
 
+// A cached GPS fix this recent is accurate enough for a 100-mile radius cap —
+// skip the slow fresh-fix round-trip when the browser has one.
+const GEO_FIX_MAX_AGE_MS = 300000; // 5 minutes
+
+const HTTP_TOO_MANY_REQUESTS = 429;
+
 const truckIcon = L.divIcon({
     html: PIN_SVG,
     className: 'truck-map__pin',
@@ -141,7 +147,7 @@ document.addEventListener('alpine:init', () => {
                 // Denied/unavailable — keep the pin-centred view and reveal
                 // the ZIP/address fallback instead.
                 () => window.dispatchEvent(new CustomEvent('user-location-denied')),
-                { maximumAge: 300000 }
+                { maximumAge: GEO_FIX_MAX_AGE_MS }
             );
         },
 
@@ -324,7 +330,7 @@ document.addEventListener('alpine:init', () => {
                 if (!response.ok) {
                     this.label = null;
                     this.error =
-                        response.status === 429
+                        response.status === HTTP_TOO_MANY_REQUESTS
                             ? 'Too many searches — give it a minute and try again.'
                             : "We couldn't find that spot — try a ZIP code or a street and city.";
 

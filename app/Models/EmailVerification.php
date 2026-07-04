@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -40,7 +41,7 @@ class EmailVerification extends Model
             [
                 'code' => Hash::make($code),
                 'attempts' => 0,
-                'expires_at' => Carbon::now()->addMinutes(self::TTL_MINUTES),
+                'expires_at' => Date::now()->addMinutes(self::TTL_MINUTES),
             ],
         );
 
@@ -81,6 +82,7 @@ class EmailVerification extends Model
      *
      * @return array<string, string>
      */
+    #[\Override]
     protected function casts(): array
     {
         return [

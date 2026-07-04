@@ -44,6 +44,7 @@
     --radius-md: 0.75rem; /* 12px */
 
     /* --- Interaction & ADA tokens (plain CSS vars, no utilities) ------------ */
+    --gradient-placeholder: linear-gradient(135deg, #eef0f2, #dfe3e6); /* empty photo slots */
     --min-tap-target: 48px; /* WCAG 2.1 minimum touch target              */
     --transition-fast: all 0.2s ease-in-out;
     --focus-outline-width: 3px;
