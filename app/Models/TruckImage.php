@@ -34,7 +34,7 @@ class TruckImage extends Model
      */
     protected function url(): Attribute
     {
-        return Attribute::get(fn (): string => Storage::disk('public')->url($this->path));
+        return Attribute::get(fn (): string => Storage::disk(config('filesystems.public_disk'))->url($this->path));
     }
 
     /**

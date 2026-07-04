@@ -1,0 +1,168 @@
+name: Release Deploy
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write # required for OIDC
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECS_CLUSTER: ${{ vars.ECS_CLUSTER_NAME }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    environment: production # scopes gha-deploy-role's OIDC trust (terraform/bootstrap/oidc.tf)
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr-login
+
+      - name: Build and push
+        id: build
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPOSITORY: ${{ vars.ECR_REPOSITORY_NAME }}
+          # Release tag only — the ECR repo is IMMUTABLE, so a shared `latest`
+          # tag isn't reusable (see terraform/modules/ecr/main.tf).
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          docker build -t "$REGISTRY/$REPOSITORY:$TAG" .
+          docker push "$REGISTRY/$REPOSITORY:$TAG"
+          echo "image=$REGISTRY/$REPOSITORY:$TAG" >> "$GITHUB_OUTPUT"
+
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+    needs: build-and-push
+
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Registers a new task-definition revision for `web` with the release
+      # image, but does NOT touch the running service yet — migrations run
+      # first as a one-off task against that new revision, before any service
+      # picks up the new code. Avoids a multi-task `web` service racing a
+      # concurrent `artisan migrate`.
+      - name: Register new web task definition
+        id: register
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${{ vars.PROJECT_NAME }}-web" \
+            --query 'taskDefinition' > task-def.json
+
+          NEW_DEF=$(jq --arg IMAGE "${{ needs.build-and-push.outputs.image }}" \
+            '.containerDefinitions[0].image = $IMAGE
+             | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            task-def.json)
+
+          echo "$NEW_DEF" > new-task-def.json
+          ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "task_def_arn=$ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Get network config for the run-task migration
+        id: netconf
+        run: |
+          SERVICE=$(aws ecs describe-services --cluster "$ECS_CLUSTER" \
+            --services "${{ vars.PROJECT_NAME }}-web" --query 'services[0]')
+          SUBNETS=$(echo "$SERVICE" | jq -c '.networkConfiguration.awsvpcConfiguration.subnets')
+          SGS=$(echo "$SERVICE" | jq -c '.networkConfiguration.awsvpcConfiguration.securityGroups')
+          echo "subnets=$SUBNETS" >> "$GITHUB_OUTPUT"
+          echo "security_groups=$SGS" >> "$GITHUB_OUTPUT"
+
+      - name: Run migration task
+        id: run_migration
+        run: |
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --task-definition "${{ steps.register.outputs.task_def_arn }}" \
+            --launch-type FARGATE \
+            --network-configuration "{\"awsvpcConfiguration\":{\"subnets\":${{ steps.netconf.outputs.subnets }},\"securityGroups\":${{ steps.netconf.outputs.security_groups }},\"assignPublicIp\":\"DISABLED\"}}" \
+            --overrides '{"containerOverrides":[{"name":"web","command":["php","artisan","migrate","--force"]}]}' \
+            --query 'tasks[0].taskArn' --output text)
+
+          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN"
+
+          EXIT_CODE=$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "Migration task exited with code $EXIT_CODE"
+            aws logs tail "/ecs/${{ vars.PROJECT_NAME }}/web" --since 10m || true
+            exit 1
+          fi
+
+    outputs:
+      web_task_def_arn: ${{ steps.register.outputs.task_def_arn }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    needs: [build-and-push, migrate]
+
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Roll out web (already-migrated task definition)
+        run: |
+          aws ecs update-service --cluster "$ECS_CLUSTER" \
+            --service "${{ vars.PROJECT_NAME }}-web" \
+            --task-definition "${{ needs.migrate.outputs.web_task_def_arn }}"
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "${{ vars.PROJECT_NAME }}-web"
+
+  deploy-others:
+    runs-on: ubuntu-latest
+    environment: production
+    needs: [build-and-push, deploy]
+    strategy:
+      matrix:
+        service: [reverb, queue-worker]
+
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # No migration dependency for these two, so the standard render+deploy
+      # actions are a cleaner fit than web's manual two-phase rollout above —
+      # they handle registering the new revision and polling
+      # wait-for-service-stability in one step.
+      - name: Fetch current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${{ vars.PROJECT_NAME }}-${{ matrix.service }}" \
+            --query 'taskDefinition' > task-def.json
+
+      - uses: aws-actions/amazon-ecs-render-task-definition@v1
+        id: render
+        with:
+          task-definition: task-def.json
+          container-name: ${{ matrix.service }}
+          image: ${{ needs.build-and-push.outputs.image }}
+
+      - uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: ${{ vars.PROJECT_NAME }}-${{ matrix.service }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true

@@ -335,7 +335,8 @@ user from the `is_favorited` withExists flag, null for guests),
 Uploads go through `App\Actions\StoreTruckImage` (uses **`intervention/image` v4**,
 GD/Imagick both available in the container): `cover(250, 250)` (centre-crop to a
 1:1 square) → `WebpEncoder(quality: 80)` → stored at
-`truck-images/{truck}/{uuid}.webp` on the **public** disk. Re-encoding strips
+`truck-images/{truck}/{uuid}.webp` on **`config('filesystems.public_disk')`**
+(`public` locally, `s3` in production — see *Deployment (AWS)*). Re-encoding strips
 EXIF/GPS metadata (privacy) and arbitrary file bytes; the component validates
 `image|mimes:jpeg,png,webp` with the size cap in `TruckEditor::MAX_UPLOAD_KB` (5120).
 
@@ -349,7 +350,8 @@ All mapping is **OpenStreetMap — free, no API key, no billing** (dep
 map centre is known:
 
 - **Truck detail page — cached static PNG.** `App\Actions\GenerateTruckMapImage`
-  renders OSM tiles (zoom 13, ~2.5-mile view) to a PNG on the **public** disk at
+  renders OSM tiles (zoom 13, ~2.5-mile view) to a PNG on
+  **`config('filesystems.public_disk')`** at
   `truck-maps/{truck}/{fingerprint}.png`. The **fingerprint** is a `sha1` of
   `(lat, lng, zoom, size)`, so moving the pin changes the path — the next page view
   regenerates and deletes the stale sibling (no schema, no cache table). Marker-free;
@@ -550,3 +552,32 @@ built manifest in `public/build`.
 ## Reverb container startup
 
 The `reverb` Lando service polls for `/app/artisan` before starting `artisan reverb:start`. It auto-recovers once the Laravel install exists — no manual restart needed after `lando composer install`.
+
+## Deployment (AWS)
+
+Production deployment is entirely separate from Lando — Terraform and Docker
+run directly on the host (or in CI), never through `lando`. Full detail is in
+`docs_and_archetecture/deployment-infrastructure.md`; the cross-cutting facts
+that matter while touching app code:
+
+- **`Dockerfile` + `docker/`** build one production image; ECS runs it as
+  three services (`web`, `reverb`, `queue-worker` — mirrors the `.lando.yml`
+  split) that differ only in container command.
+- **`config('filesystems.public_disk')`** (`config/filesystems.php`, env
+  `FILESYSTEM_PUBLIC_DISK`) is what every truck-image/map-cache call site
+  resolves through instead of a hardcoded `'public'` disk name — `public`
+  (local disk) here in Lando, `s3` in production. Never hardcode `'public'` in
+  new code that writes to the public disk; use the config key.
+- **`terraform/`** — `bootstrap/` (applied once, by hand, never by CI) creates
+  the state backend and the two GitHub OIDC IAM roles;
+  `environments/prod/` is the actual infrastructure, built from
+  `terraform/modules/*`. Adding a second environment later means copying
+  `environments/prod/`, not restructuring the modules.
+- **`.github/workflows/`** — `ci.yml` (PR quality gate), `terraform-plan.yml` /
+  `terraform-apply.yml` (infra, gated behind the `production-infra`
+  Environment), `release-deploy.yml` (builds + deploys on every published
+  GitHub Release, migrating before rolling `web`).
+- This repo's **main/default branch is `develop`, not `main`** — the OIDC
+  trust policies and `terraform-apply.yml` are scoped to `develop` accordingly.
+- No custom domain/TLS yet (plain HTTP on the ALB's `*.elb.amazonaws.com`
+  name) — a known, documented gap, not an oversight.

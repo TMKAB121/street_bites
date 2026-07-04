@@ -48,7 +48,7 @@ final class GenerateTruckMapImage
         }
 
         // Everyday hot path — cached file, no network.
-        if (Storage::disk('public')->exists($path)) {
+        if (Storage::disk(config('filesystems.public_disk'))->exists($path)) {
             return $path;
         }
 
@@ -89,11 +89,13 @@ final class GenerateTruckMapImage
             throw new \LogicException('Cannot store a map for a truck without a pinned location.');
         }
 
-        Storage::disk('public')->put($path, $png);
+        $disk = Storage::disk(config('filesystems.public_disk'));
 
-        foreach (Storage::disk('public')->files("truck-maps/{$truck->id}") as $file) {
+        $disk->put($path, $png);
+
+        foreach ($disk->files("truck-maps/{$truck->id}") as $file) {
             if ($file !== $path) {
-                Storage::disk('public')->delete($file);
+                $disk->delete($file);
             }
         }
 

@@ -17,6 +17,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Public-Facing Disk
+    |--------------------------------------------------------------------------
+    |
+    | Truck images and generated map PNGs are written through this disk name
+    | rather than a hardcoded "public"/"s3" literal, so production (ECS/Fargate,
+    | ephemeral local storage) can point it at the "s3" disk below via env
+    | without touching application code.
+    |
+    */
+
+    'public_disk' => env('FILESYSTEM_PUBLIC_DISK', 'public'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

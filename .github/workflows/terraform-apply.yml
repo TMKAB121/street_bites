@@ -1,0 +1,40 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches: [develop] # this repo's main/default branch
+    paths:
+      - 'terraform/**'
+
+permissions:
+  id-token: write # required for OIDC
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    # Gate infra changes behind a reviewed GitHub Environment — merging to
+    # develop queues the apply, but a required reviewer (configure this in the
+    # repo's environment settings) must approve before it actually runs.
+    environment: production-infra
+    defaults:
+      run:
+        working-directory: terraform/environments/prod
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '~1.5'
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve -input=false

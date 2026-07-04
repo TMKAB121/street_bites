@@ -1,0 +1,226 @@
+module "vpc" {
+  source  = "../../modules/vpc"
+  project = var.project
+}
+
+module "ecr" {
+  source = "../../modules/ecr"
+  name   = var.project
+}
+
+module "s3_public" {
+  source      = "../../modules/s3-public"
+  bucket_name = var.s3_bucket_name
+}
+
+module "ecs_cluster" {
+  source  = "../../modules/ecs-cluster"
+  project = var.project
+}
+
+module "alb" {
+  source            = "../../modules/alb"
+  project           = var.project
+  vpc_id            = module.vpc.vpc_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+}
+
+module "reverb_lb" {
+  source            = "../../modules/reverb-lb"
+  project           = var.project
+  vpc_id            = module.vpc.vpc_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+  target_port       = var.reverb_port
+}
+
+module "iam_task_roles" {
+  source        = "../../modules/iam-task-roles"
+  project       = var.project
+  s3_bucket_arn = module.s3_public.bucket_arn
+  secrets_arns  = local.secrets_arns
+}
+
+# --- Per-service security groups, created here (not inside modules/ecs-service)
+# so RDS/ElastiCache can allow-list them without a module dependency cycle: RDS
+# needs these SG ids, while each service's env vars need RDS's endpoint. ------
+
+resource "aws_security_group" "web" {
+  name_prefix = "${var.project}-web-"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [module.alb.security_group_id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# NLBs don't carry their own security group (see modules/reverb-lb), so the
+# reverb task itself is opened to 0.0.0.0/0 on its port — an accepted
+# simplification for this no-TLS, no-custom-domain first cut.
+resource "aws_security_group" "reverb" {
+  name_prefix = "${var.project}-reverb-"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    from_port   = var.reverb_port
+    to_port     = var.reverb_port
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_security_group" "queue_worker" {
+  name_prefix = "${var.project}-queue-worker-"
+  vpc_id      = module.vpc.vpc_id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+module "rds" {
+  source                     = "../../modules/rds"
+  project                    = var.project
+  vpc_id                     = module.vpc.vpc_id
+  private_subnet_ids         = module.vpc.private_subnet_ids
+  allowed_security_group_ids = [aws_security_group.web.id, aws_security_group.queue_worker.id]
+  db_name                    = var.db_name
+  username                   = var.db_username
+  password                   = random_password.db_password.result
+}
+
+module "elasticache" {
+  source                     = "../../modules/elasticache"
+  project                    = var.project
+  vpc_id                     = module.vpc.vpc_id
+  private_subnet_ids         = module.vpc.private_subnet_ids
+  allowed_security_group_ids = [aws_security_group.web.id, aws_security_group.reverb.id, aws_security_group.queue_worker.id]
+}
+
+# --- Shared env vars for all three services ---------------------------------
+#
+# REVERB_HOST here points at the same public NLB DNS name used by the browser
+# (no internal service-discovery/Cloud Map in this first cut) — the `web` and
+# `queue-worker` containers hairpin out through the NLB to broadcast events.
+# Cheaper/faster internal-only routing via AWS Cloud Map is a reasonable
+# fast-follow, not a correctness requirement.
+locals {
+  base_environment = [
+    { name = "APP_NAME", value = "Street Bites" },
+    { name = "APP_ENV", value = "production" },
+    { name = "APP_DEBUG", value = "false" },
+    { name = "APP_URL", value = "http://${module.alb.dns_name}" },
+    { name = "LOG_CHANNEL", value = "stack" },
+    { name = "DB_CONNECTION", value = "mariadb" },
+    { name = "DB_HOST", value = module.rds.endpoint },
+    { name = "DB_PORT", value = tostring(module.rds.port) },
+    { name = "DB_DATABASE", value = var.db_name },
+    { name = "DB_USERNAME", value = var.db_username },
+    { name = "REDIS_CLIENT", value = "phpredis" },
+    { name = "REDIS_HOST", value = module.elasticache.primary_endpoint },
+    { name = "REDIS_PORT", value = tostring(module.elasticache.port) },
+    { name = "CACHE_STORE", value = "redis" },
+    { name = "SESSION_DRIVER", value = "redis" },
+    { name = "SESSION_SECURE_COOKIE", value = "false" }, # no TLS on the ALB yet — flip true once HTTPS is wired up
+    { name = "QUEUE_CONNECTION", value = "redis" },
+    { name = "BROADCAST_CONNECTION", value = "reverb" },
+    { name = "REVERB_HOST", value = module.reverb_lb.dns_name },
+    { name = "REVERB_PORT", value = tostring(var.reverb_port) },
+    { name = "REVERB_SCHEME", value = "http" },
+    { name = "FILESYSTEM_PUBLIC_DISK", value = "s3" },
+    { name = "AWS_DEFAULT_REGION", value = var.aws_region },
+    { name = "AWS_BUCKET", value = module.s3_public.bucket_name },
+    { name = "AWS_URL", value = "https://${module.s3_public.bucket_regional_domain_name}" },
+  ]
+}
+
+module "web" {
+  source                = "../../modules/ecs-service"
+  project               = var.project
+  service_name          = "web"
+  cluster_arn           = module.ecs_cluster.cluster_arn
+  cluster_name          = module.ecs_cluster.cluster_name
+  vpc_id                = module.vpc.vpc_id
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  security_group_id     = aws_security_group.web.id
+  container_image       = "${module.ecr.repository_url}:${var.image_tag}"
+  container_port        = 8080
+  execution_role_arn    = module.iam_task_roles.execution_role_arn
+  task_role_arn         = module.iam_task_roles.task_role_arn
+  environment_variables = local.base_environment
+  secrets               = local.task_secrets
+  desired_count         = 1
+  target_group_arn      = module.alb.target_group_arn
+  enable_autoscaling    = true
+  min_capacity          = 1
+  max_capacity          = 3
+}
+
+module "reverb" {
+  source                = "../../modules/ecs-service"
+  project               = var.project
+  service_name          = "reverb"
+  cluster_arn           = module.ecs_cluster.cluster_arn
+  cluster_name          = module.ecs_cluster.cluster_name
+  vpc_id                = module.vpc.vpc_id
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  security_group_id     = aws_security_group.reverb.id
+  container_image       = "${module.ecr.repository_url}:${var.image_tag}"
+  container_command     = ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=${var.reverb_port}"]
+  container_port        = var.reverb_port
+  execution_role_arn    = module.iam_task_roles.execution_role_arn
+  task_role_arn         = module.iam_task_roles.task_role_arn
+  environment_variables = local.base_environment
+  secrets               = local.task_secrets
+  desired_count         = 1
+  target_group_arn      = module.reverb_lb.target_group_arn
+}
+
+module "queue_worker" {
+  source                = "../../modules/ecs-service"
+  project               = var.project
+  service_name          = "queue-worker"
+  cluster_arn           = module.ecs_cluster.cluster_arn
+  cluster_name          = module.ecs_cluster.cluster_name
+  vpc_id                = module.vpc.vpc_id
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  security_group_id     = aws_security_group.queue_worker.id
+  container_image       = "${module.ecr.repository_url}:${var.image_tag}"
+  container_command     = ["php", "artisan", "queue:work", "redis", "--tries=3"]
+  execution_role_arn    = module.iam_task_roles.execution_role_arn
+  task_role_arn         = module.iam_task_roles.task_role_arn
+  environment_variables = local.base_environment
+  secrets               = local.task_secrets
+  desired_count         = 1
+}
