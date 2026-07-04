@@ -1,0 +1,92 @@
+/*
+ | -----------------------------------------------------------------------------
+ | About page
+ | -----------------------------------------------------------------------------
+ | Public "About us" page (resources/views/about.blade.php): the founding
+ | question as a pull-quote, the developer intro, and the follow-along link
+ | cards. Headings and section rhythm come from Tailwind utilities on the view;
+ | this partial owns the bespoke visuals only.
+ */
+
+@layer components {
+    /* The founding question, pulled out on a card surface with a chili bar. */
+    .about-page__quote {
+        @apply text-md mb-4 rounded-md p-4 font-semibold italic;
+        color: var(--color-primary);
+        background: var(--color-surface);
+        border-left: 4px solid var(--color-accent-chili);
+        box-shadow: 0 4px 12px rgb(30 34 41 / 4%);
+    }
+
+    /* Body-copy rhythm without per-paragraph utilities. */
+    .about-page__prose p + p {
+        margin-top: 0.75rem;
+    }
+
+    .about-page__lead {
+        @apply text-md mb-3 font-semibold;
+        color: var(--color-primary);
+    }
+
+    /* Follow-along cards: stacked on mobile, three-up on desktop. */
+    .about-page__cards {
+        @apply mt-4 grid gap-3 md:grid-cols-3;
+    }
+
+    /* One destination — the whole card is the tap target. */
+    .about-page__card {
+        @apply flex items-start rounded-md p-4;
+        gap: 0.875rem;
+        background: var(--color-surface);
+        border: 1px solid rgb(30 34 41 / 8%);
+        box-shadow: 0 4px 12px rgb(30 34 41 / 4%);
+        min-height: var(--min-tap-target);
+        text-decoration: none;
+        transition: var(--transition-fast);
+    }
+
+    .about-page__card:hover {
+        border-color: rgb(30 34 41 / 20%);
+        transform: translateY(-1px);
+    }
+
+    /* Mustard icon on Asphalt Dark — the dark-surface exception to the
+       dark-text-only rule (see resources/css/CLAUDE.md). */
+    .about-page__card-icon {
+        @apply flex flex-none items-center justify-center rounded-full;
+        width: 2.5rem;
+        height: 2.5rem;
+        background: var(--color-primary);
+        color: var(--color-accent-mustard);
+    }
+
+    .about-page__card-icon svg {
+        width: 1.375rem;
+        height: 1.375rem;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .about-page__card-body {
+        @apply flex min-w-0 flex-col;
+        gap: 0.25rem;
+    }
+
+    .about-page__card-title {
+        @apply font-semibold;
+        color: var(--color-primary);
+    }
+
+    .about-page__card-text {
+        @apply text-sm;
+        color: var(--color-text-muted);
+    }
+
+    .about-page__card-cta {
+        @apply mt-1 text-sm font-semibold;
+        color: var(--color-accent-chili);
+    }
+}

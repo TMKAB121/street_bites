@@ -7,19 +7,27 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "dantsu/php-osm-static-api": "^0.6.4",
+        "intervention/image": "^4.1",
         "laravel/framework": "^13.8",
         "laravel/reverb": "^1.0",
         "laravel/tinker": "^3.0",
+        "league/flysystem-aws-s3-v3": "^3.35",
         "livewire/livewire": "^4.3"
     },
     "require-dev": {
+        "driftingly/rector-laravel": "^2.0",
         "fakerphp/faker": "^1.23",
+        "larastan/larastan": "^3.0",
         "laravel/pail": "^1.2.5",
         "laravel/pao": "^1.0.6",
         "laravel/pint": "^1.27",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
-        "phpunit/phpunit": "^12.5.12"
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.0",
+        "phpunit/phpunit": "^12.5.12",
+        "rector/rector": "^2.0"
     },
     "autoload": {
         "psr-4": {
@@ -40,15 +48,20 @@
             "@php artisan key:generate",
             "@php artisan migrate --force",
             "npm install --ignore-scripts",
-            "npm run build"
-        ],
-        "dev": [
-            "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
+            "npm run build",
+            "git config core.hooksPath .githooks"
         ],
         "test": [
             "@php artisan config:clear --ansi @no_additional_args",
             "@php artisan test"
+        ],
+        "stan": "@php vendor/bin/phpstan analyse --memory-limit=512M",
+        "stan:baseline": "@php vendor/bin/phpstan analyse --generate-baseline --memory-limit=512M",
+        "rector": "@php vendor/bin/rector process",
+        "rector:dry": "@php vendor/bin/rector process --dry-run",
+        "lint": [
+            "@php vendor/bin/pint --test",
+            "@stan"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
@@ -62,7 +75,6 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
             "@php artisan migrate --graceful --ansi"
         ],
         "pre-package-uninstall": [

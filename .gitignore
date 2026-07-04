@@ -37,6 +37,7 @@
 /.vscode
 /.nova
 /.zed
+/.claude
 /.cursor/
 /.codex
 /.phpactor.json
@@ -69,3 +70,13 @@ Thumbs.db
 
 # Misc
 *.cache
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+# .terraform.lock.hcl is intentionally NOT ignored — commit it for reproducible provider versions.

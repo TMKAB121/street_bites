@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(ls /Users/anthonysayge/Desktop/docs_and_archetecture 2>/dev/null && echo \"EXISTS\" || echo \"MISSING\")",
-      "Read(//Users/anthonysayge/Desktop/docs_and_archetecture/**)",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Laravel:', d['require'].get\\('laravel/framework','?'\\), '| Livewire:', d['require'].get\\('livewire/livewire','?'\\), '| Reverb:', d['require'].get\\('laravel/reverb','?'\\)\\)\")"
-    ]
-  }
-}

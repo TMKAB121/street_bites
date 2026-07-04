@@ -1,0 +1,116 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Truck form
+ | -----------------------------------------------------------------------------
+ | The vendor's editable food-truck form (nested <x-truck-form>): grouped
+ | sections, today's-hours row, repeatable menu rows, and the photo gallery.
+ | Reuses .field / .field__input / .btn* from the design system. Tokens, no hex.
+ */
+
+@layer components {
+    .truck-form__section {
+        @apply mt-5 border-t pt-4;
+        border-color: color-mix(in srgb, var(--color-text-muted) 18%, transparent);
+    }
+
+    .truck-form__legend {
+        @apply mb-1 text-sm font-semibold text-primary;
+    }
+
+    .truck-form__hint {
+        @apply mb-3 text-sm text-text-muted;
+    }
+
+    .truck-form__textarea {
+        @apply py-2;
+        min-height: auto;
+    }
+
+    /* Opens / closes side by side. */
+    .truck-form__hours {
+        @apply grid grid-cols-2 items-start gap-3;
+    }
+
+    /* "Opened at …" line under the Now Open button — tight to the button. */
+    .truck-form__opens-status {
+        @apply mt-2;
+    }
+
+    /* Set-my-location row: the CTA with the pinned-at status beside it. */
+    .truck-form__location {
+        @apply flex flex-wrap items-center;
+        gap: 0.75rem;
+    }
+
+    .truck-form__location-status {
+        margin: 0;
+    }
+
+    /* Repeatable menu item. */
+    .menu-row {
+        @apply mb-3 rounded-xl p-3;
+        background: var(--color-bg);
+    }
+
+    .menu-row__main {
+        @apply flex gap-3;
+    }
+
+    .menu-row__main .field {
+        @apply mb-2 flex-1;
+    }
+
+    .menu-row__price {
+        max-width: 7rem;
+    }
+
+    .menu-row__foot {
+        @apply flex items-center justify-between;
+    }
+
+    .truck-form__check {
+        @apply flex items-center gap-2 text-sm text-text-main;
+    }
+
+    .truck-form__remove {
+        @apply text-sm font-medium;
+        color: var(--color-accent-chili);
+    }
+
+    /* Photo gallery. */
+    .truck-form__gallery {
+        @apply flex flex-wrap gap-3;
+    }
+
+    .truck-image {
+        @apply relative overflow-hidden rounded-xl;
+        width: 96px;
+        height: 96px;
+    }
+
+    .truck-image__img {
+        @apply h-full w-full object-cover;
+    }
+
+    .truck-image__remove {
+        @apply absolute right-1 top-1 flex items-center justify-center rounded-full text-white;
+        width: 1.5rem;
+        height: 1.5rem;
+        background: color-mix(in srgb, var(--color-primary) 80%, transparent);
+        line-height: 1;
+    }
+
+    .truck-form__file {
+        @apply block w-full text-sm text-text-muted;
+    }
+
+    .truck-form__actions {
+        @apply mt-6 flex items-center justify-between gap-3 border-t pt-4;
+        border-color: color-mix(in srgb, var(--color-text-muted) 18%, transparent);
+    }
+
+    .truck-form__delete {
+        @apply text-sm font-medium;
+        color: var(--color-accent-chili);
+    }
+}

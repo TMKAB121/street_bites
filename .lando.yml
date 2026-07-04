@@ -24,15 +24,35 @@ services:
       password: steet_bites
       database: steet_bites
     portforward: 3306
+    # Create the test database (used by phpunit.xml) on every start. Idempotent
+    # via IF NOT EXISTS; the schema/data inside it are managed automatically by
+    # Laravel's RefreshDatabase at test time, so it only needs to exist + be
+    # grantable to the app user. Waits for mysqld to accept connections first.
+    run_as_root:
+      - |
+        until mysqladmin -uroot ping --silent 2>/dev/null; do sleep 1; done
+        mysql -uroot -e "CREATE DATABASE IF NOT EXISTS steet_bites_testing;
+          GRANT ALL PRIVILEGES ON steet_bites_testing.* TO 'steet_bites'@'%';
+          FLUSH PRIVILEGES;"
 
   cache:
     portforward: 6379
 
   node:
     type: node:20
+    # The Lando proxy will not reliably route to Vite's custom port, so the
+    # browser hits Vite directly on the published host port 5173. ssl: true makes
+    # Lando issue a CA-trusted *.lndo.site cert (mounted at /certs in the
+    # container) so Vite can serve HTTPS — required because the app is HTTPS and
+    # browsers block mixed (http) content. sslExpose: false = no extra SSL port;
+    # we publish 5173 ourselves.
+    ssl: true
+    sslExpose: false
     overrides:
       environment:
         NODE_ENV: development
+      ports:
+        - '5173:5173'
 
   reverb:
     type: lando
@@ -48,18 +68,42 @@ services:
             --port=8080
             --no-interaction
         "
+      # Pin host 8080 -> container 8080 explicitly. Lando's `portforward: 8080`
+      # does NOT guarantee the host port (it assigned a random one), which broke
+      # the browser's VITE_REVERB_HOST=localhost:8080 path. An explicit compose
+      # mapping is deterministic.
       ports:
-        - '8080'
-    portforward: 8080
+        - '8080:8080'
 
   mailpit:
     type: mailpit
     mailFrom:
       - appserver
+    # Publish the Mailpit web UI to the host at http://localhost:8025. Lando's
+    # mailpit service serves the UI on container port 80 (8025 is NOT the UI),
+    # so map host 8025 -> container 80. Explicit ports (not portforward) for a
+    # deterministic host port — same rationale as the reverb service above.
+    overrides:
+      ports:
+        - '8025:80'
 
 proxy:
   reverb:
     - reverb.steet-bites.lndo.site:8080
+  mailpit:
+    # Mailpit's web UI is on container port 80 (Lando's default proxy target),
+    # so no explicit port suffix is needed here.
+    - mailpit.steet-bites.lndo.site
+  # node/Vite is listed here for ONE reason only: Lando derives a service's TLS
+  # cert SANs from its proxy hostnames, so this entry puts
+  # vite.steet-bites.lndo.site into the cert Vite serves at /certs — without it
+  # the cert covers only node.internal/localhost/127.0.0.1 and Chrome rejects
+  # the lndo.site hostname (NET::ERR_CERT_COMMON_NAME_INVALID), forcing a manual
+  # bypass. The browser still loads assets directly from the published host port
+  # 5173 (see overrides.ports + vite.config.js), NOT through the Lando proxy —
+  # the proxy still can't route Vite's custom port (Traefik 404), and that's
+  # fine because we never route through it. After changing this, `lando rebuild`
+  # to reissue the cert with the new SAN.
   node:
     - vite.steet-bites.lndo.site:5173
 
@@ -87,10 +131,6 @@ tooling:
     service: node
     cmd: npx vite
     description: Run Vite commands
-  reverb:start:
-    service: reverb
-    cmd: php /app/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction
-    description: Start the Laravel Reverb WebSocket server
   queue:work:
     service: appserver
     cmd: php /app/artisan queue:work redis --tries=3
@@ -107,3 +147,7 @@ tooling:
     service: appserver
     cmd: ./vendor/bin/pint
     description: Run Laravel Pint code style fixer
+  pest:
+    service: appserver
+    cmd: ./vendor/bin/pest
+    description: Run the Pest test suite

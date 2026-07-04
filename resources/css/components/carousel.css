@@ -1,0 +1,41 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Card carousel
+ | -----------------------------------------------------------------------------
+ | A horizontal, swipeable row of cards built on native CSS scroll-snap — no JS
+ | dependency, keyboard-scrollable (the region is focusable), and immune to
+ | Livewire DOM-morphing. Any direct child becomes a fixed-width snap item.
+ |
+ |   <x-card-carousel label="Popular trucks"> <x-food-truck-card … /> … </x-card-carousel>
+ */
+
+@layer components {
+    .card-carousel {
+        @apply flex w-full;
+        gap: 1rem;
+        padding: 0.25rem 1rem 1rem;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scroll-padding-left: 1rem;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: rgb(30 34 41 / 25%) transparent;
+    }
+
+    .card-carousel::-webkit-scrollbar {
+        height: 8px;
+    }
+
+    .card-carousel::-webkit-scrollbar-thumb {
+        background: rgb(30 34 41 / 20%);
+        border-radius: 9999px;
+    }
+
+    /* Each direct child is a snap item at a fixed width — slot-based, so the
+       consumer just drops cards in without a wrapper class. */
+    .card-carousel > * {
+        flex: 0 0 auto;
+        width: 16rem;
+        scroll-snap-align: start;
+    }
+}

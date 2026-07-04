@@ -1,0 +1,8 @@
+node_modules
+vendor
+public/build
+bootstrap/ssr
+storage
+# CSS is owned by Stylelint, Blade by Pint/Blade formatter — keep Prettier off them.
+*.css
+*.blade.php

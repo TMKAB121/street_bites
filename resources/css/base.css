@@ -1,0 +1,45 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Base / global foundations
+ | -----------------------------------------------------------------------------
+ | Tailwind's Preflight (pulled in by `@import 'tailwindcss'`) already handles
+ | the reset: box-sizing, margin zeroing, etc. So this file only layers on the
+ | design-system + accessibility defaults the style guide calls for.
+ |
+ | Everything lives in @layer base so utility classes still win when needed.
+ */
+
+@layer base {
+    body {
+        font-family: var(--font-sans);
+        font-size: var(--text-base);
+        color: var(--color-text-main);
+        background-color: var(--color-bg);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ADA: enforce a minimum touch target on interactive elements so taps are
+       reliable on the go (one-handed, busy street corners). */
+    button,
+    [role='button'],
+    .interactive-target,
+    input[type='submit'],
+    input[type='button'] {
+        min-height: var(--min-tap-target);
+        min-width: var(--min-tap-target);
+    }
+
+    /* Highly visible keyboard/AT focus ring (Chili Red), per style guide. */
+    :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+        outline: var(--focus-outline-width) solid var(--color-accent-chili);
+        outline-offset: 3px;
+    }
+}
+
+/* Alpine: keep x-cloak'd elements hidden until Alpine initializes, so the
+   collapsed menu never flashes on page load. Outside @layer base so it wins. */
+[x-cloak] {
+    display: none !important;
+}

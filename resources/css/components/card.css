@@ -1,0 +1,89 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Food truck card
+ | -----------------------------------------------------------------------------
+ | Discovery card: a Crisp White surface with a rounded border, a food-truck
+ | image on top, the truck name, and a full-width Mustard "FIND NOW" CTA. Width
+ | is set by the parent (carousel item / results grid), so the card is fluid.
+ |
+ |   <x-food-truck-card name="…" :image="…" href="…" />
+ */
+
+@layer components {
+    .food-truck-card {
+        @apply flex w-full flex-col overflow-hidden rounded-md bg-surface;
+        border: 1px solid rgb(30 34 41 / 8%);
+        box-shadow: 0 4px 12px rgb(30 34 41 / 4%);
+    }
+
+    .food-truck-card__media {
+        @apply relative w-full overflow-hidden;
+        aspect-ratio: 4 / 3;
+        background: var(--color-bg);
+    }
+
+    .food-truck-card__image {
+        @apply block h-full w-full;
+        object-fit: cover;
+    }
+
+    /* "Now Open" badge — overlaid top-left on the image while the truck is
+       serving. Chili Red with white text (chili passes contrast on white text,
+       unlike mustard/tangerine). The dot pulses to draw the eye. */
+    .food-truck-card__status {
+        @apply absolute left-2 top-2 z-10 inline-flex items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-xs font-semibold uppercase tracking-wide text-white;
+        background: var(--color-accent-chili);
+        box-shadow: 0 2px 6px rgb(30 34 41 / 20%);
+    }
+
+    .food-truck-card__status-dot {
+        @apply inline-block h-2 w-2 rounded-full bg-white;
+        animation: food-truck-card-pulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes food-truck-card-pulse {
+        0%,
+        100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        50% {
+            opacity: 0.4;
+            transform: scale(0.7);
+        }
+    }
+
+    /* Respect reduced-motion preferences — hold the dot steady. */
+    @media (prefers-reduced-motion: reduce) {
+        .food-truck-card__status-dot {
+            animation: none;
+        }
+    }
+
+    /* Shown until a real image is provided. */
+    .food-truck-card__placeholder {
+        @apply flex h-full w-full items-center justify-center;
+        background: var(--gradient-placeholder);
+        color: var(--color-text-muted);
+    }
+
+    .food-truck-card__placeholder svg {
+        width: 40%;
+        max-width: 5rem;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .food-truck-card__body {
+        @apply flex flex-col gap-3 p-4;
+    }
+
+    .food-truck-card__title {
+        @apply text-md font-semibold;
+        color: var(--color-primary);
+    }
+}
