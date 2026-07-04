@@ -37,6 +37,7 @@
 /.vscode
 /.nova
 /.zed
+/.claude
 /.cursor/
 /.codex
 /.phpactor.json
