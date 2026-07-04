@@ -38,8 +38,19 @@ jobs:
           # Release tag only — the ECR repo is IMMUTABLE, so a shared `latest`
           # tag isn't reusable (see terraform/modules/ecr/main.tf).
           TAG: ${{ github.event.release.tag_name }}
+        # The VITE_REVERB_* build args are the browser-facing Reverb config,
+        # inlined into the JS bundle by Vite (the runtime task-definition env
+        # can't reach it). Values are GitHub repo/environment variables:
+        # host = the reverb_dns_name Terraform output (NLB), port/scheme from
+        # terraform/environments/prod (8080/http), key = the Secrets Manager
+        # reverb_app_key value (it ships in public JS anyway — not a secret).
         run: |
-          docker build -t "$REGISTRY/$REPOSITORY:$TAG" .
+          docker build \
+            --build-arg VITE_REVERB_APP_KEY="${{ vars.VITE_REVERB_APP_KEY }}" \
+            --build-arg VITE_REVERB_HOST="${{ vars.VITE_REVERB_HOST }}" \
+            --build-arg VITE_REVERB_PORT="${{ vars.VITE_REVERB_PORT }}" \
+            --build-arg VITE_REVERB_SCHEME="${{ vars.VITE_REVERB_SCHEME }}" \
+            -t "$REGISTRY/$REPOSITORY:$TAG" .
           docker push "$REGISTRY/$REPOSITORY:$TAG"
           echo "image=$REGISTRY/$REPOSITORY:$TAG" >> "$GITHUB_OUTPUT"
 

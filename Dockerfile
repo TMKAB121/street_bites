@@ -18,6 +18,14 @@ RUN composer install \
 # ---- assets: Vite build only, never ships into the runtime image -----------
 FROM node:20-alpine AS assets
 WORKDIR /app
+# Browser-facing Reverb config. Vite inlines import.meta.env.VITE_* into the
+# bundle at build time, so the runtime REVERB_* task-definition env can never
+# reach it — these must arrive here as --build-arg (release-deploy.yml). ARGs
+# are exposed as env to RUN, which is how Vite picks them up.
+ARG VITE_REVERB_APP_KEY
+ARG VITE_REVERB_HOST
+ARG VITE_REVERB_PORT
+ARG VITE_REVERB_SCHEME
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
