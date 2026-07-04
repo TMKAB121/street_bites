@@ -88,12 +88,26 @@ jobs:
 
       - name: Run migration task
         id: run_migration
+        env:
+          SUBNETS: ${{ steps.netconf.outputs.subnets }}
+          SECURITY_GROUPS: ${{ steps.netconf.outputs.security_groups }}
+          TASK_DEF_ARN: ${{ steps.register.outputs.task_def_arn }}
         run: |
+          # Built via jq --argjson (not string-concatenation) — mixing GitHub
+          # Actions expression substitution (which pastes in raw, already-quoted
+          # JSON) with a hand-escaped bash string is fragile: the substituted
+          # quotes aren't escaped, so they can prematurely terminate the outer
+          # bash string and corrupt everything after (lost quotes around subnet IDs).
+          NETWORK_CONFIG=$(jq -n \
+            --argjson subnets "$SUBNETS" \
+            --argjson sgs "$SECURITY_GROUPS" \
+            '{awsvpcConfiguration: {subnets: $subnets, securityGroups: $sgs, assignPublicIp: "DISABLED"}}')
+
           TASK_ARN=$(aws ecs run-task \
             --cluster "$ECS_CLUSTER" \
-            --task-definition "${{ steps.register.outputs.task_def_arn }}" \
+            --task-definition "$TASK_DEF_ARN" \
             --launch-type FARGATE \
-            --network-configuration "{\"awsvpcConfiguration\":{\"subnets\":${{ steps.netconf.outputs.subnets }},\"securityGroups\":${{ steps.netconf.outputs.security_groups }},\"assignPublicIp\":\"DISABLED\"}}" \
+            --network-configuration "$NETWORK_CONFIG" \
             --overrides '{"containerOverrides":[{"name":"web","command":["php","artisan","migrate","--force"]}]}' \
             --query 'tasks[0].taskArn' --output text)
 
