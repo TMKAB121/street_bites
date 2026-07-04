@@ -23,16 +23,22 @@
         </p>
     </section>
 
-    <div class="grid grid-cols-2 gap-4 md:grid-cols-3">
+    {{-- truckRadiusFilter hides matches beyond the 100-mile radius when the
+         visitor's location is known — remembered from the session, since this
+         page has no map to prompt for GPS itself. The trailing note keeps the
+         server-side match count above honest about what's hidden. --}}
+    <div class="grid grid-cols-2 gap-4 md:grid-cols-3" x-data="truckRadiusFilter">
         @forelse ($trucks as $truck)
-            <x-food-truck-card
-                :name="$truck->name"
-                :image="$truck->images->first()?->url"
-                :href="route('trucks.show', $truck)"
-                :open="$truck->isOpenNow()"
-                :truck-id="$truck->id"
-                :favorited="auth()->check() ? (bool) ($truck->is_favorited ?? false) : null"
-            />
+            <div data-lat="{{ $truck->latitude }}" data-lng="{{ $truck->longitude }}">
+                <x-food-truck-card
+                    :name="$truck->name"
+                    :image="$truck->images->first()?->url"
+                    :href="route('trucks.show', $truck)"
+                    :open="$truck->isOpenNow()"
+                    :truck-id="$truck->id"
+                    :favorited="auth()->check() ? (bool) ($truck->is_favorited ?? false) : null"
+                />
+            </div>
         @empty
             @if ($term !== '')
                 <p class="col-span-2 text-sm text-text-muted md:col-span-3">
@@ -41,5 +47,11 @@
                 </p>
             @endif
         @endforelse
+
+        <p x-cloak x-show="hiddenCount > 0" class="col-span-2 text-sm text-text-muted md:col-span-3">
+            <span x-text="hiddenCount"></span>
+            <span x-text="hiddenCount === 1 ? 'match is' : 'matches are'"></span>
+            more than 100 miles away and not shown.
+        </p>
     </div>
 </x-layouts::shell>

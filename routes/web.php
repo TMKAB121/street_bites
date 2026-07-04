@@ -212,6 +212,11 @@ Route::post('/api/favorites/{truck}', function (Request $request, string $truck)
     return response()->json(['favorited' => $changes['attached'] !== []]);
 })->whereNumber('truck')->middleware(['auth', 'throttle:60,1'])->name('favorites.toggle');
 
+// Public "About us" page — the mission, the developer, and where to follow the
+// build. Static Blade view on the shared shell chrome, linked from the
+// hamburger menu (and the desktop header nav).
+Route::view('/about', 'about')->name('about');
+
 // Living style guide — visual reference for the "Urban Vibrant" design tokens.
 Route::view('/styleguide', 'styleguide');
 

@@ -20,7 +20,9 @@
     is active: <x-truck-filters> dispatches `tag-filter` window events, the grid
     x-shows matching cards, and <x-truck-map> filters its pins in lockstep.
     truckDistanceSort (resources/js/truck-map.js) reorders the grid open-first,
-    then closest-first, once the visitor shares a location.
+    then closest-first, once the visitor shares a location — and hides any truck
+    beyond the 100-mile radius cap (the map drops those pins too); the trailing
+    <p> is the client-side empty state for when nothing remains in range.
 --}}
 <section
     {{ $attributes }}
@@ -63,5 +65,9 @@
         @empty
             <p class="col-span-2 text-sm text-text-muted md:col-span-3">{{ $empty }}</p>
         @endforelse
+
+        <p x-cloak x-show="allBeyondRadius" class="col-span-2 text-sm text-text-muted md:col-span-3">
+            No trucks within 100 miles of your location — try searching a different area above.
+        </p>
     </div>
 </section>

@@ -31,20 +31,24 @@
             {{-- Popular carousel — the ten most-favourited trucks, open-now
                  first (ordering computed in the home route). Popularity drives
                  this list, so it keeps its server order — no truckDistanceSort;
-                 the discovery grid below handles proximity. --}}
-            <section class="mb-8">
+                 truckRadiusFilter still hides any card beyond the 100-mile
+                 radius once the visitor's location is known, and the whole
+                 section steps aside when none remain in range. --}}
+            <section class="mb-8" x-data="truckRadiusFilter" x-show="anyInRange">
                 <h2 class="text-lg font-semibold text-primary mb-3 px-1">Popular near you</h2>
                 <div class="-mx-4">
                     <x-card-carousel label="Popular trucks">
                         @forelse ($popular as $truck)
-                            <x-food-truck-card
-                                :name="$truck->name"
-                                :image="$truck->images->first()?->url"
-                                :href="route('trucks.show', $truck)"
-                                :open="$truck->isOpenNow()"
-                                :truck-id="$truck->id"
-                                :favorited="auth()->check() ? (bool) ($truck->is_favorited ?? false) : null"
-                            />
+                            <div data-lat="{{ $truck->latitude }}" data-lng="{{ $truck->longitude }}">
+                                <x-food-truck-card
+                                    :name="$truck->name"
+                                    :image="$truck->images->first()?->url"
+                                    :href="route('trucks.show', $truck)"
+                                    :open="$truck->isOpenNow()"
+                                    :truck-id="$truck->id"
+                                    :favorited="auth()->check() ? (bool) ($truck->is_favorited ?? false) : null"
+                                />
+                            </div>
                         @empty
                             <p class="px-4 text-sm text-text-muted">No trucks yet — check back soon!</p>
                         @endforelse

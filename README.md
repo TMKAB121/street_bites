@@ -189,7 +189,7 @@ steet_bites/
 │   │   ├── app.js              # imports the JS modules below (Alpine is bundled by Livewire 4)
 │   │   ├── echo.js             # Laravel Echo / Reverb client config
 │   │   ├── truck-map.js        # Leaflet home-page map + closest-first card sorting
-│   │   │                       #   + ZIP/address location-search fallback
+│   │   │                       #   + 100-mile radius cap + ZIP/address location-search fallback
 │   │   ├── favorites.js        # favourite star toggle (optimistic Alpine + fetch)
 │   │   └── search.js           # header search typeahead dropdown
 │   └── views/
@@ -203,6 +203,7 @@ steet_bites/
 │       ├── welcome.blade.php   # home page — assembled mobile shell (/)
 │       ├── favorites.blade.php # signed-in favorites page (/favorites)
 │       ├── search.blade.php    # search landing page (/search?q=…)
+│       ├── about.blade.php     # public "About us" page (/about)
 │       └── styleguide.blade.php # living style guide (/styleguide)
 ├── routes/
 │   ├── web.php
@@ -357,6 +358,12 @@ prompt** get a fallback instead: a search card appears where they can enter a **
 code or address**, which is geocoded to rough coordinates — the map recenters and
 the cards re-sort just as if location had been shared.
 
+Once a location is known (either way), every result surface applies a **100-mile
+radius cap**: trucks further out are hidden from the discovery grids, the Popular
+carousel, the search results, and the map's pins, so visitors only ever see trucks
+they could realistically reach. The location is remembered for the browser session,
+so it keeps working across pages without re-prompting.
+
 All mapping uses **OpenStreetMap** with **no API key or billing**: truck pages
 render a cached static map ([`dantsu/php-osm-static-api`](https://github.com/DantSu/php-osm-static-api)),
 the home page uses [Leaflet](https://leafletjs.com/), and both geocoding directions
@@ -433,3 +440,7 @@ Services communicate by Docker service name, not `localhost`:
 This project is built live across a YouTube series. Each commit maps to a video episode — follow along to see every decision made from scratch.
 
 https://www.youtube.com/playlist?list=PLCFAvrjCdis-mdDgzj3wAYA6wXjzgml9z
+
+The app itself tells this story on its public **About page** (`/about`, linked from
+the menu) — the mission, the developer, and follow-along links to the YouTube
+series, the GitHub repo, and LinkedIn.

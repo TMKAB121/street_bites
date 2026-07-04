@@ -105,18 +105,32 @@ document, so plain `x-data`/`x-show` markup still works, and it's exposed on
 `base.css` so collapsed UI never flashes on load. Prefer Alpine for pure-UI state;
 reserve Livewire for server-backed interactivity.
 
-`truck-map.js` registers three Alpine components on `alpine:init` (so they use
+`truck-map.js` registers four Alpine components on `alpine:init` (so they use
 Livewire's bundled Alpine — never import Alpine): `truckMap(pins)` renders the
 zoomable OSM/Leaflet map (opens at `MAP_ZOOM = 12`, ~5-mile radius; free zoom up to
 OSM's tile max) with custom pin markers; `truckDistanceSort`
 reorders a card list **open-first, then closest-first** (real DOM re-append) using each
-card's `data-open` + `data-lat`/`data-lng`; `locationSearch(endpoint)` is the ZIP/address fallback form
+card's `data-open` + `data-lat`/`data-lng`; `truckRadiusFilter` applies the radius cap
+alone to lists that keep their server order (the Popular carousel, the search results
+grid); `locationSearch(endpoint)` is the ZIP/address fallback form
 (see *Maps & geolocation*). It also imports `leaflet/dist/leaflet.css`. The visitor's
 position flows through two **window events** that decouple the pieces:
 `user-located` `{ lat, lng }` (dispatched by the GPS success callback **and** by
 `locationSearch` — `truckMap` listens and recenters/moves the "you are here" dot,
 `truckDistanceSort` reorders) and `user-location-denied` (dispatched when GPS is
 declined or missing — `locationSearch` reveals itself on it).
+
+**100-mile radius cap:** once a location is known, every result surface hides trucks
+beyond `MAX_RADIUS_MILES` (100, in `truck-map.js`) — `truckDistanceSort` and
+`truckRadiusFilter` set the `hidden` attribute on out-of-range cards (Tailwind
+preflight's `!important` display rule outranks the tag filter's `x-show`), and
+`truckMap` drops out-of-range pins. Trucks without a pin stay visible (unknown ≠ far).
+`truckMap` remembers each `user-located` position in `sessionStorage`
+(`street-bites:user-location`) so map-less pages (`/search`) and revisits filter
+immediately without their own GPS prompt — only the map writes the key, so the truck
+form's pin fallback (same event, but the *truck's* location, on a map-less page) never
+pollutes it. The cap is client-side only by necessity: the visitor's position is never
+known server-side.
 
 Two more Alpine components follow the same register-on-`alpine:init` pattern:
 `favoriteToggle(endpoint, favorited, csrf)` (`resources/js/favorites.js`) powers the
@@ -143,7 +157,9 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   — the pre-geolocation order; `truckDistanceSort` re-sorts the grid open-first, then
   closest-first once GPS is granted. `$popular` is the **ten most-favourited trucks**,
   open-now first then by favourite count (stable sorts keep count as the tie-breaker)
-  — popularity drives the carousel, so it keeps its server order (no distance sort).
+  — popularity drives the carousel, so it keeps its server order (no distance sort),
+  but `truckRadiusFilter` hides its cards beyond the 100-mile cap and collapses the
+  whole section when none remain in range (see *100-mile radius cap*).
   Client-side tag filtering is Alpine-driven via the `tag-filter` window event.
 - `/favorites` → `favorites.blade.php` (`favorites`, `auth` + consent middleware) —
   the home page's discovery section (`<x-truck-discovery>`) scoped to the trucks the
@@ -151,13 +167,20 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
 - `/search` → `search.blade.php` (`search`) — the **search landing page** the header
   search bar submits to (see *Search*): a plain grid of matching discovery cards,
   open-now first. Empty query prompts; no map/filters — refining happens by searching
-  again from the still-visible, pre-filled header.
+  again from the still-visible, pre-filled header. `truckRadiusFilter` hides matches
+  beyond the 100-mile cap using the session-remembered location (no map here to
+  prompt for GPS), with an "n matches are more than 100 miles away" note.
 - `/trucks/{truck}` → `trucks/show.blade.php` (`trucks.show`, `whereNumber`) — the
   **public truck detail page** discovery cards link to. Plain Blade view (no Livewire):
   cached OSM static map with a centred pin, cuisine tags, today's hours
   ("Open today …" / "Open now — since …" / unposted), location, and menu. The route
   eager-loads `images`, `tags`, `menuItems`, `todayHours` and passes `$mapUrl` from
   `GenerateTruckMapImage`. Unpublished/missing trucks 404. See *Maps & geolocation*.
+- `/about` → `about.blade.php` (`about`) — public **"About us"** page: the mission
+  (founding question as a pull-quote), the developer intro, and follow-along link
+  cards (YouTube / GitHub / LinkedIn). Static `Route::view` on the shell layout,
+  linked from the hamburger menu (`active="about"`); bespoke visuals in
+  `resources/css/components/about.css`.
 - `/profile` → `App\Livewire\Profile\ProfilePage` (`auth` middleware) — the
   signed-in profile (see *Profile & vendor management* below). Uses the
   `layouts/shell.blade.php` layout, which factors the welcome shell's chrome

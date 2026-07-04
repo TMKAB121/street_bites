@@ -5,7 +5,7 @@
 
 {{--
     Mobile top header bar.
-    - $active: which menu link is current — 'home' | 'favorites' | 'profile'.
+    - $active: which menu link is current — 'home' | 'favorites' | 'about' | 'profile'.
     - $fixed: pin to the viewport top and hide on >= md (real-app default).
              Pass :fixed="false" to render in-flow (e.g. the styleguide demo).
     The hamburger toggles a full-screen Asphalt Dark menu via Alpine (x-data).
@@ -28,6 +28,7 @@
     $items = [
         'home' => ['label' => 'Home', 'href' => '/'],
         'favorites' => ['label' => 'Favorites', 'href' => route('favorites')],
+        'about' => ['label' => 'About us', 'href' => route('about')],
         'profile' => $account,
     ];
 
