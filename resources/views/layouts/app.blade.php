@@ -3,7 +3,8 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>{{ $title ?? 'Street Bites' }}</title>
+        {{-- Auth-flow pages: crawlers shouldn't index sign-in / OTP steps. --}}
+        <x-seo-meta :title="$title ?? 'Street Bites'" robots="noindex" />
 
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="icon" href="/favicon.ico" sizes="48x48">

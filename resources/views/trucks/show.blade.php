@@ -5,7 +5,13 @@
     menuItems, and todayHours and computes $isFavorited, so this view triggers
     no queries of its own.
 --}}
-<x-layouts::shell :title="$truck->name.' — Street Bites'" active="home">
+<x-layouts::shell
+    :title="$truck->name.' — Street Bites'"
+    :description="filled($truck->description)
+        ? Str::limit($truck->description, 160)
+        : 'Find '.$truck->name.' on Street Bites — live location, today\'s hours, and the menu.'"
+    active="home"
+>
     <a href="{{ route('home') }}" class="truck-page__back">&larr; All trucks</a>
 
     {{-- Photo gallery — reuses the scroll-snap carousel; square gallery shots. --}}

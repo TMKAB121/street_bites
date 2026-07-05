@@ -5,7 +5,12 @@
     No map/filters here — refining happens by searching again from the header,
     which stays visible and pre-filled with the current term.
 --}}
-<x-layouts::shell :title="$term === '' ? 'Search — Street Bites' : 'Search: '.$term.' — Street Bites'" active="search">
+{{-- robots noindex: internal search results shouldn't be indexed (Google guideline). --}}
+<x-layouts::shell
+    :title="$term === '' ? 'Search — Street Bites' : 'Search: '.$term.' — Street Bites'"
+    robots="noindex"
+    active="search"
+>
     <section class="mb-8">
         <h1 class="text-xl font-semibold text-primary">
             @if ($term === '')
