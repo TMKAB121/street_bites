@@ -78,10 +78,13 @@ Blade components** (a CSS partial + a `.blade.php` file) in
 mark), `favicon.ico` (16/32/48 fallback), `apple-touch-icon.png` (180², opaque),
 and `public/images/` (`street-bites-logo.svg` — the master pin + wordmark used in
 the header — plus transparent `street-bites-logo.png` / `street-bites-icon.png`
-rasters). The SVGs are the masters (traced from the original art with potrace);
+rasters, and `og-image.jpg` — the 1200×630 / 1.91:1 social share card, the default
+`og:image`; keep re-exports under ~300 KB, the strictest crawler preview cap).
+The SVGs are the masters (traced from the original art with potrace);
 their fill is the logo's own brand red `#C72F2E` — close to but deliberately
 **not** the `--color-accent-chili` token, so don't "fix" either to match the
-other. Every full-page view links the favicon set in `<head>` (see
+other. Every full-page view opens `<head>` with `<x-seo-meta>` (title +
+description + Open Graph link previews) and the favicon set (see
 `resources/views/CLAUDE.md`).
 
 Directory-local detail is in nested memory (loaded on demand — see *Nested memory*):

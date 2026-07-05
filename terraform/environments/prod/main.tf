@@ -153,7 +153,10 @@ locals {
     { name = "APP_ENV", value = "production" },
     { name = "APP_DEBUG", value = "false" },
     { name = "APP_URL", value = "https://www.${var.domain}" },
-    { name = "LOG_CHANNEL", value = "stack" },
+    # stderr, not stack: the stack channel writes to a file inside the
+    # ephemeral container, so app exceptions never reach CloudWatch — only
+    # nginx access lines do. stderr flows through the awslogs driver.
+    { name = "LOG_CHANNEL", value = "stderr" },
     { name = "DB_CONNECTION", value = "mariadb" },
     { name = "DB_HOST", value = module.rds.endpoint },
     { name = "DB_PORT", value = tostring(module.rds.port) },

@@ -7,11 +7,17 @@ Full-page views live here (`welcome.blade.php`, `trucks/show.blade.php`,
 (`resources/css/components/`, visuals only) with a `.blade.php` file (markup +
 `@props`). CSS/token conventions live in `resources/css/CLAUDE.md`.
 
-Every full-page `<head>` (both layouts, `welcome`, `styleguide`) carries the
-favicon links — `/favicon.svg` (`type="image/svg+xml"`), `/favicon.ico`
-(`sizes="48x48"` fallback), and `/apple-touch-icon.png` — right after `<title>`.
-Include all three in any new full-page view (brand-asset detail is in the root
-`CLAUDE.md`, *Front-end / design system*).
+Every full-page `<head>` (both layouts, `welcome`, `styleguide`) opens with
+`<x-seo-meta>` — the component owns `<title>`, meta description, canonical, and
+the Open Graph / Twitter link-preview tags (see the component table) — followed
+by the favicon links: `/favicon.svg` (`type="image/svg+xml"`), `/favicon.ico`
+(`sizes="48x48"` fallback), and `/apple-touch-icon.png`. Include all four in any
+new full-page view (brand-asset detail is in the root `CLAUDE.md`, *Front-end /
+design system*). Shell-layout pages don't touch the head directly — they pass
+`title` / `description` / `robots` props through `<x-layouts::shell>`
+(`trucks/show` derives its description from the truck; `search` passes
+`robots="noindex"` — internal search results shouldn't be indexed; the auth
+layout hardcodes `noindex` for the whole sign-in/OTP flow).
 
 ## Blade components
 
@@ -29,6 +35,7 @@ Include all three in any new full-page view (brand-asset detail is in the root
 | `<x-truck-map>` | `map.css` | Interactive **Leaflet** map of pinned trucks on the home page (JS in `resources/js/truck-map.js`). Serializes `$trucks` to pin markers, centres on the visitor's GPS, and forwards the `tag-filter` window event to filter pins in lockstep with the grid. Props: `trucks` (Collection of FoodTruck models) |
 | `<x-location-search>` | `location-search.css` | ZIP/address geocoding form, used twice: the home-page fallback for visitors who decline geolocation (default: hidden until the `user-location-denied` window event fires) and the truck form's pin fallback when the vendor's GPS fails. The `locationSearch` Alpine component (`resources/js/truck-map.js`) geocodes the entry via `GET /api/geocode` and `$dispatch`es a **bubbling** `user-located` event — window listeners (map, card sort) and ancestor elements (the truck form) both hear it. Reuses `.field__input` (auth.css) + `.btn-mustard`. **Form-free markup by design** — it nests inside the truck editor's `<form wire:submit="save">` and a nested `<form>` would orphan the outer submit button; Enter/click call `search()` directly, with the min-length guard in JS. Props (all optional): `always-visible`, `input-id`, `label`, `cta`, `result-prefix` (null hides the success hint) |
 | `<x-toast>` | `toast.css` | App-wide transient confirmations. Alpine-only; listens for the browser `toast` event Livewire dispatches (`$this->dispatch('toast', message:…, type:…)`). Stacked once in `layouts/shell.blade.php` |
+| `<x-seo-meta>` | — (head-only, no visuals) | The shared `<head>` metadata block: `<title>`, meta description, canonical, Open Graph + `twitter:card`. Defaults to the site pitch and the 1200×630 branded share card (`/images/og-image.jpg`, kept **under 300 KB** — WhatsApp's preview cap; og:image must be an **absolute** URL). `robots` (e.g. `noindex`) suppresses the canonical — mixed signals otherwise. Twitter/X falls back to `og:*`, so only `twitter:card` is emitted. Props: `title`, `description`, `image`, `type`, `robots` |
 | `<x-cookie-consent>` | `cookie-consent.css` | GDPR consent banner + the persistent round "cookie preferences" button that reopens it. Stacked once per full page (both layouts, `welcome`, `styleguide`). Reads the encrypted `cookie_consent` cookie server-side (no flash), posts choices to `cookie-consent.store`, and force-opens on the `cookie_consent.required` session flash. **Accept and Decline share one class — equal prominence is a GDPR rule, never fork them.** Props: `fixed`, `demo` (styleguide: in-flow, never posts) |
 
 Conventions for these components:
