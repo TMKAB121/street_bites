@@ -32,7 +32,11 @@
     ];
 @endphp
 
-<x-layouts::shell title="About us — Street Bites" active="about">
+<x-layouts::shell
+    title="About us — Street Bites"
+    description="The story behind Street Bites — one developer's mission to connect hungry locals with the food trucks rolling through their city."
+    active="about"
+>
     <header class="mb-8">
         <h1 class="text-xl font-semibold text-primary">About Street Bites</h1>
         <p class="text-text-muted mt-1">The mission, the developer, and how to follow the build.</p>
