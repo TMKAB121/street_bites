@@ -84,7 +84,7 @@ it('renders favourites as a slim alphabetical list of links with filled stars', 
         ->test(ProfilePage::class)
         ->assertSeeInOrder(['Arepa Avenue', 'Zebra Cakes'])
         // Each row: a link to the truck page + the filled favourite star.
-        ->assertSeeHtml(route('trucks.show', $arepa))
+        ->assertSeeHtml(route('trucks.show', [$arepa, $arepa->slug]))
         ->assertSeeHtml('class="fav-toggle fav-toggle--active')
         // No card grid — the list replaced <x-food-truck-card>.
         ->assertDontSeeHtml('food-truck-card');

@@ -1,0 +1,34 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Social links
+ | -----------------------------------------------------------------------------
+ | Icon row of a truck's social profiles (<x-social-links>, truck detail page).
+ | One circular chip per link, sized to the WCAG tap-target minimum; the brand
+ | glyph inherits a single token color — no per-brand hex, per the design rules.
+ */
+
+@layer components {
+    .social-links {
+        @apply flex flex-wrap items-center;
+        gap: 0.5rem;
+        list-style: none;
+        padding: 0;
+    }
+
+    .social-links__link {
+        @apply inline-flex items-center justify-center rounded-full bg-surface;
+        width: var(--min-tap-target);
+        height: var(--min-tap-target);
+        border: 1px solid rgb(30 34 41 / 12%);
+        color: var(--color-primary);
+    }
+
+    .social-links__link:hover {
+        color: var(--color-accent-chili);
+    }
+
+    .social-links__link svg {
+        width: 1.375rem;
+        height: 1.375rem;
+    }
+}

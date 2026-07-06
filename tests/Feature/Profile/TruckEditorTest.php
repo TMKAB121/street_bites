@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\SocialPlatform;
 use App\Livewire\Profile\TruckEditor;
 use App\Models\FoodTruck;
 use App\Models\MenuItem;
@@ -109,6 +110,73 @@ it('deletes a menu item the vendor removed from the form', function (): void {
         ->assertHasNoErrors();
 
     expect($truck->menuItems()->count())->toBe(0);
+});
+
+it('saves a social link with its platform detected from the URL', function (): void {
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->call('addSocialLink')
+        ->set('socialLinks.0.url', 'https://www.instagram.com/tacotitan')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $link = $truck->socialLinks()->sole();
+    expect($link->url)->toBe('https://www.instagram.com/tacotitan')
+        ->and($link->platform)->toBe(SocialPlatform::Instagram);
+});
+
+it('re-detects the platform when a social link is edited to a different network', function (): void {
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+    $truck->socialLinks()->create([
+        'url' => 'https://facebook.com/tacotitan',
+        'platform' => SocialPlatform::Facebook,
+        'sort_order' => 0,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->set('socialLinks.0.url', 'https://www.snapchat.com/add/tacotitan')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $link = $truck->socialLinks()->sole();
+    expect($link->platform)->toBe(SocialPlatform::Snapchat);
+});
+
+it('deletes a social link the vendor removed from the form', function (): void {
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+    $truck->socialLinks()->create([
+        'url' => 'https://x.com/tacotitan',
+        'platform' => SocialPlatform::X,
+        'sort_order' => 0,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->call('removeSocialLink', 0)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($truck->socialLinks()->count())->toBe(0);
+});
+
+it('rejects a social link that is not a valid http(s) URL', function (): void {
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->call('addSocialLink')
+        ->set('socialLinks.0.url', 'not-a-url')
+        ->call('save')
+        ->assertHasErrors('socialLinks.0.url');
+
+    expect($truck->socialLinks()->count())->toBe(0);
 });
 
 it('normalises an uploaded image to a 250x250 webp', function (): void {

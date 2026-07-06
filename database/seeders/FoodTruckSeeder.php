@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Actions\StoreTruckImage;
+use App\Enums\SocialPlatform;
 use App\Models\FoodTruck;
 use App\Models\Tag;
 use App\Models\User;
@@ -267,6 +268,8 @@ class FoodTruckSeeder extends Seeder
             }
             $truck->menuItems()->createMany($menuRows);
 
+            $this->seedSocialLinks($truck, $i);
+
             if ($imageCount > 0) {
                 // Cycle through the shuffled pool so every fixture image is used
                 // at least once across the 10 trucks. Even-indexed trucks also get
@@ -299,6 +302,40 @@ class FoodTruckSeeder extends Seeder
         $testUser?->favorites()->syncWithoutDetaching(
             collect($trucks)->random(min(3, count($trucks)))->pluck('id'),
         );
+    }
+
+    /**
+     * Give most trucks 1–3 social profiles (varying platforms, handle derived
+     * from the name) so the detail page's icon row has data out of the box.
+     * Every fourth truck gets none — the hidden state stays exercised too.
+     */
+    private function seedSocialLinks(FoodTruck $truck, int $index): void
+    {
+        if ($index % 4 === 3) {
+            return;
+        }
+
+        $handle = Str::slug($truck->name);
+
+        $urls = [
+            "https://www.instagram.com/{$handle}",
+            "https://www.facebook.com/{$handle}",
+            "https://www.tiktok.com/@{$handle}",
+            "https://x.com/{$handle}",
+            "https://www.snapchat.com/add/{$handle}",
+            "https://www.youtube.com/@{$handle}",
+        ];
+
+        $rows = [];
+        foreach (array_slice($urls, $index % 3, 1 + ($index % 3)) as $order => $url) {
+            $rows[] = [
+                'url' => $url,
+                'platform' => SocialPlatform::fromUrl($url),
+                'sort_order' => $order,
+            ];
+        }
+
+        $truck->socialLinks()->createMany($rows);
     }
 
     /**

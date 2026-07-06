@@ -25,7 +25,7 @@ it('shows the cached map with attribution when the truck has a pin', function ()
     Storage::disk('public')->put((string) $path, 'fake-png-bytes');
 
     $this->withoutVite()
-        ->get(route('trucks.show', $truck))
+        ->get(route('trucks.show', [$truck, $truck->slug]))
         ->assertOk()
         ->assertSee(Storage::disk('public')->url((string) $path), escape: false)
         ->assertSee('truck-page__map', escape: false)
@@ -39,7 +39,7 @@ it('hides the map when the truck has no pinned location', function (): void {
     $truck = FoodTruck::factory()->published()->create();
 
     $this->withoutVite()
-        ->get(route('trucks.show', $truck))
+        ->get(route('trucks.show', [$truck, $truck->slug]))
         ->assertOk()
         ->assertDontSee('truck-page__map', escape: false)
         ->assertDontSee('openstreetmap.org', escape: false);

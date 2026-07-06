@@ -99,6 +99,25 @@
         text-decoration: underline;
     }
 
+    /* Directions CTA under the map — extends .btn.btn-mustard (dark text on
+       mustard, per the contrast rule) to full width with a navigation glyph. */
+    .truck-page__directions {
+        @apply mt-3 w-full;
+        gap: 0.5rem;
+        box-shadow: 0 4px 12px rgb(30 34 41 / 8%);
+    }
+
+    .truck-page__directions svg {
+        width: 1.125rem;
+        height: 1.125rem;
+        flex: none;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
     /* Today's hours + location, on a card surface like .food-truck-card. */
     .truck-page__today {
         @apply flex flex-col rounded-md bg-surface p-4;

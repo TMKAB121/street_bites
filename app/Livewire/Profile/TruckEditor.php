@@ -6,6 +6,7 @@ namespace App\Livewire\Profile;
 
 use App\Actions\ReverseGeocodeLabel;
 use App\Actions\StoreTruckImage;
+use App\Enums\SocialPlatform;
 use App\Models\FoodTruck;
 use App\Models\Tag;
 use Illuminate\Contracts\View\View;
@@ -52,6 +53,15 @@ class TruckEditor extends Component
     public mixed $upload = null;
 
     /**
+     * Repeatable social-link rows: ['id' => ?int, 'url' => string]. Only the
+     * URL is edited — the platform (which brand icon shows on the truck page)
+     * is detected from the URL's host on save.
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    public array $socialLinks = [];
+
+    /**
      * IDs of cuisine tags currently selected for this truck. Livewire populates
      * this from the checkbox group in truck-form via wire:model.
      *
@@ -82,6 +92,11 @@ class TruckEditor extends Component
         ])->all();
 
         $this->selectedTagIds = $truck->tags->pluck('id')->map(fn ($id): int => (int) $id)->all();
+
+        $this->socialLinks = $truck->socialLinks->map(fn ($link): array => [
+            'id' => $link->id,
+            'url' => $link->url,
+        ])->all();
     }
 
     /**
@@ -114,6 +129,21 @@ class TruckEditor extends Component
             'selectedTagIds' => 'array',
             'selectedTagIds.*' => 'integer|exists:tags,id',
             'newTagName' => 'nullable|string|max:100',
+            'socialLinks' => 'array',
+            'socialLinks.*.url' => 'required|url:http,https|max:255',
+        ];
+    }
+
+    /**
+     * Readable names for the repeatable-row fields in validation messages
+     * ("The link field is required", not "The social links.0.url field …").
+     *
+     * @return array<string, string>
+     */
+    protected function validationAttributes(): array
+    {
+        return [
+            'socialLinks.*.url' => 'link',
         ];
     }
 
@@ -126,6 +156,17 @@ class TruckEditor extends Component
     {
         unset($this->menuItems[$index]);
         $this->menuItems = array_values($this->menuItems);
+    }
+
+    public function addSocialLink(): void
+    {
+        $this->socialLinks[] = ['id' => null, 'url' => ''];
+    }
+
+    public function removeSocialLink(int $index): void
+    {
+        unset($this->socialLinks[$index]);
+        $this->socialLinks = array_values($this->socialLinks);
     }
 
     public function save(): void
@@ -152,6 +193,7 @@ class TruckEditor extends Component
 
         $this->saveMenuItems($truck);
         $this->saveTags($truck);
+        $this->saveSocialLinks($truck);
 
         $this->dispatch('truck-saved', name: $truck->name)->to(ProfilePage::class);
         $this->toast('Changes saved');
@@ -290,6 +332,33 @@ class TruckEditor extends Component
         $truck->tags()->sync($ids);
 
         $this->selectedTagIds = $truck->tags()->pluck('id')->map(fn ($id): int => (int) $id)->all();
+    }
+
+    /**
+     * Reconcile social links the same way as menu items: update, create, and
+     * delete removed rows. The platform is re-detected from the URL on every
+     * save, so editing a row's link to a different network swaps its icon too.
+     */
+    private function saveSocialLinks(FoodTruck $truck): void
+    {
+        $keptIds = [];
+
+        foreach (array_values($this->socialLinks) as $order => $row) {
+            $url = trim((string) ($row['url'] ?? ''));
+
+            $link = $truck->socialLinks()->updateOrCreate(
+                ['id' => $row['id'] ?? null],
+                [
+                    'url' => $url,
+                    'platform' => SocialPlatform::fromUrl($url),
+                    'sort_order' => $order,
+                ],
+            );
+
+            $keptIds[] = $link->id;
+        }
+
+        $truck->socialLinks()->whereNotIn('id', $keptIds)->delete();
     }
 
     /**

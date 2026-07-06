@@ -68,6 +68,21 @@
         @apply flex items-center justify-between;
     }
 
+    /* Repeatable social-link row: URL input with the remove action beside it. */
+    .social-row {
+        @apply mb-3 flex items-start gap-3;
+    }
+
+    .social-row__url {
+        @apply flex-1;
+        margin-bottom: 0;
+    }
+
+    /* Keep the remove link vertically centred on the input it removes. */
+    .social-row > .truck-form__remove {
+        @apply mt-3;
+    }
+
     .truck-form__check {
         @apply flex items-center gap-2 text-sm text-text-main;
     }

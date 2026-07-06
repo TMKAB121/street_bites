@@ -1,6 +1,7 @@
 @props([
     'truckId',
     'menuItems' => [],
+    'socialLinks' => [],
     'images' => null,
     'allTags' => collect(),
     'locatedAt' => null,
@@ -16,6 +17,7 @@
 
     - $truckId:   namespaces input ids so several open editors stay unique.
     - $menuItems: repeatable menu rows (for iteration; values are wire:model-bound).
+    - $socialLinks: repeatable social profile URL rows (same pattern as the menu).
     - $images:    the truck's stored gallery images (collection).
     - $locatedAt: when the truck's pin was last set (Carbon|null, UTC) — shown
                   next to the Set-my-location CTA, in the truck's timezone.
@@ -264,6 +266,46 @@
 
         <button type="button" class="btn btn-mustard mt-2" wire:click="addMenuItem">
             + Add menu item
+        </button>
+    </fieldset>
+
+    {{-- Social media ------------------------------------------------------------
+         Repeatable URL rows (same reconcile-on-save pattern as the menu). The
+         vendor only pastes links — SocialPlatform::fromUrl detects the network
+         from each URL's host on save, and the truck page shows its brand icon. --}}
+    <fieldset class="truck-form__section">
+        <legend class="truck-form__legend">Social media</legend>
+        <p class="truck-form__hint">
+            Paste links to your accounts (Facebook, Instagram, TikTok, X, YouTube,
+            Snapchat…). We match each link to its logo on your truck’s page.
+        </p>
+
+        @foreach ($socialLinks as $i => $link)
+            <div class="social-row" wire:key="social-{{ $truckId }}-{{ $i }}-{{ $link['id'] ?? 'new' }}">
+                <div class="field social-row__url">
+                    <label class="sr-only" for="social-url-{{ $truckId }}-{{ $i }}">Profile link</label>
+                    <input
+                        id="social-url-{{ $truckId }}-{{ $i }}"
+                        type="url"
+                        class="field__input"
+                        wire:model="socialLinks.{{ $i }}.url"
+                        placeholder="https://instagram.com/yourtruck"
+                        maxlength="255"
+                    >
+                    @error('socialLinks.'.$i.'.url') <p class="field__error">{{ $message }}</p> @enderror
+                </div>
+                <button
+                    type="button"
+                    class="truck-form__remove"
+                    wire:click="removeSocialLink({{ $i }})"
+                >
+                    Remove
+                </button>
+            </div>
+        @endforeach
+
+        <button type="button" class="btn btn-mustard mt-2" wire:click="addSocialLink">
+            + Add social link
         </button>
     </fieldset>
 

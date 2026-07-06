@@ -8,12 +8,14 @@ use Database\Factories\FoodTruckFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 
 /**
  * A food truck owned by a single user (the vendor). Everything a vendor edits on
@@ -98,6 +100,22 @@ class FoodTruck extends Model
     }
 
     /**
+     * The descriptive URL segment for the truck detail page — derived from the
+     * name on the fly (no column), so it always reflects the current name. The
+     * id in the route is what identifies the truck; a stale slug 404s rather
+     * than redirects. Falls back to a constant when the name slugs to nothing
+     * (e.g. an all-emoji name), since the route segment is required.
+     *
+     * @return Attribute<non-falsy-string, never>
+     */
+    protected function slug(): Attribute
+    {
+        return Attribute::get(
+            fn (): string => Str::slug($this->name) ?: 'food-truck',
+        );
+    }
+
+    /**
      * The `favorited` prop for <x-favorite-toggle>: true/false for a signed-in
      * user (reading the `is_favorited` withExists flag the discovery queries
      * add), null for a guest — null hides the star entirely.
@@ -148,6 +166,16 @@ class FoodTruck extends Model
     public function menuItems(): HasMany
     {
         return $this->hasMany(MenuItem::class)->orderBy('sort_order');
+    }
+
+    /**
+     * Social-media profile links, in the order the vendor listed them.
+     *
+     * @return HasMany<TruckSocialLink, $this>
+     */
+    public function socialLinks(): HasMany
+    {
+        return $this->hasMany(TruckSocialLink::class)->orderBy('sort_order');
     }
 
     /**

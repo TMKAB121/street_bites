@@ -21,7 +21,7 @@
             'lat' => (float) $truck->latitude,
             'lng' => (float) $truck->longitude,
             'tags' => $truck->tags->pluck('slug')->all(),
-            'url' => route('trucks.show', $truck),
+            'url' => route('trucks.show', [$truck, $truck->slug]),
         ])
         ->values();
 @endphp

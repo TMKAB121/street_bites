@@ -176,8 +176,9 @@ steet_bites/
 │   └── seeders/
 ├── public/
 │   ├── favicon.svg             # vector icon (pin mark) + favicon.ico / apple-touch-icon.png
+│   ├── robots.txt              # crawl rules + Sitemap: pointer to /sitemap.xml
 │   └── images/                 # brand assets: street-bites-logo.svg (header logo),
-│                               #   transparent logo/icon PNGs
+│                               #   transparent logo/icon PNGs, og-image.jpg (social share card)
 ├── resources/
 │   ├── css/                    # Tailwind 4 CSS-first design system
 │   │   ├── app.css             # entry: @import 'tailwindcss' + partials
@@ -196,10 +197,10 @@ steet_bites/
 │       ├── components/         # anonymous Blade components (x-mobile-nav, x-mobile-header,
 │       │                       #   x-food-truck-card, x-favorite-toggle, x-truck-discovery,
 │       │                       #   x-card-carousel, x-truck-filters, x-truck-form, x-truck-map,
-│       │                       #   x-location-search, x-toast, x-cookie-consent)
+│       │                       #   x-location-search, x-social-links, x-toast, x-cookie-consent)
 │       ├── layouts/            # app.blade.php (centered) + shell.blade.php (mobile chrome)
 │       ├── livewire/           # full-page Livewire views (auth/, profile/)
-│       ├── trucks/show.blade.php # public truck detail page (/trucks/{id})
+│       ├── trucks/show.blade.php # public truck detail page (/trucks/{id}/{slug})
 │       ├── welcome.blade.php   # home page — assembled mobile shell (/)
 │       ├── favorites.blade.php # signed-in favorites page (/favorites)
 │       ├── search.blade.php    # search landing page (/search?q=…)
@@ -239,6 +240,15 @@ classes from a single source of truth. A living style guide renders at
 Branding is vector-first: the Street Bites logo (map pin + wordmark) ships as an
 SVG in `public/images/` and renders in the app header, and every page links the
 favicon set (`favicon.svg` with `.ico` and apple-touch fallbacks) from `public/`.
+Every page also opens its `<head>` with the `<x-seo-meta>` component — title,
+meta description, canonical, and the Open Graph / Twitter tags that make shared
+links render as rich previews (backed by the 1200×630 share card
+`public/images/og-image.jpg`). Truck detail pages share with the truck's own name
+and description; auth pages, the styleguide, and search results are `noindex`. A
+dynamic [`/sitemap.xml`](https://steet-bites.lndo.site/sitemap.xml) (advertised by
+`public/robots.txt`) lists the home page, `/about`, and every published truck's
+detail page for search-engine crawlers — generated per request, so a newly
+published truck appears immediately.
 
 Reusable UI is built as **anonymous Blade components** in
 `resources/views/components/` (mobile header, bottom nav, food-truck card, the
@@ -332,15 +342,18 @@ authenticated home for two roles in one page:
 - **Vendor on demand** — an "Add a food truck" button registers a food truck
   against the user. Owned trucks list as collapsible cards; expanding one
   **lazy-loads** an editable form for the truck's name, **today's** operating
-  hours, menu items, photos, and **live location**. Saving a new truck publishes
-  it. Confirmations surface as toasts.
+  hours, menu items, photos, **social-media links**, and **live location**. Saving a
+  new truck publishes it. Confirmations surface as toasts.
+- **Social links** — vendors paste their profile URLs (Facebook, Instagram, TikTok,
+  X, YouTube, Snapchat…); the app detects each platform from the link and shows the
+  matching brand icon on the truck's page. Unknown links get a generic globe.
 - **Real-time presence** — a **Set my location** button pins the truck at the
   vendor's current GPS position (and reverse-geocodes an area label); a **Now Open**
   button stamps today's opening time. Both capture the browser timezone so times show
   in the truck's local zone (the app runs in UTC).
 
 Data is persisted in a normalized schema (`food_trucks`, `truck_operating_hours`,
-`menu_items`, `truck_images`, and a `favorites` pivot). Photo uploads are
+`menu_items`, `truck_images`, `truck_social_links`, and a `favorites` pivot). Photo uploads are
 normalized to a **250×250 WebP** (centre-cropped, EXIF stripped) via
 [`intervention/image`](https://image.intervention.io/) and stored on the public
 disk — so a fresh environment needs `lando artisan storage:link` once (see setup).
@@ -350,9 +363,11 @@ See `CLAUDE.md` → *Profile & vendor management* for the schema and conventions
 
 ## Discovery & Maps
 
-Each published truck has a **detail page** (`/trucks/{id}`) that discovery cards
+Each published truck has a **detail page** (`/trucks/{id}/{name-slug}`) that discovery cards
 link to — its photos, cuisine tags, today's hours ("Open now — since …" when a
-vendor has flipped **Now Open**), location, menu, and a map of the surrounding area.
+vendor has flipped **Now Open**), location, menu, social-media icons, and a map of
+the surrounding area with a **Get directions** button that routes from the visitor's
+current location in Google Maps (opening the native maps app on a phone).
 Trucks that are **serving right now** carry a red **"Now Open"** badge on their card
 and are listed **first** — the home page leads with open trucks (alphabetical), and once
 location is shared the cards re-sort to the **nearest open truck first**. The home page
