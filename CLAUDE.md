@@ -215,6 +215,11 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   signed-in profile (see *Profile & vendor management* below). Uses the
   `layouts/shell.blade.php` layout, which factors the welcome shell's chrome
   (fixed header + bottom nav + `<x-toast>`) into a reusable layout for app pages.
+- `/admin/trucks` → `App\Livewire\Admin\ModerationQueue` (`auth` + `EnsureAdmin` +
+  consent) — the **content-moderation queue** (see *Content moderation*): every
+  truck newest-first with review / removed tabs, the editable blocklist panel, and
+  approve / remove / restore / block-vendor actions. Admin-only; disallowed in
+  `robots.txt`.
 - `/styleguide` → `styleguide.blade.php` — living style guide demoing every token
   and component in isolation (route in `routes/web.php`).
 
@@ -334,8 +339,11 @@ home for two roles in one page. Views live in `resources/views/livewire/profile/
 - **Saves are silent → confirmed by toast.** `save`/`uploadImage`/`deleteImage`/
   `deleteTruck` dispatch a `toast` browser event (`<x-toast>`); `save` also
   dispatches `truck-saved`/`truck-deleted` to `ProfilePage` to refresh the list.
-- **Saving publishes.** `save()` sets `is_published = true` — a newly added truck
-  (unpublished by default) goes live on its first save and appears in discovery.
+- **Saving publishes — unless screening holds it.** `save()` auto-screens the truck
+  (text via a word-list, images already screened at upload) and sets `is_published
+  = true` only when clean; a flagged truck is held (`screen_status = 'flagged'`,
+  unpublished) for admin review, and a banned vendor is blocked from publishing
+  altogether. See *Content moderation*.
 - **Now Open + pin (real-time presence).** `goLiveNow()` stamps today's `opens_at` at
   the current truck-local moment (replaces a manual open-time input); `setLocation()`
   writes `latitude`/`longitude`/`located_at` from the browser's geolocation and
@@ -348,17 +356,20 @@ home for two roles in one page. Views live in `resources/views/livewire/profile/
 
 ### Normalized schema
 
-Seven create migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*` + `2026_07_05_000001_*`), all `cascadeOnDelete` from the truck, plus one alter (`2026_07_01_000001_*` adds `food_trucks.timezone`):
+Seven create migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*` + `2026_07_05_000001_*`), all `cascadeOnDelete` from the truck, plus alters (`2026_07_01_000001_*` adds `food_trucks.timezone`; the `2026_07_06_*` set adds content-moderation columns and a standalone `moderation_terms` table — see *Content moderation*):
 
 | Table | Shape / decisions |
 |---|---|
-| `food_trucks` | `user_id` owner, `name`, `description`; nullable `latitude`/`longitude`/`location_label`/`located_at`/`timezone` (**the pin — set from the editor's Set-my-location CTA; `timezone` is the browser IANA zone captured with it**); `is_published` gates discovery |
+| `food_trucks` | `user_id` owner, `name`, `description`; nullable `latitude`/`longitude`/`location_label`/`located_at`/`timezone` (**the pin — set from the editor's Set-my-location CTA; `timezone` is the browser IANA zone captured with it**); `is_published` gates discovery. Moderation adds `screen_status` (auto-screen result), `reviewed_at` (admin sign-off), `moderation_reason`, and `SoftDeletes` (`deleted_at`) so a removed truck is hidden everywhere but retained as evidence — see *Content moderation* |
 | `truck_operating_hours` | One row **per business date** (`unique(food_truck_id, business_date)`) — vendors operate in real time day-by-day, **not** on a recurring weekly schedule. The editor only upserts **today's** row via `updateOrCreate` |
-| `truck_images` | `path` to a normalized WebP on the public disk + `sort_order` |
+| `truck_images` | `path` to a normalized WebP on the public disk + `sort_order`; `screen_status` + `flag_labels` hold the per-image auto-screen result (see *Content moderation*) |
 | `menu_items` | `name`, `description`, `price_cents` (**money as integer cents, never float**), `is_available`, `sort_order` |
 | `favorites` | `user_id`+`food_truck_id` pivot (`unique`). Toggled by `POST /api/favorites/{truck}` (see *Favorites*); read via `withExists`/`withCount` for stars and the Popular carousel |
 | `tags` + `food_truck_tag` | Cuisine taxonomy. `tags`: `name`, `slug` (unique, auto-generated from name via `Str::slug()` on creating). `food_truck_tag`: composite PK pivot — no timestamps, cascade deletes on both FKs |
 | `truck_social_links` | `url` + `platform` + `sort_order`. The vendor only pastes a `url`; `platform` is **derived from its host on save** (`App\Enums\SocialPlatform::fromUrl`, cast to the enum) so the detail page renders the brand icon without re-parsing. Unrecognised hosts store `Website` (generic globe). See *Social links* |
+| `moderation_terms` | Admin-managed blocklist words (`term`, unique), layered on top of the env/config baseline. Edited from the moderation page, effective immediately (`ModerationTerm` busts a cache on every write). Not truck-scoped. See *Content moderation* |
+
+Plus `users` gained nullable `banned_at` + `ban_reason` (the vendor block — see *Content moderation*).
 
 Models: `FoodTruck` (`user`, `operatingHours`, `todayHours`, `images`,
 `menuItems`, `favoritedBy`, `tags`, `socialLinks`; plus `isOpenNow()` — true when
@@ -368,7 +379,10 @@ signed-in user from the `is_favorited` withExists flag, null for guests),
 `TruckOperatingHour`, `TruckImage` (`url` accessor),
 `MenuItem` (`price` accessor), `Tag` (`foodTrucks`),
 `TruckSocialLink` (`foodTruck`; `platform` cast to the `App\Enums\SocialPlatform`
-enum); `User` gained `foodTrucks()` and `favorites()`.
+enum), and `ModerationTerm` (admin-managed blocklist words — see *Content
+moderation*); `User` gained `foodTrucks()`, `favorites()`, plus `isAdmin()`
+(config email allowlist) and `isBanned()` (`banned_at`). `FoodTruck` uses
+`SoftDeletes`, so every discovery query already excludes admin-removed trucks.
 
 ### Image pipeline
 
@@ -379,6 +393,10 @@ GD/Imagick both available in the container): `cover(250, 250)` (centre-crop to a
 (`public` locally, `s3` in production — see *Deployment (AWS)*). Re-encoding strips
 EXIF/GPS metadata (privacy) and arbitrary file bytes; the component validates
 `image|mimes:jpeg,png,webp` with the size cap in `TruckEditor::MAX_UPLOAD_KB` (5120).
+On upload the stored image is also run through `App\Actions\ScreenImage` (AWS
+Rekognition, off unless `MODERATION_REKOGNITION_ENABLED`) and the result written to
+`truck_images.screen_status`; a flagged image holds its truck out of discovery until
+an admin approves it. See *Content moderation*.
 
 > Image uploads need the public-disk symlink — run `lando artisan storage:link`
 > once per environment (a fresh clone has no `public/storage`).
@@ -484,6 +502,61 @@ component (`resources/js/search.js`) layers a **typeahead dropdown** on top.
   (same ordering as home); the header input stays pre-filled with the term.
 
 Tests live in `tests/Feature/SearchTest.php`.
+
+## Content moderation
+
+Onboarding is deliberately frictionless — any signed-in user adds and publishes a
+truck instantly. The moderation layer keeps that fast path for clean content while
+catching offensive text/images, without gating every truck behind manual review.
+
+- **Admins are a config email allowlist**, not a DB role: `ADMIN_EMAILS`
+  (comma-separated) → `config('admin.emails')` → `User::isAdmin()`
+  (case-insensitive). No migration, trivial per-environment. `EnsureAdmin`
+  middleware guards the `/admin` route group, and every `ModerationQueue` action
+  re-checks `isAdmin()` (same defence-in-depth as `TruckEditor::truck()`).
+- **Auto-screen on the way to publish (hold-flagged-only).** `TruckEditor::save()`
+  runs `App\Actions\ScreenText` (a whole-word, case-insensitive blocklist match over
+  name/description/menu text) and checks whether any image was flagged at upload by
+  `App\Actions\ScreenImage`. Clean → publishes instantly, exactly as before; flagged
+  → held (`is_published = false`, `screen_status = 'flagged'`, `reviewed_at` cleared,
+  a `moderation_reason`) with an "in review" toast. The image screen is **AWS
+  Rekognition** `DetectModerationLabels`, **off unless `MODERATION_REKOGNITION_ENABLED`**
+  and **fail-open** (disabled or erroring → treated as clean; the admin queue is the
+  backstop). It runs once at upload (`uploadImage`), storing the result on the
+  `truck_images` row, so saves aggregate flags without re-screening. Rekognition takes
+  only JPEG/PNG bytes, so `ScreenImage` re-encodes the (WebP) source to JPEG first.
+- **Admins are emailed when a truck is held.** On the **transition** into the held
+  state (not every edit of an already-held truck), `save()` queues a
+  `App\Mail\TruckHeldForReview` mailable to `config('admin.emails')`. It's
+  `ShouldQueue`, so it never blocks or fails the vendor's save, and a no-op when the
+  allowlist is empty.
+- **The blocklist is env baseline + DB additions.** `config/moderation.php` holds a
+  default word list (override via `MODERATION_TEXT_BLOCKLIST`) that is an
+  **un-deletable floor**; `moderation_terms` rows (managed from the moderation page)
+  are unioned on top. `ScreenText` reads the union, normalised (trim/lowercase/dedupe).
+  `ModerationTerm::cachedTerms()` caches the DB terms and the model busts that cache
+  on any save/delete, so an added or removed word takes effect on the next screen —
+  **no redeploy**.
+- **The queue (`/admin/trucks`).** Newest-first, flagged surfaced first. Default
+  "Needs review" tab = `reviewed_at IS NULL` (held flags **and** newly published
+  trucks awaiting a human pass); a "Removed" tab lists soft-deleted trucks. Actions:
+  **approve** (`reviewed_at = now()`, publish the held truck), **remove** (soft-delete
+  + reason — hidden everywhere via the `SoftDeletes` global scope, rows/images kept as
+  evidence), **restore** (comes back unpublished + unreviewed), and **block vendor**.
+- **Blocking a vendor** stamps `users.banned_at`/`ban_reason` (set with `forceFill`,
+  never mass-assignable) and unpublishes **all** their trucks at once. A ban stops
+  `ProfilePage::addTruck()` and `TruckEditor::save()` only — the user can still sign
+  in, browse, and favourite. Their profile hides the "Add a food truck" CTA and shows
+  a notice.
+- **Nav:** an admins-only "Moderation" link appears in `<x-mobile-header>` (`$items`,
+  gated by `auth()->user()?->isAdmin()`).
+
+Env: `ADMIN_EMAILS`, `MODERATION_REKOGNITION_ENABLED` (+ optional
+`MODERATION_REKOGNITION_MIN_CONFIDENCE`, `_REGION`, and `MODERATION_TEXT_BLOCKLIST`)
+— see `.env.example`. Tests: `tests/Feature/Admin/ModerationQueueTest.php` (access
+control, queue filters, approve/remove/restore/block, blocklist editing) and
+`tests/Feature/Moderation/ScreeningTest.php` (text/image flagging, ban guards) —
+they set `config(['admin.emails' => …])` and mock the non-final `ScreenImage`.
 
 ## Social links
 

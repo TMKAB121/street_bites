@@ -1,0 +1,135 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Admin moderation queue
+ | -----------------------------------------------------------------------------
+ | The content-moderation admin page (/admin/trucks): filter tabs, one row per
+ | truck (thumbnail + meta + status badges + actions). Visuals only, tokens not
+ | hex. Chili = flagged/needs-attention, mustard = live (dark text per the token
+ | rule), muted grey = held/unpublished.
+ */
+
+@layer components {
+    /* Admin-managed blocklist panel. */
+    .moderation__terms {
+        @apply mb-6 rounded-2xl bg-surface p-4 shadow-sm;
+    }
+
+    .moderation__terms-title {
+        @apply font-semibold text-primary;
+    }
+
+    .moderation__terms-note {
+        @apply mt-1 text-xs text-text-muted;
+    }
+
+    .moderation__chips {
+        @apply mt-3 flex flex-wrap gap-2;
+    }
+
+    .moderation__chip {
+        @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm text-text-main;
+        background: color-mix(in srgb, var(--color-text-muted) 15%, transparent);
+    }
+
+    .moderation__chip-remove {
+        @apply inline-flex h-5 w-5 items-center justify-center rounded-full text-base leading-none text-text-muted;
+        cursor: pointer;
+    }
+
+    .moderation__chip-remove:hover {
+        @apply bg-accent-chili text-white;
+    }
+
+    .moderation__term-form {
+        @apply mt-3 flex gap-2;
+    }
+
+    .moderation__tabs {
+        @apply mb-4 flex gap-2;
+    }
+
+    .moderation__tab {
+        @apply rounded-full px-4 py-2 text-sm font-semibold text-text-muted;
+        min-height: var(--min-tap-target);
+        background: color-mix(in srgb, var(--color-text-muted) 12%, transparent);
+    }
+
+    .moderation__tab--active {
+        @apply bg-primary text-white;
+    }
+
+    .moderation__row {
+        @apply mb-3 flex gap-3 rounded-2xl bg-surface p-4 shadow-sm;
+    }
+
+    .moderation__thumb {
+        @apply h-16 w-16 shrink-0 rounded-lg object-cover;
+        background: color-mix(in srgb, var(--color-text-muted) 12%, transparent);
+    }
+
+    .moderation__body {
+        @apply min-w-0 flex-1;
+    }
+
+    .moderation__name {
+        @apply font-semibold text-primary;
+    }
+
+    .moderation__meta {
+        @apply text-xs text-text-muted;
+    }
+
+    .moderation__desc {
+        @apply mt-1 line-clamp-2 text-sm text-text-main;
+    }
+
+    .moderation__badges {
+        @apply mt-1 flex flex-wrap items-center gap-1;
+    }
+
+    .moderation__badge {
+        @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold;
+    }
+
+    .moderation__badge--flagged {
+        @apply bg-accent-chili text-white;
+    }
+
+    .moderation__badge--live {
+        @apply bg-accent-mustard text-primary;
+    }
+
+    .moderation__badge--held {
+        @apply text-text-muted;
+        background: color-mix(in srgb, var(--color-text-muted) 18%, transparent);
+    }
+
+    .moderation__reason {
+        @apply mt-1 text-xs text-accent-chili;
+    }
+
+    .moderation__actions {
+        @apply mt-3 flex flex-wrap gap-2;
+    }
+
+    .moderation__action {
+        @apply rounded-lg px-3 py-2 text-sm font-semibold;
+        min-height: var(--min-tap-target);
+        cursor: pointer;
+        transition: var(--transition-fast);
+    }
+
+    .moderation__action--approve,
+    .moderation__action--restore {
+        @apply bg-primary text-white;
+    }
+
+    .moderation__action--remove {
+        @apply text-text-main;
+        background: color-mix(in srgb, var(--color-text-muted) 15%, transparent);
+    }
+
+    .moderation__action--block {
+        @apply bg-accent-chili text-white;
+    }
+}

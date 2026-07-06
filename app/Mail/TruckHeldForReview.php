@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Mail;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\SerializesModels;
+
+/**
+ * Notifies the moderation admins that a truck was auto-screened and held for
+ * review. Queued (ShouldQueue) so it never slows or fails the vendor's save —
+ * it rides the same Redis queue as the rest of the app's background work, and a
+ * mail outage can't block publishing. Sent to `config('admin.emails')` only on
+ * the transition into the held state (see TruckEditor::save), so repeated edits
+ * of an already-held truck don't re-notify.
+ */
+class TruckHeldForReview extends Mailable implements ShouldQueue
+{
+    use Queueable, SerializesModels;
+
+    public function __construct(
+        public string $truckName,
+        public string $ownerEmail,
+        public string $reason,
+        public string $reviewUrl,
+    ) {}
+
+    public function envelope(): Envelope
+    {
+        return new Envelope(
+            subject: 'Street Bites: a truck is awaiting review',
+        );
+    }
+
+    public function content(): Content
+    {
+        return new Content(
+            view: 'emails.truck-held-for-review',
+        );
+    }
+}

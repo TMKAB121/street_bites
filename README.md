@@ -161,13 +161,13 @@ hook — run it on demand and review its diff before committing.
 ```
 steet_bites/
 ├── app/
-│   ├── Actions/                # single-purpose actions (StoreTruckImage,
-│   │                           #   GenerateTruckMapImage, ReverseGeocodeLabel, GeocodeSearch)
+│   ├── Actions/                # single-purpose actions (StoreTruckImage, GenerateTruckMapImage,
+│   │                           #   ReverseGeocodeLabel, GeocodeSearch, ScreenText, ScreenImage)
 │   ├── Http/
 │   │   ├── Controllers/
-│   │   └── Middleware/         # RequireCookieConsent (cookie-consent gate on auth/profile)
-│   ├── Livewire/               # Livewire components (Auth/, Profile/)
-│   ├── Models/                 # User, FoodTruck, MenuItem, TruckImage, ...
+│   │   └── Middleware/         # RequireCookieConsent (consent gate) + EnsureAdmin (moderation admins)
+│   ├── Livewire/               # Livewire components (Auth/, Profile/, Admin/)
+│   ├── Models/                 # User, FoodTruck, MenuItem, TruckImage, ModerationTerm, ...
 │   ├── Jobs/                   # Queued jobs
 │   └── Events/                 # Broadcast events
 ├── database/
@@ -211,7 +211,9 @@ steet_bites/
 │   └── channels.php            # Reverb broadcast channel definitions
 ├── config/
 │   ├── broadcasting.php        # Reverb configured as default broadcaster
-│   └── reverb.php
+│   ├── reverb.php
+│   ├── admin.php               # ADMIN_EMAILS allowlist (moderation admins)
+│   └── moderation.php          # text blocklist baseline + Rekognition image screening
 ├── tests/                      # Pest tests (Feature + Unit)
 ├── .github/workflows/          # CI + Terraform plan/apply + release-deploy (see Deployment)
 ├── docker/                     # nginx/php-fpm/supervisord config for the production image
@@ -411,6 +413,34 @@ page, with a hint of *why* it matched when the name alone doesn't show it.
 Pressing **Enter** (or tapping the magnifier) lands on `/search`, which lists
 every matching truck as discovery cards, open-now trucks first. See
 `CLAUDE.md` → *Favorites* and *Search*.
+
+---
+
+## Content Moderation
+
+Adding a truck is intentionally frictionless — any signed-in user can publish one
+instantly. To keep that open door safe, new content is screened and there's an
+admin surface to act on anything offensive:
+
+- **Auto-screening on publish** — a truck's text (name, description, menu) is
+  checked against a blocklist and its photos against **AWS Rekognition** image
+  moderation (enabled in production). Clean trucks go live immediately; only
+  *flagged* ones are held back for review, so honest vendors are never slowed down.
+  Admins get an email the moment a truck is held.
+- **Moderation queue** (`/admin/trucks`, admins only) — every truck newest-first,
+  with **Approve**, **Remove** (a recoverable soft-delete that retains the content
+  as evidence), and **Block vendor** actions. Removed trucks disappear from the
+  whole site automatically.
+- **Editable blocklist** — admins add or remove blocked words from the page itself;
+  changes take effect immediately, no redeploy. A baseline list ships in
+  configuration as an always-on floor.
+- **Vendor blocks** — blocking an offender stops them adding or publishing trucks
+  and unpublishes their existing ones, but they can still sign in and browse: the
+  block is on their vendor privileges, not their account.
+
+Admins are defined by an `ADMIN_EMAILS` allowlist (no role table); image screening
+is off by default and turns on with `MODERATION_REKOGNITION_ENABLED`. See
+`CLAUDE.md` → *Content moderation*.
 
 ---
 
