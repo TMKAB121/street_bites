@@ -1,8 +1,10 @@
-{!! '<?xml version="1.0" encoding="UTF-8"?>' !!}
-{{-- Rendered by the sitemap route (routes/web.php). Each entry is a
-     ['loc' => …, 'lastmod' => ?string] pair — the route decides what pages
-     exist; this view only knows how to print urlset XML. Blade's {{ }}
-     escaping is XML-safe (& → &amp;). --}}
+{{-- Rendered by the sitemap route (routes/web.php), which prepends the XML
+     declaration in plain PHP — deliberately NOT here. A literal prolog in a
+     Blade template compiles to a cached PHP file that servers with
+     short_open_tag=On mis-parse as a PHP open tag (a production 500), so this
+     view only ever prints the <urlset> body. Each entry is a
+     ['loc' => …, 'lastmod' => ?string] pair; Blade's {{ }} escaping is
+     XML-safe (& → &amp;). --}}
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 @foreach ($urls as $url)
     <url>
