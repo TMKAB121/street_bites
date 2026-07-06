@@ -117,7 +117,7 @@ Route::get('/api/search', function (Request $request) {
     return response()->json($trucks->map(fn (FoodTruck $truck): array => [
         'id' => $truck->id,
         'name' => $truck->name,
-        'url' => route('trucks.show', $truck),
+        'url' => route('trucks.show', [$truck, $truck->slug]),
         // Why this truck matched, when the name alone doesn't show it.
         'context' => mb_stripos($truck->name, $term) !== false
             ? null
@@ -177,11 +177,17 @@ Route::post('/api/cookie-consent', function (Request $request) {
 
 // Public truck detail page — the destination of every truck card's FIND NOW
 // CTA. Unpublished trucks stay invisible (404), matching home-page discovery.
-Route::get('/trucks/{truck}', function (string $truck): Factory|View {
+// The id identifies the truck; the slug segment is descriptive (SEO/legibility)
+// and must match the name-derived slug exactly — a wrong or stale slug 404s, so
+// every URL that renders is the canonical one (<x-seo-meta> canonicalises to
+// the current URL).
+Route::get('/trucks/{truck}/{slug}', function (string $truck, string $slug): Factory|View {
     $truck = FoodTruck::query()
         ->where('is_published', true)
-        ->with(['images', 'tags', 'menuItems', 'todayHours'])
+        ->with(['images', 'tags', 'menuItems', 'todayHours', 'socialLinks'])
         ->findOrFail($truck);
+
+    abort_unless($slug === $truck->slug, 404);
 
     // Whether the signed-in visitor has favourited this truck (guests get no
     // star at all, so false is fine as their placeholder).

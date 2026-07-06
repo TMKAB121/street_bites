@@ -173,12 +173,18 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   again from the still-visible, pre-filled header. `truckRadiusFilter` hides matches
   beyond the 100-mile cap using the session-remembered location (no map here to
   prompt for GPS), with an "n matches are more than 100 miles away" note.
-- `/trucks/{truck}` → `trucks/show.blade.php` (`trucks.show`, `whereNumber`) — the
-  **public truck detail page** discovery cards link to. Plain Blade view (no Livewire):
-  cached OSM static map with a centred pin, cuisine tags, today's hours
-  ("Open today …" / "Open now — since …" / unposted), location, and menu. The route
-  eager-loads `images`, `tags`, `menuItems`, `todayHours` and passes `$mapUrl` from
-  `GenerateTruckMapImage`. Unpublished/missing trucks 404. See *Maps & geolocation*.
+- `/trucks/{truck}/{slug}` → `trucks/show.blade.php` (`trucks.show`, `whereNumber`
+  on the id) — the **public truck detail page** discovery cards link to. The id
+  identifies the truck; the slug is the name-derived `FoodTruck::slug` accessor
+  (`Str::slug(name)`, no column — always current after a rename) and **must match
+  exactly or the page 404s**, so every URL that renders is its own canonical
+  (`<x-seo-meta>` canonicalises to the current URL — no redirects, no duplicates).
+  Generate links with `route('trucks.show', [$truck, $truck->slug])`. Plain Blade
+  view (no Livewire): cached OSM static map with a centred pin, cuisine tags,
+  today's hours ("Open today …" / "Open now — since …" / unposted), location, and
+  menu. The route eager-loads `images`, `tags`, `menuItems`, `todayHours` and
+  passes `$mapUrl` from `GenerateTruckMapImage`. Unpublished/missing trucks 404.
+  See *Maps & geolocation*.
 - `/about` → `about.blade.php` (`about`) — public **"About us"** page: the mission
   (founding question as a pull-quote), the developer intro, and follow-along link
   cards (YouTube / GitHub / LinkedIn). Static `Route::view` on the shell layout,

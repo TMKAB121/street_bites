@@ -54,7 +54,7 @@ it('shows a filled star on the detail page for a favourited truck', function ():
 
     $this->withoutVite()
         ->actingAs($user)
-        ->get(route('trucks.show', $truck))
+        ->get(route('trucks.show', [$truck, $truck->slug]))
         ->assertOk()
         ->assertSee('class="fav-toggle fav-toggle--active', escape: false);
 });
@@ -65,7 +65,7 @@ it('shows a hollow star on the detail page for an unfavourited truck', function 
 
     $this->withoutVite()
         ->actingAs($user)
-        ->get(route('trucks.show', $truck))
+        ->get(route('trucks.show', [$truck, $truck->slug]))
         ->assertOk()
         ->assertSee('class="fav-toggle', escape: false)
         ->assertDontSee('class="fav-toggle fav-toggle--active', escape: false);
@@ -75,7 +75,7 @@ it('shows no star to guests on the detail page', function (): void {
     $truck = FoodTruck::factory()->published()->create();
 
     $this->withoutVite()
-        ->get(route('trucks.show', $truck))
+        ->get(route('trucks.show', [$truck, $truck->slug]))
         ->assertOk()
         ->assertDontSee('fav-toggle');
 });

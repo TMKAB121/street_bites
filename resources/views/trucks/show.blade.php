@@ -2,8 +2,8 @@
     Public truck detail page (trucks.show). A plain Blade view on the shared
     shell chrome — the only interactive control is the favourite star, which is
     Alpine + fetch (no Livewire needed). The route eager-loads images, tags,
-    menuItems, and todayHours and computes $isFavorited, so this view triggers
-    no queries of its own.
+    menuItems, todayHours, and socialLinks and computes $isFavorited, so this
+    view triggers no queries of its own.
 --}}
 <x-layouts::shell
     :title="$truck->name.' — Street Bites'"
@@ -86,6 +86,25 @@
                 </figcaption>
             </figure>
         @endif
+
+        {{-- Google Maps directions deep link — omitting the origin makes Google
+             route from the visitor's current location (and open the native app
+             on mobile). Gated on the pin, not $mapUrl, so directions survive a
+             static-map render failure. --}}
+        @if ($truck->latitude !== null && $truck->longitude !== null)
+            <a
+                href="https://www.google.com/maps/dir/?api=1&amp;destination={{ $truck->latitude }},{{ $truck->longitude }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn btn-mustard truck-page__directions"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 11l19-8-8 19-2-9-9-2z"/>
+                </svg>
+                Get directions
+                <span class="sr-only">to {{ $truck->name }} (opens Google Maps)</span>
+            </a>
+        @endif
     </header>
 
     {{-- Today's window + location. Hours are per-business-date, so anything
@@ -123,6 +142,15 @@
             </p>
         @endif
     </section>
+
+    {{-- Social profiles — one icon chip per link, brand glyph picked by the
+         platform detected from the URL (SocialPlatform). Hidden when none. --}}
+    @if ($truck->socialLinks->isNotEmpty())
+        <section class="mb-8">
+            <h2 class="text-lg font-semibold text-primary mb-2">Follow {{ $truck->name }}</h2>
+            <x-social-links :links="$truck->socialLinks" />
+        </section>
+    @endif
 
     @if ($truck->description)
         <section class="mb-8">

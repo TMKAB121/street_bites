@@ -177,7 +177,7 @@ steet_bites/
 ├── public/
 │   ├── favicon.svg             # vector icon (pin mark) + favicon.ico / apple-touch-icon.png
 │   └── images/                 # brand assets: street-bites-logo.svg (header logo),
-│                               #   transparent logo/icon PNGs
+│                               #   transparent logo/icon PNGs, og-image.jpg (social share card)
 ├── resources/
 │   ├── css/                    # Tailwind 4 CSS-first design system
 │   │   ├── app.css             # entry: @import 'tailwindcss' + partials
@@ -199,7 +199,7 @@ steet_bites/
 │       │                       #   x-location-search, x-toast, x-cookie-consent)
 │       ├── layouts/            # app.blade.php (centered) + shell.blade.php (mobile chrome)
 │       ├── livewire/           # full-page Livewire views (auth/, profile/)
-│       ├── trucks/show.blade.php # public truck detail page (/trucks/{id})
+│       ├── trucks/show.blade.php # public truck detail page (/trucks/{id}/{slug})
 │       ├── welcome.blade.php   # home page — assembled mobile shell (/)
 │       ├── favorites.blade.php # signed-in favorites page (/favorites)
 │       ├── search.blade.php    # search landing page (/search?q=…)
@@ -239,6 +239,11 @@ classes from a single source of truth. A living style guide renders at
 Branding is vector-first: the Street Bites logo (map pin + wordmark) ships as an
 SVG in `public/images/` and renders in the app header, and every page links the
 favicon set (`favicon.svg` with `.ico` and apple-touch fallbacks) from `public/`.
+Every page also opens its `<head>` with the `<x-seo-meta>` component — title,
+meta description, canonical, and the Open Graph / Twitter tags that make shared
+links render as rich previews (backed by the 1200×630 share card
+`public/images/og-image.jpg`). Truck detail pages share with the truck's own name
+and description; auth pages, the styleguide, and search results are `noindex`.
 
 Reusable UI is built as **anonymous Blade components** in
 `resources/views/components/` (mobile header, bottom nav, food-truck card, the
@@ -350,7 +355,7 @@ See `CLAUDE.md` → *Profile & vendor management* for the schema and conventions
 
 ## Discovery & Maps
 
-Each published truck has a **detail page** (`/trucks/{id}`) that discovery cards
+Each published truck has a **detail page** (`/trucks/{id}/{name-slug}`) that discovery cards
 link to — its photos, cuisine tags, today's hours ("Open now — since …" when a
 vendor has flipped **Now Open**), location, menu, and a map of the surrounding area.
 Trucks that are **serving right now** carry a red **"Now Open"** badge on their card

@@ -8,6 +8,7 @@
     <x-truck-form
         :truck-id="$truckId"
         :menu-items="$menuItems"
+        :social-links="$socialLinks"
         :images="$images"
         :all-tags="$allTags"
         :located-at="$locatedAt"
