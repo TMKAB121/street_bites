@@ -190,7 +190,7 @@ Route::get('/trucks/{truck}', function (string $truck): Factory|View {
 
     // Cached OSM static map of the pin's surroundings; null hides the section.
     $mapPath = resolve(GenerateTruckMapImage::class)($truck);
-    $mapUrl = $mapPath !== null ? Storage::disk('public')->url($mapPath) : null;
+    $mapUrl = $mapPath !== null ? Storage::disk(config('filesystems.public_disk'))->url($mapPath) : null;
 
     return view('trucks.show', ['truck' => $truck, 'mapUrl' => $mapUrl, 'isFavorited' => $isFavorited]);
 })->whereNumber('truck')->name('trucks.show');
