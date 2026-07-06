@@ -516,3 +516,8 @@ https://www.youtube.com/playlist?list=PLCFAvrjCdis-mdDgzj3wAYA6wXjzgml9z
 The app itself tells this story on its public **About page** (`/about`, linked from
 the menu) — the mission, the developer, and follow-along links to the YouTube
 series, the GitHub repo, and LinkedIn.
+
+The app is free to use. When a `BUYMEACOFFEE_URL` is set (see
+`config/external-links.php`), an optional **Buy Me a Coffee** support link appears
+in three places — the About page, the profile page, and the header menu — and is
+hidden everywhere when that value is blank.

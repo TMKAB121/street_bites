@@ -193,9 +193,10 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   Unpublished/missing trucks 404. See *Maps & geolocation* and *Social links*.
 - `/about` → `about.blade.php` (`about`) — public **"About us"** page: the mission
   (founding question as a pull-quote), the developer intro, and follow-along link
-  cards (YouTube / GitHub / LinkedIn). Static `Route::view` on the shell layout,
-  linked from the hamburger menu (`active="about"`); bespoke visuals in
-  `resources/css/components/about.css`.
+  cards (YouTube / GitHub / LinkedIn) — plus, when configured, an optional
+  **Buy Me a Coffee** support card appended to that grid (see *Support link*).
+  Static `Route::view` on the shell layout, linked from the hamburger menu
+  (`active="about"`); bespoke visuals in `resources/css/components/about.css`.
 - `/sitemap.xml` → `sitemap.blade.php` (`sitemap`) — the **XML sitemap** search
   engines fetch, advertised by `public/robots.txt` (whose `Sitemap:` line is the
   absolute production URL — the directive requires one; robots.txt also disallows
@@ -324,6 +325,8 @@ decision; don't add a category picker without one.
 
 `/profile` (`App\Livewire\Profile\ProfilePage`, `auth`-guarded) is the signed-in
 home for two roles in one page. Views live in `resources/views/livewire/profile/`.
+A config-gated **Buy Me a Coffee** support callout (`.profile__support`) sits under
+the heading, deliberately quieter than the "Add a food truck" CTA (see *Support link*).
 
 - **Eater by default, vendor on demand.** We never assume a user is a food-truck
   owner: the page shows their **favourited trucks** (a slim `.fav-list` of
@@ -598,6 +601,29 @@ carries a **Get directions** CTA to Google Maps (see the `trucks.show` *Pages* e
   (`resources/views/CLAUDE.md`). Hidden entirely when a truck has no links.
 - Tests: `tests/Feature/Trucks/SocialPlatformTest.php` (host detection + fallback)
   and the social assertions in `tests/Feature/Trucks/TruckShowPageTest.php`.
+
+## Support link (Buy Me a Coffee)
+
+The app is free to use; a single **Buy Me a Coffee** link helps fund it, surfaced on
+three surfaces and gated on one config value.
+
+- **One env-backed URL.** `config/external-links.php` exposes
+  `config('external-links.buymeacoffee')` from the `BUYMEACOFFEE_URL` env var (see
+  `.env.example`). It's the single source of truth — the handle never lives in a view.
+- **Config-gated everywhere.** Each surface renders **only when the value is truthy**,
+  so a blank `BUYMEACOFFEE_URL=` hides all three cleanly (no empty card, no dead link):
+  1. the **About page** — a "Support the project" entry appended to the `$connections`
+     grid, reusing the existing `.about-page__card` pattern (no new CSS);
+  2. the **profile page** — the `.profile__support` callout under the heading
+     (`resources/css/components/profile.css`), a chili-barred card with a mustard
+     coffee glyph, kept quieter than the "Add a food truck" CTA;
+  3. the **`<x-mobile-header>` menu** — a `coffee` entry spread into `$items` (after
+     "About us"), so it shows in both the hamburger menu **and** the desktop top-nav.
+     It carries an `external => true` flag that adds `target="_blank"
+     rel="noopener noreferrer"` in both link loops. **Not** in the bottom `<x-mobile-nav>`
+     — that bar is for in-app navigation only.
+- The coffee-cup icon is inline stroke SVG (viewBox `0 0 24 24`), matching the icon
+  convention (see `resources/views/CLAUDE.md`).
 
 ## Internal Docker hostnames
 
