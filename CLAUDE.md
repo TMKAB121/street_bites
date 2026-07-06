@@ -204,8 +204,13 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   newly published truck is in the very next fetch: home, `/about`, and every
   published truck's canonical slug URL with `lastmod` = the truck's `updated_at`.
   The route builds `['loc' => …, 'lastmod' => ?]` entries and the view only prints
-  urlset XML, so future public surfaces (e.g. a news feed) join by `concat()`ing
-  their own entries in the route. Plain XML view — no layout, no `<x-seo-meta>`.
+  the `<urlset>` body, so future public surfaces (e.g. a news feed) join by
+  `concat()`ing their own entries in the route. Plain XML view — no layout, no
+  `<x-seo-meta>`. **The `<?xml` prolog is prepended in the route (plain PHP), never
+  written in the Blade view** — a literal prolog compiles to a cached PHP file
+  whose open-tag bytes a `short_open_tag=On` server (prod) mis-parses, 500ing the
+  page. Same trap in PHP `//` comments: a `?>` ends the comment, so keep both out
+  of the route file too.
 - `/profile` → `App\Livewire\Profile\ProfilePage` (`auth` middleware) — the
   signed-in profile (see *Profile & vendor management* below). Uses the
   `layouts/shell.blade.php` layout, which factors the welcome shell's chrome
