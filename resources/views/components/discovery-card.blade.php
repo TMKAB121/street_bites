@@ -16,7 +16,7 @@
     <x-food-truck-card
         :name="$truck->name"
         :image="$truck->images->first()?->url"
-        :href="route('trucks.show', $truck)"
+        :href="route('trucks.show', [$truck, $truck->slug])"
         :open="$open"
         :truck-id="$truck->id"
         :favorited="$truck->favoritedState()"

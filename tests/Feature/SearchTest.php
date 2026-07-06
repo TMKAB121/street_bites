@@ -98,7 +98,7 @@ it('suggests matching trucks with detail-page links', function (): void {
         ->assertJson([[
             'id' => $truck->id,
             'name' => 'Taco Titan',
-            'url' => route('trucks.show', $truck),
+            'url' => route('trucks.show', [$truck, $truck->slug]),
             'context' => null,
         ]]);
 });

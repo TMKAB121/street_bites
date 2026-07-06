@@ -88,6 +88,34 @@
                 </p>
             </section>
 
+            {{-- Social links --}}
+            <section class="mb-12">
+                <h2 class="text-lg font-semibold text-primary mb-4">Social links</h2>
+                @php
+                    // Unsaved models are enough for a demo — the component only
+                    // reads ->url and the ->platform enum cast.
+                    $styleguideSocialLinks = collect([
+                        'https://www.facebook.com/streetbites',
+                        'https://www.instagram.com/streetbites',
+                        'https://www.tiktok.com/@streetbites',
+                        'https://x.com/streetbites',
+                        'https://www.youtube.com/@streetbites',
+                        'https://www.snapchat.com/add/streetbites',
+                        'https://streetbites.example.com',
+                    ])->map(fn (string $url) => new \App\Models\TruckSocialLink([
+                        'url' => $url,
+                        'platform' => \App\Enums\SocialPlatform::fromUrl($url),
+                    ]));
+                @endphp
+                <x-social-links :links="$styleguideSocialLinks" />
+                <p class="text-sm text-text-muted mt-3">
+                    A truck's social profiles on the detail page. The vendor only pastes
+                    URLs — <code>SocialPlatform::fromUrl()</code> detects the network from
+                    the host and picks the brand glyph; anything unrecognised gets the
+                    globe. Single-tone icons (tokens, not brand colors), 48px tap targets.
+                </p>
+            </section>
+
             {{-- Card carousel --}}
             <section class="mb-12">
                 <h2 class="text-lg font-semibold text-primary mb-4">Card carousel</h2>

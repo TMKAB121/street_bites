@@ -18,7 +18,7 @@
             <ul class="fav-list">
                 @foreach ($favorites as $favorite)
                     <li class="fav-list__item" wire:key="fav-{{ $favorite->id }}">
-                        <a href="{{ route('trucks.show', $favorite) }}" class="fav-list__link">
+                        <a href="{{ route('trucks.show', [$favorite, $favorite->slug]) }}" class="fav-list__link">
                             {{ $favorite->name }}
                         </a>
                         <x-favorite-toggle

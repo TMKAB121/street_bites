@@ -18,6 +18,7 @@ use App\Models\User;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -117,7 +118,7 @@ Route::get('/api/search', function (Request $request) {
     return response()->json($trucks->map(fn (FoodTruck $truck): array => [
         'id' => $truck->id,
         'name' => $truck->name,
-        'url' => route('trucks.show', $truck),
+        'url' => route('trucks.show', [$truck, $truck->slug]),
         // Why this truck matched, when the name alone doesn't show it.
         'context' => mb_stripos($truck->name, $term) !== false
             ? null
@@ -177,11 +178,17 @@ Route::post('/api/cookie-consent', function (Request $request) {
 
 // Public truck detail page — the destination of every truck card's FIND NOW
 // CTA. Unpublished trucks stay invisible (404), matching home-page discovery.
-Route::get('/trucks/{truck}', function (string $truck): Factory|View {
+// The id identifies the truck; the slug segment is descriptive (SEO/legibility)
+// and must match the name-derived slug exactly — a wrong or stale slug 404s, so
+// every URL that renders is the canonical one (<x-seo-meta> canonicalises to
+// the current URL).
+Route::get('/trucks/{truck}/{slug}', function (string $truck, string $slug): Factory|View {
     $truck = FoodTruck::query()
         ->where('is_published', true)
-        ->with(['images', 'tags', 'menuItems', 'todayHours'])
+        ->with(['images', 'tags', 'menuItems', 'todayHours', 'socialLinks'])
         ->findOrFail($truck);
+
+    abort_unless($slug === $truck->slug, 404);
 
     // Whether the signed-in visitor has favourited this truck (guests get no
     // star at all, so false is fine as their placeholder).
@@ -190,7 +197,7 @@ Route::get('/trucks/{truck}', function (string $truck): Factory|View {
 
     // Cached OSM static map of the pin's surroundings; null hides the section.
     $mapPath = resolve(GenerateTruckMapImage::class)($truck);
-    $mapUrl = $mapPath !== null ? Storage::disk('public')->url($mapPath) : null;
+    $mapUrl = $mapPath !== null ? Storage::disk(config('filesystems.public_disk'))->url($mapPath) : null;
 
     return view('trucks.show', ['truck' => $truck, 'mapUrl' => $mapUrl, 'isFavorited' => $isFavorited]);
 })->whereNumber('truck')->name('trucks.show');
@@ -218,6 +225,32 @@ Route::post('/api/favorites/{truck}', function (Request $request, string $truck)
 // build. Static Blade view on the shared shell chrome, linked from the
 // hamburger menu (and the desktop header nav).
 Route::view('/about', 'about')->name('about');
+
+// XML sitemap for search engines (advertised by public/robots.txt). Lists the
+// public crawlable pages: home, about, and every published truck's detail page
+// (lastmod = the truck's last update, so crawlers re-fetch renamed/edited
+// trucks). Generated per request — a truck published moments ago is already in
+// the next fetch, with no file to rebuild or cache to bust; the query is three
+// columns over published trucks and crawlers fetch sitemaps rarely. Future
+// public surfaces (e.g. a news feed) join by concat()ing their own URL entries.
+Route::get('/sitemap.xml', function (): Response {
+    $trucks = FoodTruck::query()
+        ->where('is_published', true)
+        ->orderBy('id')
+        ->get(['id', 'name', 'updated_at']);
+
+    $urls = collect([
+        ['loc' => route('home')],
+        ['loc' => route('about')],
+    ])->concat($trucks->map(fn (FoodTruck $truck): array => [
+        'loc' => route('trucks.show', [$truck, $truck->slug]),
+        'lastmod' => $truck->updated_at?->toAtomString(),
+    ]));
+
+    return response()
+        ->view('sitemap', ['urls' => $urls])
+        ->header('Content-Type', 'application/xml');
+})->name('sitemap');
 
 // Living style guide — visual reference for the "Urban Vibrant" design tokens.
 Route::view('/styleguide', 'styleguide');
