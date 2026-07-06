@@ -194,35 +194,30 @@ class TruckEditor extends Component
 
         $truck = $this->truck();
 
-        // Was this truck already held before this save? Used to email admins only
-        // on the *transition* into moderation, not on every edit of a held truck.
-        $alreadyHeld = $truck->screen_status === FoodTruck::SCREEN_FLAGGED;
-
         // Auto-screen before going live: text now, images already screened at
-        // upload. Any flag holds the truck out of discovery (is_published =
-        // false) for admin review rather than publishing it. Clean trucks
-        // publish instantly, exactly as before.
+        // upload. Any flag holds the truck out of discovery for admin review
+        // rather than publishing it. Clean trucks publish instantly, as before.
         $textFlags = $screenText(...$this->screenableText());
         $imageFlagged = $truck->images()->where('screen_status', FoodTruck::SCREEN_FLAGGED)->exists();
         $flagged = $textFlags !== [] || $imageFlagged;
-        $reason = $flagged ? $this->flagReason($textFlags, $imageFlagged) : null;
 
         $truck->update([
             'name' => $this->name,
             'description' => $this->description ?: null,
-            // Saving is the vendor's "go live": a freshly added truck stays
-            // invisible until its first clean save; a flagged one stays held.
-            'is_published' => ! $flagged,
-            'screen_status' => $flagged ? FoodTruck::SCREEN_FLAGGED : FoodTruck::SCREEN_PASSED,
-            'moderation_reason' => $reason,
-            // A flag re-opens the truck for review; a clean save keeps whatever
-            // admin sign-off it already had (no re-queue spam on hours edits).
-            'reviewed_at' => $flagged ? null : $truck->reviewed_at,
         ]);
 
-        // Alert the admins when a truck newly enters moderation.
-        if ($flagged && ! $alreadyHeld) {
-            $this->notifyAdminsOfHold($truck->name, $user->email, (string) $reason);
+        if ($flagged) {
+            // Held out of discovery until an admin approves; emails the admins on
+            // the transition into review (see holdForReview).
+            $this->holdForReview($truck, $this->flagReason($textFlags, $imageFlagged));
+        } else {
+            // Clean: publish instantly, keeping any admin sign-off it already had
+            // (no re-queue spam on an hours edit).
+            $truck->update([
+                'is_published' => true,
+                'screen_status' => FoodTruck::SCREEN_PASSED,
+                'moderation_reason' => null,
+            ]);
         }
 
         // Upsert today's operating window (the per-day vendor model).
@@ -279,6 +274,31 @@ class TruckEditor extends Component
         }
 
         return Str::limit(implode('; ', $parts), 250, '');
+    }
+
+    /**
+     * Take a truck out of discovery pending admin review, and email the admins
+     * on the *transition* into that state (not on every edit of an already-held
+     * truck). Shared by save() and image upload so a flag from either path holds
+     * the truck immediately and consistently — an offensive photo can't linger
+     * on a live truck until the vendor's next save.
+     */
+    private function holdForReview(FoodTruck $truck, string $reason): void
+    {
+        $alreadyHeld = $truck->screen_status === FoodTruck::SCREEN_FLAGGED;
+
+        $truck->update([
+            'is_published' => false,
+            'screen_status' => FoodTruck::SCREEN_FLAGGED,
+            'moderation_reason' => $reason,
+            'reviewed_at' => null,
+        ]);
+
+        if (! $alreadyHeld) {
+            /** @var User $user */
+            $user = auth()->user();
+            $this->notifyAdminsOfHold($truck->name, $user->email, $reason);
+        }
     }
 
     /**
@@ -499,28 +519,31 @@ class TruckEditor extends Component
             'upload' => 'required|image|mimes:jpeg,png,webp|max:'.self::MAX_UPLOAD_KB,
         ]);
 
-        $image = $storeTruckImage($this->truck(), $this->upload);
+        $truck = $this->truck();
+        $image = $storeTruckImage($truck, $this->upload);
 
-        // Screen the image once, here — the truck-level publish decision in
-        // save() aggregates this flag without re-screening. A flagged image is
-        // kept (private to the vendor/admins, never shown publicly) but holds
-        // the truck out of discovery until an admin approves it.
-        $labels = $screenImage((string) $this->upload->getRealPath());
+        // Screen the image on the way in. A flag both records the result on the
+        // image row and immediately holds the whole truck out of discovery — so
+        // an offensive photo can never sit on a live truck while it waits for an
+        // admin, rather than only being caught on the vendor's next save.
+        $labels = $screenImage((string) $this->upload->getRealPath(), (string) $this->upload->getClientOriginalName());
 
         $this->reset('upload');
 
-        if ($labels !== []) {
-            $image->update([
-                'screen_status' => FoodTruck::SCREEN_FLAGGED,
-                'flag_labels' => Str::limit(implode(', ', $labels), 250, ''),
-            ]);
-
-            $this->toast('Photo added, but flagged for review — it won’t appear publicly until approved.', 'info');
+        if ($labels === []) {
+            $this->toast('Photo added');
 
             return;
         }
 
-        $this->toast('Photo added');
+        $image->update([
+            'screen_status' => FoodTruck::SCREEN_FLAGGED,
+            'flag_labels' => Str::limit(implode(', ', $labels), 250, ''),
+        ]);
+
+        $this->holdForReview($truck, 'Flagged image');
+
+        $this->toast('Photo added, but flagged — your truck is held for review until it’s approved.', 'info');
     }
 
     public function deleteImage(int $imageId): void

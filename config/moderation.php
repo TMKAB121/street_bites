@@ -57,9 +57,30 @@ return [
     */
 
     'rekognition' => [
-        'enabled' => (bool) env('MODERATION_REKOGNITION_ENABLED', false),
+        'enabled' => (bool) env('MODERATION_REKOGNITION_ENABLED', true),
         'min_confidence' => (float) env('MODERATION_REKOGNITION_MIN_CONFIDENCE', 80),
         'region' => env('MODERATION_REKOGNITION_REGION', env('AWS_DEFAULT_REGION', 'us-east-1')),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Filename image screen (local/CI stand-in for Rekognition)
+    |--------------------------------------------------------------------------
+    |
+    | Rekognition can't run in Lando, so image screening always "passes" locally.
+    | To exercise the image flag → hold flow without AWS, set a comma-separated
+    | list of trigger words here; when Rekognition is *disabled*, an upload whose
+    | original filename contains one of them is flagged (e.g. upload "nsfw.jpg").
+    | Empty (the default) = off, so it never surprises a real environment, and it
+    | is ignored entirely when Rekognition is enabled (production).
+    |
+    */
+
+    'image' => [
+        'filename_triggers' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', mb_strtolower((string) env('MODERATION_IMAGE_FILENAME_TRIGGERS', ''))),
+        ))),
     ],
 
 ];

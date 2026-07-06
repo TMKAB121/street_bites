@@ -103,14 +103,50 @@
         @endif
     </section>
 
-    {{-- Account footer: a plain CSRF-protected POST (not a Livewire action) so
-         the session is torn down in a full request. --}}
-    <section class="mt-12 border-t border-primary/10 pt-6">
+    {{-- Account footer: plain CSRF-protected POSTs (not Livewire actions) so the
+         session is torn down in a full request. --}}
+    <section class="mt-12 border-t border-primary/10 pt-6 space-y-3">
         <form method="POST" action="{{ route('logout') }}">
             @csrf
             <button type="submit" class="btn w-full border border-primary/15 text-text-muted">
                 Sign out
             </button>
         </form>
+
+        {{-- Delete account — irreversible, so gate it behind an Alpine confirm
+             step before the real CSRF POST fires. Removes the account and, via
+             the food_trucks FK cascade, every truck the user owns. --}}
+        <div x-data="{ confirming: false }">
+            <button
+                type="button"
+                class="btn w-full border border-accent-chili/30 text-accent-chili"
+                x-show="!confirming"
+                @click="confirming = true"
+            >
+                Delete account
+            </button>
+
+            <div x-show="confirming" x-cloak class="rounded-lg border border-accent-chili/30 p-4">
+                <p class="text-sm text-text-muted mb-3">
+                    This permanently deletes your account and every food truck you
+                    own — hours, menu, photos, and social links. This can’t be undone.
+                </p>
+                <div class="flex gap-2">
+                    <button
+                        type="button"
+                        class="btn flex-1 border border-primary/15 text-text-muted"
+                        @click="confirming = false"
+                    >
+                        Cancel
+                    </button>
+                    <form method="POST" action="{{ route('account.destroy') }}" class="flex-1">
+                        @csrf
+                        <button type="submit" class="btn btn-accent w-full">
+                            Permanently delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </section>
 </div>
