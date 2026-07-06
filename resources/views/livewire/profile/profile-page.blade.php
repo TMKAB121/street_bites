@@ -82,4 +82,15 @@
             </button>
         @endif
     </section>
+
+    {{-- Account footer: a plain CSRF-protected POST (not a Livewire action) so
+         the session is torn down in a full request. --}}
+    <section class="mt-12 border-t border-primary/10 pt-6">
+        <form method="POST" action="{{ route('logout') }}">
+            @csrf
+            <button type="submit" class="btn w-full border border-primary/15 text-text-muted">
+                Sign out
+            </button>
+        </form>
+    </section>
 </div>

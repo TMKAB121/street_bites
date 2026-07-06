@@ -46,6 +46,7 @@
         'hamburger' => '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>',
         'close' => '<path d="M6 6l12 12"/><path d="M18 6 6 18"/>',
         'search' => '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+        'logout' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
     ];
 @endphp
 
@@ -184,6 +185,20 @@
                     {{ $item['label'] }}
                 </a>
             @endforeach
+
+            {{-- Sign out: a CSRF-protected POST (not a link), styled as a menu
+                 row. Only rendered when signed in. --}}
+            @auth
+                <form method="POST" action="{{ route('logout') }}" @submit="open = false">
+                    @csrf
+                    <button type="submit" class="mobile-menu__link cursor-pointer border-0 bg-transparent p-0">
+                        <span class="mobile-menu__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">{!! $icons['logout'] !!}</svg>
+                        </span>
+                        Sign out
+                    </button>
+                </form>
+            @endauth
         </nav>
     </div>
 </div>
