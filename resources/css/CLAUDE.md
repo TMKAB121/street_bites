@@ -24,7 +24,7 @@ resources/css/
     ├── map.css          # .truck-map (Leaflet homepage map + custom pin / "you are here" markers)
     ├── auth.css         # .auth-card + .field (login / sign-up form styling)
     ├── location-search.css # .location-search (home-page ZIP/address fallback; reuses .field__input)
-    ├── profile.css      # .profile + .fav-list (slim favourites rows) + .truck-disclosure (collapsible owned-truck cards)
+    ├── profile.css      # .profile + .profile__support (config-gated Buy-Me-a-Coffee callout) + .fav-list (slim favourites rows) + .truck-disclosure (collapsible owned-truck cards)
     ├── admin.css        # .moderation (admin queue: blocklist chips, truck rows, status badges + actions — chili flagged / mustard live / grey held)
     ├── truck-form.css   # .truck-form + .menu-row + .social-row + .truck-image (vendor edit form)
     ├── truck-page.css   # .truck-page (public truck detail page: static map + pin, Get-directions CTA, hours, menu)

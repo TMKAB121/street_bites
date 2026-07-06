@@ -30,6 +30,17 @@
             'icon' => '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>',
         ],
     ];
+
+    // Optional Buy Me a Coffee support card — only when the URL is configured.
+    if ($coffee = config('external-links.buymeacoffee')) {
+        $connections[] = [
+            'title' => 'Support the project',
+            'text' => 'Street Bites is free to use. If it helps you find your next meal, buy me a coffee to help fund hosting and new features.',
+            'cta' => 'Buy me a coffee',
+            'href' => $coffee,
+            'icon' => '<path d="M4 8h13v5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M17 9h2a2 2 0 0 1 0 4h-2"/><path d="M7 3v2"/><path d="M11 3v2"/><path d="M15 3v2"/>',
+        ];
+    }
 @endphp
 
 <x-layouts::shell
