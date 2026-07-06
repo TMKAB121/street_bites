@@ -84,6 +84,29 @@ it('approves a held truck and publishes it', function (): void {
         ->and($truck->moderation_reason)->toBeNull();
 });
 
+it('clears image flags on approve so the truck is not re-held later', function (): void {
+    $truck = FoodTruck::factory()->create([
+        'is_published' => false,
+        'screen_status' => FoodTruck::SCREEN_FLAGGED,
+        'moderation_reason' => 'Flagged image',
+        'reviewed_at' => null,
+    ]);
+    $truck->images()->create([
+        'path' => 'truck-images/x.webp',
+        'sort_order' => 0,
+        'screen_status' => FoodTruck::SCREEN_FLAGGED,
+        'flag_labels' => 'Explicit Nudity',
+    ]);
+
+    Livewire::actingAs(moderationAdmin())
+        ->test(ModerationQueue::class)
+        ->call('approve', $truck->id);
+
+    $truck->refresh();
+    expect($truck->is_published)->toBeTrue()
+        ->and($truck->images()->where('screen_status', FoodTruck::SCREEN_FLAGGED)->count())->toBe(0);
+});
+
 it('removes a truck as a soft-delete that 404s publicly', function (): void {
     $truck = FoodTruck::factory()->published()->create(['reviewed_at' => now()]);
 

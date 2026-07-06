@@ -336,6 +336,33 @@ Route::post('/logout', function (Request $request) {
     return redirect()->route('home');
 })->middleware('auth')->name('logout');
 
+// Delete the signed-in user's account. A plain CSRF POST (mirrors logout) so the
+// deletion + session teardown happen in one full request, not an AJAX round-trip.
+// The food_trucks.user_id FK is cascadeOnDelete, so deleting the user hard-deletes
+// every truck they own and (cascading from each truck) its hours, images, menu
+// items, tag pivots, social links, and favourite rows; cookie_consents.user_id is
+// nulled so the GDPR audit trail outlives the account. DB cascade doesn't touch the
+// public disk, so we clear each truck's stored images/maps first (withTrashed so
+// admin-removed trucks' files go too). Irreversible — the UI gates it behind a
+// confirm step.
+Route::post('/account/delete', function (Request $request) {
+    /** @var User $user */
+    $user = $request->user();
+
+    $disk = Storage::disk(config('filesystems.public_disk'));
+    foreach ($user->foodTrucks()->withTrashed()->pluck('id') as $truckId) {
+        $disk->deleteDirectory("truck-images/{$truckId}");
+        $disk->deleteDirectory("truck-maps/{$truckId}");
+    }
+
+    auth()->logout();
+    $user->delete();
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+
+    return redirect()->route('home');
+})->middleware('auth')->name('account.destroy');
+
 // Content-moderation admin surface. Behind auth + the config email allowlist
 // (EnsureAdmin → User::isAdmin()) + cookie consent (auth is cookie-backed). The
 // moderation queue lists every truck newest-first so an admin can review, remove

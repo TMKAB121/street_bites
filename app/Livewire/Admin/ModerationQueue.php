@@ -95,6 +95,12 @@ class ModerationQueue extends Component
             'moderation_reason' => null,
         ]);
 
+        // Clear the flags on the truck's images too, so the vendor's next save
+        // doesn't re-hold the truck on the very images the admin just approved.
+        $truck->images()
+            ->where('screen_status', FoodTruck::SCREEN_FLAGGED)
+            ->update(['screen_status' => FoodTruck::SCREEN_PASSED, 'flag_labels' => null]);
+
         $this->toast('Truck approved');
     }
 
