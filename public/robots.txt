@@ -1,2 +1,9 @@
 User-agent: *
-Disallow:
+Disallow: /profile
+Disallow: /favorites
+Disallow: /auth/
+Disallow: /api/
+Disallow: /search
+Disallow: /styleguide
+
+Sitemap: https://www.street-bites.org/sitemap.xml

@@ -18,6 +18,7 @@ use App\Models\User;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -224,6 +225,32 @@ Route::post('/api/favorites/{truck}', function (Request $request, string $truck)
 // build. Static Blade view on the shared shell chrome, linked from the
 // hamburger menu (and the desktop header nav).
 Route::view('/about', 'about')->name('about');
+
+// XML sitemap for search engines (advertised by public/robots.txt). Lists the
+// public crawlable pages: home, about, and every published truck's detail page
+// (lastmod = the truck's last update, so crawlers re-fetch renamed/edited
+// trucks). Generated per request — a truck published moments ago is already in
+// the next fetch, with no file to rebuild or cache to bust; the query is three
+// columns over published trucks and crawlers fetch sitemaps rarely. Future
+// public surfaces (e.g. a news feed) join by concat()ing their own URL entries.
+Route::get('/sitemap.xml', function (): Response {
+    $trucks = FoodTruck::query()
+        ->where('is_published', true)
+        ->orderBy('id')
+        ->get(['id', 'name', 'updated_at']);
+
+    $urls = collect([
+        ['loc' => route('home')],
+        ['loc' => route('about')],
+    ])->concat($trucks->map(fn (FoodTruck $truck): array => [
+        'loc' => route('trucks.show', [$truck, $truck->slug]),
+        'lastmod' => $truck->updated_at?->toAtomString(),
+    ]));
+
+    return response()
+        ->view('sitemap', ['urls' => $urls])
+        ->header('Content-Type', 'application/xml');
+})->name('sitemap');
 
 // Living style guide — visual reference for the "Urban Vibrant" design tokens.
 Route::view('/styleguide', 'styleguide');

@@ -180,16 +180,32 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   exactly or the page 404s**, so every URL that renders is its own canonical
   (`<x-seo-meta>` canonicalises to the current URL — no redirects, no duplicates).
   Generate links with `route('trucks.show', [$truck, $truck->slug])`. Plain Blade
-  view (no Livewire): cached OSM static map with a centred pin, cuisine tags,
-  today's hours ("Open today …" / "Open now — since …" / unposted), location, and
-  menu. The route eager-loads `images`, `tags`, `menuItems`, `todayHours` and
-  passes `$mapUrl` from `GenerateTruckMapImage`. Unpublished/missing trucks 404.
-  See *Maps & geolocation*.
+  view (no Livewire): cached OSM static map with a centred pin, a **"Get
+  directions"** CTA under it, cuisine tags, today's hours ("Open today …" / "Open
+  now — since …" / unposted), location, the **"Follow …" social-icon row**
+  (`<x-social-links>`, hidden when the truck has none), and menu. The **Get
+  directions** button is a mustard `.btn` linking to a Google Maps
+  `dir/?api=1&destination={lat},{lng}` deep link — **no origin**, so Google routes
+  from the visitor's current location and deep-links the native maps app on mobile;
+  it's gated on the truck having a pin (not on `$mapUrl`, so directions survive a
+  static-map render failure). The route eager-loads `images`, `tags`, `menuItems`,
+  `todayHours`, and `socialLinks` and passes `$mapUrl` from `GenerateTruckMapImage`.
+  Unpublished/missing trucks 404. See *Maps & geolocation* and *Social links*.
 - `/about` → `about.blade.php` (`about`) — public **"About us"** page: the mission
   (founding question as a pull-quote), the developer intro, and follow-along link
   cards (YouTube / GitHub / LinkedIn). Static `Route::view` on the shell layout,
   linked from the hamburger menu (`active="about"`); bespoke visuals in
   `resources/css/components/about.css`.
+- `/sitemap.xml` → `sitemap.blade.php` (`sitemap`) — the **XML sitemap** search
+  engines fetch, advertised by `public/robots.txt` (whose `Sitemap:` line is the
+  absolute production URL — the directive requires one; robots.txt also disallows
+  the non-indexable surfaces: profile, favorites, auth, api, search, styleguide).
+  Generated fresh on every request — no cron, no cached file to rebuild — so a
+  newly published truck is in the very next fetch: home, `/about`, and every
+  published truck's canonical slug URL with `lastmod` = the truck's `updated_at`.
+  The route builds `['loc' => …, 'lastmod' => ?]` entries and the view only prints
+  urlset XML, so future public surfaces (e.g. a news feed) join by `concat()`ing
+  their own entries in the route. Plain XML view — no layout, no `<x-seo-meta>`.
 - `/profile` → `App\Livewire\Profile\ProfilePage` (`auth` middleware) — the
   signed-in profile (see *Profile & vendor management* below). Uses the
   `layouts/shell.blade.php` layout, which factors the welcome shell's chrome
@@ -291,9 +307,9 @@ home for two roles in one page. Views live in `resources/views/livewire/profile/
 - **Collapsed list → lazy editor.** Owned trucks render as collapsed
   `.truck-disclosure` cards (stub data: id + name only). Expanding one renders
   `<livewire:profile.truck-editor :truck-id … lazy />` — `TruckEditor` is
-  `#[Lazy]`, so its full data (today's hours, menu, images, **cuisine tags**) loads
-  in a **follow-up request** behind a `placeholder()` skeleton. The editable form
-  is the nested `<x-truck-form>` Blade component.
+  `#[Lazy]`, so its full data (today's hours, menu, images, **cuisine tags**,
+  **social links**) loads in a **follow-up request** behind a `placeholder()`
+  skeleton. The editable form is the nested `<x-truck-form>` Blade component.
 - **Ownership is re-checked on every action.** `TruckEditor::truck()` does
   `findOrFail` + `abort_unless($truck->user_id === auth()->id(), 403)` and is
   called by mount **and** every mutating method — never trust the lazy snapshot.
@@ -303,6 +319,13 @@ home for two roles in one page. Views live in `resources/views/livewire/profile/
   button calls `addTag()`, which does `Tag::firstOrCreate(['slug' => Str::slug(…)])`
   and appends the new ID to `$selectedTagIds`. CSS-only active state via
   `:has(input:checked)` — no Alpine needed in the picker.
+- **Social links.** `TruckEditor` holds `$socialLinks` (array of `['id', 'url']`
+  rows). The form shows repeatable URL inputs (`addSocialLink()`/`removeSocialLink()`,
+  same reconcile-on-save pattern as the menu); each URL is validated `url:http,https`.
+  `save()` calls `saveSocialLinks()`, which `updateOrCreate`s each row (stamping
+  `sort_order` from position and `platform` from `SocialPlatform::fromUrl($url)`) and
+  deletes any rows the vendor removed. **The vendor never picks a platform** — it's
+  detected from the pasted URL's host. See *Social links*.
 - **Saves are silent → confirmed by toast.** `save`/`uploadImage`/`deleteImage`/
   `deleteTruck` dispatch a `toast` browser event (`<x-toast>`); `save` also
   dispatches `truck-saved`/`truck-deleted` to `ProfilePage` to refresh the list.
@@ -320,7 +343,7 @@ home for two roles in one page. Views live in `resources/views/livewire/profile/
 
 ### Normalized schema
 
-Six create migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*`), all `cascadeOnDelete` from the truck, plus one alter (`2026_07_01_000001_*` adds `food_trucks.timezone`):
+Seven create migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*` + `2026_07_05_000001_*`), all `cascadeOnDelete` from the truck, plus one alter (`2026_07_01_000001_*` adds `food_trucks.timezone`):
 
 | Table | Shape / decisions |
 |---|---|
@@ -330,14 +353,17 @@ Six create migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*`), all `casc
 | `menu_items` | `name`, `description`, `price_cents` (**money as integer cents, never float**), `is_available`, `sort_order` |
 | `favorites` | `user_id`+`food_truck_id` pivot (`unique`). Toggled by `POST /api/favorites/{truck}` (see *Favorites*); read via `withExists`/`withCount` for stars and the Popular carousel |
 | `tags` + `food_truck_tag` | Cuisine taxonomy. `tags`: `name`, `slug` (unique, auto-generated from name via `Str::slug()` on creating). `food_truck_tag`: composite PK pivot — no timestamps, cascade deletes on both FKs |
+| `truck_social_links` | `url` + `platform` + `sort_order`. The vendor only pastes a `url`; `platform` is **derived from its host on save** (`App\Enums\SocialPlatform::fromUrl`, cast to the enum) so the detail page renders the brand icon without re-parsing. Unrecognised hosts store `Website` (generic globe). See *Social links* |
 
 Models: `FoodTruck` (`user`, `operatingHours`, `todayHours`, `images`,
-`menuItems`, `favoritedBy`, `tags`; plus `isOpenNow()` — true when now is within
-today's window in the truck's timezone, or past an open time with no close set —
-and `favoritedState()` — the card star's `favorited` prop: bool for a signed-in
-user from the `is_favorited` withExists flag, null for guests),
+`menuItems`, `favoritedBy`, `tags`, `socialLinks`; plus `isOpenNow()` — true when
+now is within today's window in the truck's timezone, or past an open time with no
+close set — and `favoritedState()` — the card star's `favorited` prop: bool for a
+signed-in user from the `is_favorited` withExists flag, null for guests),
 `TruckOperatingHour`, `TruckImage` (`url` accessor),
-`MenuItem` (`price` accessor), `Tag` (`foodTrucks`); `User` gained `foodTrucks()` and `favorites()`.
+`MenuItem` (`price` accessor), `Tag` (`foodTrucks`),
+`TruckSocialLink` (`foodTruck`; `platform` cast to the `App\Enums\SocialPlatform`
+enum); `User` gained `foodTrucks()` and `favorites()`.
 
 ### Image pipeline
 
@@ -398,8 +424,9 @@ wall-clock and shown verbatim, so only the `located_at` timestamp is converted f
 ### Dev seed
 
 `database/seeders/FoodTruckSeeder` (called by `DatabaseSeeder`) creates 3 vendor
-users, 8 eater users, the full tag taxonomy, and 10 published trucks with menu items
-and images. Every truck is pinned near ZIP 66202 (Mission, KS) — most within ~5 miles,
+users, 8 eater users, the full tag taxonomy, and 10 published trucks with menu items,
+images, and 1–3 social links each (platforms derived from the seeded URLs via
+`SocialPlatform::fromUrl`). Every truck is pinned near ZIP 66202 (Mission, KS) — most within ~5 miles,
 every third one an outlier up to 20 miles — with `timezone` `America/Chicago` (maps are
 **not** pre-generated; the first page view renders and caches each). Each truck draws a
 random crowd of eater favourites so the Popular carousel has a meaningful order out of
@@ -452,6 +479,29 @@ component (`resources/js/search.js`) layers a **typeahead dropdown** on top.
   (same ordering as home); the header input stays pre-filled with the term.
 
 Tests live in `tests/Feature/SearchTest.php`.
+
+## Social links
+
+Vendors add social-media profile links to their truck; the detail page shows them
+as a row of single-tone brand icons (`<x-social-links>`), and the truck page also
+carries a **Get directions** CTA to Google Maps (see the `trucks.show` *Pages* entry).
+
+- **The vendor pastes a URL; we detect the platform.** `App\Enums\SocialPlatform`
+  (Facebook, Instagram, TikTok, X, YouTube, Snapchat, Website) has `fromUrl()`,
+  which matches the link's host (exact domain **or any subdomain** — `m.facebook.com`,
+  `www.tiktok.com`) against a per-platform domain list (Meta brands, `x.com`/
+  `twitter.com`, `youtu.be`, …). **Anything unrecognised falls back to `Website`**
+  (a generic globe) so an odd link still renders a working icon, never an error.
+  `label()` gives the screen-reader/hover text.
+- **Stored, not re-parsed.** `saveSocialLinks()` in `TruckEditor` writes the detected
+  `platform` onto each `truck_social_links` row at save time, so the detail page just
+  reads it (no host parsing on render). See *Profile & vendor management* and the
+  `truck_social_links` schema row.
+- **Icons are single-tone, token-coloured inline SVG** — brand glyphs as `fill`, the
+  globe stroke-drawn — **not** brand hex, per the icon conventions
+  (`resources/views/CLAUDE.md`). Hidden entirely when a truck has no links.
+- Tests: `tests/Feature/Trucks/SocialPlatformTest.php` (host detection + fallback)
+  and the social assertions in `tests/Feature/Trucks/TruckShowPageTest.php`.
 
 ## Internal Docker hostnames
 
