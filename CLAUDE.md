@@ -225,7 +225,7 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
 
 ## Authentication
 
-Two email-verified flows live under `app/Livewire/Auth/` (full-page Livewire
+Three email-verified flows live under `app/Livewire/Auth/` (full-page Livewire
 components; views in `resources/views/livewire/auth/`). State passes between steps
 via the session; the user is logged in only at the final step.
 
@@ -233,12 +233,14 @@ via the session; the user is logged in only at the final step.
 |---|---|---|
 | Sign-up | `auth.email` → `auth.verify` → `auth.password` (`EmailEntry` → `VerifyCode` → `SetPassword`) | Verify email via 6-digit code, then set a password and create the account |
 | Sign-in | `auth.login` → `auth.login.verify` (`Login` → `LoginVerify`) | Password (primary factor) → emailed 6-digit code (second factor) → home |
+| Password reset | `auth.password.request` → `auth.password.verify` → `auth.password.reset` (`ForgotPassword` → `ResetVerify` → `ResetPassword`) | "Forgot password?" on the login form → email a code → verify → set a new password and sign in. Reuses the same OTP engine; email ownership stands in for the forgotten password |
 
 - **One-time codes:** `App\Models\EmailVerification` stores a **hashed** 6-digit
   code per email (10-min TTL, 5-attempt cap, burned on success/exhaustion). Mailed
   via `EmailVerificationCode` (sign-up — includes an auto-verifying signed magic
-  link to `auth.verify`) and `LoginCode` (sign-in — code only, **no** magic link,
-  so it can't drop the user into the sign-up flow).
+  link to `auth.verify`), `LoginCode` (sign-in — code only, **no** magic link, so
+  it can't drop the user into the sign-up flow), and `PasswordResetCode` (reset —
+  likewise code only, no link, so a click can't misroute into another flow).
 - **Email-as-2FA is deliberate** — the second factor stays email OTP (not
   TOTP/SMS) to limit PII and complexity. Don't swap it without a product decision.
 - **Stepped auth + anti-enumeration:** `Login` validates the password first, then
@@ -247,7 +249,22 @@ via the session; the user is logged in only at the final step.
   is rate-limited through the shared `ThrottlesAttempts` trait
   (`app/Livewire/Auth/Concerns/`) — one policy (5 attempts / rolling minute) and
   one generic "slow down" error for all flows. Pending sign-in is tracked by
-  `session('auth.login.pending')` = the user id only — never the password.
+  `session('auth.login.pending')` = the user id only — never the password. The
+  **reset** flow's request step (`ForgotPassword`) is anti-enumeration too: it
+  always advances to the code screen with the same message and only actually mails
+  a code when the email belongs to a real account. Reset state lives in its own
+  `auth.reset.email` / `auth.reset.verified` session keys (kept separate from
+  sign-up's `auth.email` / `auth.verified` so the flows never cross-contaminate);
+  `ResetPassword` re-checks the verified email maps to a real account before
+  updating the password, then signs the user in (mirrors sign-up's `SetPassword`).
+- **Sign out** is a plain CSRF-protected `POST /logout` (route name `logout`,
+  `auth`-guarded) — not a Livewire action, so the session teardown
+  (`logout` → `invalidate` → `regenerateToken` → redirect home) is a full request,
+  not an AJAX round-trip. It's deliberately **outside** `RequireCookieConsent`
+  (logging out must always work), and reachable from two surfaces: the profile
+  page's account footer and the `<x-mobile-header>` hamburger menu (both `@auth`-only
+  forms posting to `route('logout')`). Same teardown the cookie-withdrawal endpoint
+  uses.
 
 ### Password & session security (NIST SP 800-63B / OWASP)
 
@@ -294,8 +311,9 @@ decision; don't add a category picker without one.
 - **Withdrawing while signed in signs the visitor out** (auth is cookie-backed):
   the endpoint logs out, invalidates the session, and the banner JS sends them
   home as a guest.
-- **`RequireCookieConsent` middleware** wraps `/profile` and all five auth
-  routes: anything but an `accepted` cookie redirects home with the
+- **`RequireCookieConsent` middleware** wraps `/profile` and all eight auth
+  routes (sign-up, sign-in, and password-reset steps): anything but an `accepted`
+  cookie redirects home with the
   `cookie_consent.required` flash, which force-opens the banner with a
   "sign-in and favorites need cookies" notice.
 - **Equal prominence is a legal rule, not styling:** Accept and Decline share

@@ -309,7 +309,7 @@ banner re-prompts. See `CLAUDE.md` → *Cookie consent (GDPR)* for conventions.
 
 ## Authentication
 
-Two email-verified [Livewire](https://livewire.laravel.com/) flows live under
+Three email-verified [Livewire](https://livewire.laravel.com/) flows live under
 `app/Livewire/Auth/`:
 
 - **Sign-up** — enter email → confirm a 6-digit code (or click the emailed magic
@@ -317,6 +317,11 @@ Two email-verified [Livewire](https://livewire.laravel.com/) flows live under
 - **Sign-in** — email + password (primary factor) → a one-time code emailed as a
   second factor → home. The bottom nav and hamburger menu show a **Login** link
   for guests and **Profile** once authenticated.
+- **Password reset** — the "Forgot password?" link on the sign-in form → enter
+  email → confirm an emailed 6-digit code → set a new password and sign in. Reuses
+  the same one-time-code engine; email ownership stands in for the lost password.
+- **Sign out** — a CSRF-protected `POST /logout`, reachable from the profile page
+  and the hamburger menu, that tears down and regenerates the session.
 
 Security follows NIST SP 800-63B / OWASP guidance:
 

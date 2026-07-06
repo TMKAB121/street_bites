@@ -38,6 +38,10 @@
             @enderror
         </div>
 
+        <a href="{{ route('auth.password.request') }}" class="mt-2 block text-right text-sm text-text-muted" wire:navigate>
+            Forgot password?
+        </a>
+
         <button type="submit" class="btn btn-primary mt-6 w-full" wire:loading.attr="disabled" wire:target="submit">
             <span wire:loading.remove wire:target="submit">Sign in</span>
             <span wire:loading wire:target="submit">Checking…</span>

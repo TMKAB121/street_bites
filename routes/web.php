@@ -8,8 +8,11 @@ use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\RequireCookieConsent;
 use App\Livewire\Admin\ModerationQueue;
 use App\Livewire\Auth\EmailEntry;
+use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\LoginVerify;
+use App\Livewire\Auth\ResetPassword;
+use App\Livewire\Auth\ResetVerify;
 use App\Livewire\Auth\SetPassword;
 use App\Livewire\Auth\VerifyCode;
 use App\Livewire\Profile\ProfilePage;
@@ -312,7 +315,26 @@ Route::middleware(RequireCookieConsent::class)->group(function (): void {
     // Sign-in flow: password (primary factor) → emailed one-time code (second factor).
     Route::get('/auth/login', Login::class)->name('auth.login');
     Route::get('/auth/login/verify', LoginVerify::class)->name('auth.login.verify');
+
+    // Password-reset flow: enter email → verify emailed code → set a new password.
+    // Reuses the email-OTP engine; ownership of the inbox stands in for the
+    // forgotten password (anti-enumeration at the request step — see ForgotPassword).
+    Route::get('/auth/password/reset', ForgotPassword::class)->name('auth.password.request');
+    Route::get('/auth/password/reset/verify', ResetVerify::class)->name('auth.password.verify');
+    Route::get('/auth/password/reset/new', ResetPassword::class)->name('auth.password.reset');
 });
+
+// Sign out. A plain POST (CSRF-protected) rather than a Livewire action so the
+// session teardown is a full request, not an AJAX round-trip. Deliberately
+// outside RequireCookieConsent — logging out must always work, even if consent
+// was somehow withdrawn — but behind `auth` so only a signed-in user can call it.
+Route::post('/logout', function (Request $request) {
+    auth()->logout();
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+
+    return redirect()->route('home');
+})->middleware('auth')->name('logout');
 
 // Content-moderation admin surface. Behind auth + the config email allowlist
 // (EnsureAdmin → User::isAdmin()) + cookie consent (auth is cookie-backed). The
