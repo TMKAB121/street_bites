@@ -247,9 +247,15 @@ Route::get('/sitemap.xml', function (): Response {
         'lastmod' => $truck->updated_at?->toAtomString(),
     ]));
 
-    return response()
-        ->view('sitemap', ['urls' => $urls])
-        ->header('Content-Type', 'application/xml');
+    // The XML declaration is prepended here, in plain PHP, rather than living in
+    // the Blade view: a literal prolog in a template compiles to a cached PHP file
+    // carrying open-tag bytes, which a server with short_open_tag=On mis-parses as
+    // a PHP open tag (a production 500). Keeping it out of Blade sidesteps that.
+    $body = view('sitemap', ['urls' => $urls])->render();
+
+    return response('<?xml version="1.0" encoding="UTF-8"?>'."\n".$body, 200, [
+        'Content-Type' => 'application/xml',
+    ]);
 })->name('sitemap');
 
 // Living style guide — visual reference for the "Urban Vibrant" design tokens.
