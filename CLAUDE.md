@@ -266,6 +266,19 @@ via the session; the user is logged in only at the final step.
   page's account footer and the `<x-mobile-header>` hamburger menu (both `@auth`-only
   forms posting to `route('logout')`). Same teardown the cookie-withdrawal endpoint
   uses.
+- **Delete account** is a sibling plain CSRF `POST /account/delete` (route name
+  `account.destroy`, `auth`-guarded) in the profile footer — same full-request
+  pattern as logout (clear the public-disk assets, delete the user, then
+  `logout` → `invalidate` → `regenerateToken` → redirect home). Deleting the user
+  hard-deletes every truck they own through the `food_trucks.user_id`
+  `cascadeOnDelete` FK (and, cascading from each truck, its hours, images, menu
+  items, tag pivots, social links, and favourite rows); `cookie_consents.user_id`
+  is `nullOnDelete` so the GDPR audit trail outlives the account. The route also
+  clears each truck's `truck-images/{id}` + `truck-maps/{id}` directories
+  (`withTrashed`, so admin-removed trucks' files go too) since the DB cascade never
+  touches the disk. Irreversible, so the profile UI gates it behind an Alpine
+  confirm step (a `btn-accent` "Permanently delete" inside a reveal). No
+  re-auth/OTP step — same trust level as the other profile actions.
 
 ### Password & session security (NIST SP 800-63B / OWASP)
 
@@ -546,6 +559,12 @@ catching offensive text/images, without gating every truck behind manual review.
   backstop). It runs once at upload (`uploadImage`), storing the result on the
   `truck_images` row, so saves aggregate flags without re-screening. Rekognition takes
   only JPEG/PNG bytes, so `ScreenImage` re-encodes the (WebP) source to JPEG first.
+  A flagged upload **holds the truck immediately** (`uploadImage` calls the shared
+  `holdForReview()` too, not just `save()`), so an offensive photo can never sit on an
+  already-live truck until the vendor's next save. **Local testing without AWS:**
+  when Rekognition is off, `ScreenImage` falls back to a filename stand-in — set
+  `MODERATION_IMAGE_FILENAME_TRIGGERS` (e.g. `nsfw,explicit`) and any upload whose
+  name contains a trigger is flagged (off unless set; ignored when Rekognition is on).
 - **Admins are emailed when a truck is held.** On the **transition** into the held
   state (not every edit of an already-held truck), `save()` queues a
   `App\Mail\TruckHeldForReview` mailable to `config('admin.emails')`. It's
@@ -561,9 +580,11 @@ catching offensive text/images, without gating every truck behind manual review.
 - **The queue (`/admin/trucks`).** Newest-first, flagged surfaced first. Default
   "Needs review" tab = `reviewed_at IS NULL` (held flags **and** newly published
   trucks awaiting a human pass); a "Removed" tab lists soft-deleted trucks. Actions:
-  **approve** (`reviewed_at = now()`, publish the held truck), **remove** (soft-delete
-  + reason — hidden everywhere via the `SoftDeletes` global scope, rows/images kept as
-  evidence), **restore** (comes back unpublished + unreviewed), and **block vendor**.
+  **approve** (`reviewed_at = now()`, publish the held truck, **and clear its images'
+  flags** so a later vendor save doesn't re-hold it on the same approved photos),
+  **remove** (soft-delete + reason — hidden everywhere via the `SoftDeletes` global
+  scope, rows/images kept as evidence), **restore** (comes back unpublished +
+  unreviewed), and **block vendor**.
 - **Blocking a vendor** stamps `users.banned_at`/`ban_reason` (set with `forceFill`,
   never mass-assignable) and unpublishes **all** their trucks at once. A ban stops
   `ProfilePage::addTruck()` and `TruckEditor::save()` only — the user can still sign
@@ -617,10 +638,11 @@ three surfaces and gated on one config value.
   2. the **profile page** — the `.profile__support` callout under the heading
      (`resources/css/components/profile.css`), a chili-barred card with a mustard
      coffee glyph, kept quieter than the "Add a food truck" CTA;
-  3. the **`<x-mobile-header>` menu** — a `coffee` entry spread into `$items` (after
-     "About us"), so it shows in both the hamburger menu **and** the desktop top-nav.
-     It carries an `external => true` flag that adds `target="_blank"
-     rel="noopener noreferrer"` in both link loops. **Not** in the bottom `<x-mobile-nav>`
+  3. the **`<x-mobile-header>` hamburger menu** — a `coffee` entry spread into
+     `$items` (after "About us"). It carries an `external => true` flag that adds
+     `target="_blank" rel="noopener noreferrer"`. It renders in the mobile menu
+     **only** — the desktop top-nav loop `@continue`s past it (alongside `profile`)
+     so it doesn't crowd the header. **Not** in the bottom `<x-mobile-nav>` either
      — that bar is for in-app navigation only.
 - The coffee-cup icon is inline stroke SVG (viewBox `0 0 24 24`), matching the icon
   convention (see `resources/views/CLAUDE.md`).

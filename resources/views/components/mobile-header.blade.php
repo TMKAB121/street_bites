@@ -88,10 +88,11 @@
             </a>
         </div>
 
-        {{-- Desktop nav links (Home / Favorites) — profile handled separately --}}
+        {{-- Desktop nav links (Home / Favorites) — profile handled separately;
+             coffee is hamburger-only so it doesn't crowd the desktop nav. --}}
         <nav class="mobile-header__desktop-nav hidden md:flex" aria-label="Primary">
             @foreach ($items as $key => $item)
-                @if ($key === 'profile') @continue @endif
+                @if (in_array($key, ['profile', 'coffee'], true)) @continue @endif
                 <a
                     href="{{ $item['href'] }}"
                     @class([

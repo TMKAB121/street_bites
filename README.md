@@ -322,6 +322,10 @@ Three email-verified [Livewire](https://livewire.laravel.com/) flows live under
   the same one-time-code engine; email ownership stands in for the lost password.
 - **Sign out** — a CSRF-protected `POST /logout`, reachable from the profile page
   and the hamburger menu, that tears down and regenerates the session.
+- **Delete account** — a confirmation-gated, CSRF-protected `POST /account/delete`
+  in the profile footer that permanently removes the account and, via the
+  `food_trucks` foreign-key cascade, every food truck the user owns (hours, menu,
+  photos, social links, and favourite rows), then signs them out.
 
 Security follows NIST SP 800-63B / OWASP guidance:
 

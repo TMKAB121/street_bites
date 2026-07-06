@@ -180,9 +180,87 @@ it('flags an uploaded image that the screener rejects', function (): void {
         ->assertHasNoErrors()
         ->assertDispatched('toast', type: 'info');
 
-    $image = $truck->images()->sole();
-    expect($image->screen_status)->toBe(FoodTruck::SCREEN_FLAGGED)
-        ->and($image->flag_labels)->toContain('Explicit Nudity');
+    $truck->refresh();
+    expect($truck->images()->sole()->screen_status)->toBe(FoodTruck::SCREEN_FLAGGED)
+        ->and($truck->is_published)->toBeFalse()
+        ->and($truck->screen_status)->toBe(FoodTruck::SCREEN_FLAGGED);
+});
+
+it('holds and unpublishes an already-live truck the moment a flagged photo is added', function (): void {
+    Storage::fake('public');
+    Mail::fake();
+    config(['admin.emails' => ['admin@example.com']]);
+
+    $fake = Mockery::mock(ScreenImage::class);
+    $fake->shouldReceive('__invoke')->andReturn(['Explicit Nudity']);
+    $this->instance(ScreenImage::class, $fake);
+
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->published()->create([
+        'screen_status' => FoodTruck::SCREEN_PASSED,
+        'reviewed_at' => now(),
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->set('upload', UploadedFile::fake()->image('t.jpg', 300, 300))
+        ->call('uploadImage')
+        ->assertDispatched('toast', type: 'info');
+
+    $truck->refresh();
+    expect($truck->is_published)->toBeFalse()
+        ->and($truck->screen_status)->toBe(FoodTruck::SCREEN_FLAGGED)
+        ->and($truck->reviewed_at)->toBeNull()
+        ->and($truck->moderation_reason)->toContain('Flagged image');
+
+    // Newly held → the admins are notified.
+    Mail::assertQueued(TruckHeldForReview::class);
+});
+
+it('flags an upload by filename via the local stand-in and holds the truck', function (): void {
+    Storage::fake('public');
+    config([
+        'moderation.rekognition.enabled' => false,
+        'moderation.image.filename_triggers' => ['nsfw'],
+    ]);
+
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->published()->create([
+        'screen_status' => FoodTruck::SCREEN_PASSED,
+        'reviewed_at' => now(),
+    ]);
+
+    // Real ScreenImage (not mocked): Rekognition is off, so the filename
+    // stand-in runs — "NSFW-photo.jpg" trips the 'nsfw' trigger.
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->set('upload', UploadedFile::fake()->image('NSFW-photo.jpg', 300, 300))
+        ->call('uploadImage')
+        ->assertDispatched('toast', type: 'info');
+
+    $truck->refresh();
+    expect($truck->images()->sole()->screen_status)->toBe(FoodTruck::SCREEN_FLAGGED)
+        ->and($truck->is_published)->toBeFalse()
+        ->and($truck->screen_status)->toBe(FoodTruck::SCREEN_FLAGGED);
+});
+
+it('passes a clean filename under the local stand-in', function (): void {
+    Storage::fake('public');
+    config([
+        'moderation.rekognition.enabled' => false,
+        'moderation.image.filename_triggers' => ['nsfw'],
+    ]);
+
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->set('upload', UploadedFile::fake()->image('lunch.jpg', 300, 300))
+        ->call('uploadImage')
+        ->assertDispatched('toast', type: 'success');
+
+    expect($truck->images()->sole()->screen_status)->toBe(FoodTruck::SCREEN_PASSED);
 });
 
 it('blocks a banned vendor from adding a truck', function (): void {

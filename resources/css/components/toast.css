@@ -3,8 +3,10 @@
  | Toast
  | -----------------------------------------------------------------------------
  | Transient confirmation notifications (<x-toast>), stacked above the bottom nav
- | on mobile. Success rides the Asphalt Dark surface (mustard tick is allowed on
- | dark); errors use Chili Red. Tokens only, no hard-coded hex.
+ | on mobile. Success and info notices ride the Asphalt Dark surface (mustard tick
+ | is allowed on dark); errors use Chili Red. Every dispatched type needs a
+ | background here — an unstyled variant is transparent and reads as sitting behind
+ | the page. Tokens only, no hard-coded hex.
  */
 
 @layer components {
@@ -40,6 +42,15 @@
 
     .toast--error {
         background: var(--color-accent-chili);
+        color: var(--color-surface);
+    }
+
+    /* Neutral notices (e.g. "submitted for review"). Rides the same Asphalt Dark
+       surface as success — without a background it'd be transparent and let the
+       page bleed through, which reads as the toast sitting *behind* the content.
+       The info-circle icon (not a mustard tick) is what tells it apart. */
+    .toast--info {
+        background: var(--color-primary);
         color: var(--color-surface);
     }
 
