@@ -29,6 +29,16 @@
         'home' => ['label' => 'Home', 'href' => '/'],
         'favorites' => ['label' => 'Favorites', 'href' => route('favorites')],
         'about' => ['label' => 'About us', 'href' => route('about')],
+        // Optional Buy Me a Coffee support link (config/external-links.php) —
+        // external, so it opens in a new tab. Omitted entirely when unset.
+        ...(config('external-links.buymeacoffee') ? [
+            'coffee' => [
+                'label' => 'Buy me a coffee',
+                'href' => config('external-links.buymeacoffee'),
+                'external' => true,
+                'icon' => '<path d="M4 8h13v5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M17 9h2a2 2 0 0 1 0 4h-2"/><path d="M7 3v2"/><path d="M11 3v2"/><path d="M15 3v2"/>',
+            ],
+        ] : []),
         'profile' => $account,
     ];
 
@@ -88,6 +98,7 @@
                         'mobile-header__desktop-nav-link',
                         'mobile-header__desktop-nav-link--active' => $key === $active,
                     ])
+                    @if ($item['external'] ?? false) target="_blank" rel="noopener noreferrer" @endif
                     @if ($key === $active) aria-current="page" @endif
                 >
                     {{ $item['label'] }}
@@ -175,6 +186,7 @@
                         'mobile-menu__link',
                         'mobile-menu__link--active' => $key === $active,
                     ])
+                    @if ($item['external'] ?? false) target="_blank" rel="noopener noreferrer" @endif
                     @if ($key === $active) aria-current="page" @endif
                 >
                     @isset($item['icon'])

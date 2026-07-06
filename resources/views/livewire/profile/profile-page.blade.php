@@ -6,6 +6,26 @@
         </p>
     </header>
 
+    {{-- Optional support callout — only when a Buy Me a Coffee URL is configured
+         (config/external-links.php). Deliberately quieter than the primary
+         "Add a food truck" CTA so it reads as an aside, not a demand. --}}
+    @if (config('external-links.buymeacoffee'))
+        <a
+            href="{{ config('external-links.buymeacoffee') }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="profile__support"
+        >
+            <span class="profile__support-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 8h13v5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M17 9h2a2 2 0 0 1 0 4h-2"/><path d="M7 3v2"/><path d="M11 3v2"/><path d="M15 3v2"/></svg>
+            </span>
+            <span class="profile__support-body">
+                <span class="profile__support-title">Enjoying Street Bites?</span>
+                <span class="profile__support-text">It’s free to use — buy me a coffee to help fund it. &rarr;</span>
+            </span>
+        </a>
+    @endif
+
     {{-- Favourites: every user is an eater first. --}}
     <section class="mb-10">
         <h2 class="text-lg font-semibold text-primary mb-3 px-1">Favourite trucks</h2>
