@@ -24,3 +24,11 @@ Tests use **Pest** (on PHPUnit). Run: `lando pest` (or `lando composer test`).
 - **Hashing override:** `phpunit.xml` sets `HASH_DRIVER=bcrypt` (rounds=4) for
   speed — don't assert the Argon2id hash format under the test driver, and the
   Have-I-Been-Pwned breach check is skipped under `runningUnitTests()`.
+- **Moderation admins & screening:** an admin is an email in `config('admin.emails')`,
+  so admin tests set it (`config(['admin.emails' => ['admin@example.com']])`) and
+  create a user with that email. Text screening is deterministic — set
+  `config(['moderation.text_blocklist' => [...]])`. Rekognition image screening is
+  off by default (fail-open → clean); to exercise a flagged image, mock the
+  non-final `App\Actions\ScreenImage` (`$this->instance(ScreenImage::class, …)`) or
+  seed a `truck_images` row with `screen_status = 'flagged'`. See
+  `tests/Feature/{Admin,Moderation}/`.

@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Storage;
 /**
  * A normalised 250x250 WebP gallery image stored on the public disk.
  */
-#[Fillable(['path', 'sort_order'])]
+#[Fillable(['path', 'sort_order', 'screen_status', 'flag_labels'])]
 class TruckImage extends Model
 {
     /**

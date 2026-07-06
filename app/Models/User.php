@@ -29,8 +29,30 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'banned_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Whether this user is a content-moderation admin. Admins are a config email
+     * allowlist (ADMIN_EMAILS), not a DB role — no migration, trivial to change
+     * per environment. The comparison is case-insensitive.
+     */
+    public function isAdmin(): bool
+    {
+        $admins = array_map(mb_strtolower(...), config('admin.emails'));
+
+        return in_array(mb_strtolower($this->email), $admins, true);
+    }
+
+    /**
+     * Whether this user has been blocked from adding or publishing trucks
+     * (see App\Livewire\Admin\ModerationQueue::blockOwner).
+     */
+    public function isBanned(): bool
+    {
+        return $this->banned_at !== null;
     }
 
     /**

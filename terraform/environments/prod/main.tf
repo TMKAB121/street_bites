@@ -179,6 +179,12 @@ locals {
     { name = "AWS_DEFAULT_REGION", value = var.aws_region },
     { name = "AWS_BUCKET", value = module.s3_public.bucket_name },
     { name = "AWS_URL", value = "https://${module.s3_public.bucket_regional_domain_name}" },
+    # Content moderation: the admin allowlist (/admin/trucks) and image screening
+    # via Rekognition. The task role's rekognition:DetectModerationLabels grant is
+    # in modules/iam-task-roles; region falls back to AWS_DEFAULT_REGION above.
+    # Text screening (a word-list) always runs and needs nothing here.
+    { name = "ADMIN_EMAILS", value = var.admin_emails },
+    { name = "MODERATION_REKOGNITION_ENABLED", value = "true" },
   ]
 }
 

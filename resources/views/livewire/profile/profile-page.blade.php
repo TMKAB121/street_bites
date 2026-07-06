@@ -71,8 +71,15 @@
             </p>
         @endforelse
 
-        <button type="button" class="btn btn-primary mt-4 w-full" wire:click="addTruck">
-            + Add a food truck
-        </button>
+        @if ($banned)
+            <p class="profile__empty mt-4">
+                Your account has been blocked from adding or publishing food trucks.
+                If you think this is a mistake, please get in touch.
+            </p>
+        @else
+            <button type="button" class="btn btn-primary mt-4 w-full" wire:click="addTruck">
+                + Add a food truck
+            </button>
+        @endif
     </section>
 </div>
