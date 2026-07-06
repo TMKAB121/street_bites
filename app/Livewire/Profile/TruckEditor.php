@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace App\Livewire\Profile;
 
 use App\Actions\ReverseGeocodeLabel;
+use App\Actions\ScreenImage;
+use App\Actions\ScreenText;
 use App\Actions\StoreTruckImage;
 use App\Enums\SocialPlatform;
+use App\Mail\TruckHeldForReview;
 use App\Models\FoodTruck;
 use App\Models\Tag;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Lazy;
@@ -169,21 +174,56 @@ class TruckEditor extends Component
         $this->socialLinks = array_values($this->socialLinks);
     }
 
-    public function save(): void
+    public function save(ScreenText $screenText): void
     {
         // Livewire sends checkbox values as strings.
         $this->selectedTagIds = array_map(intval(...), $this->selectedTagIds);
 
         $this->validate($this->rules());
 
+        /** @var User $user */
+        $user = auth()->user();
+
+        // A blocked vendor can neither publish new trucks nor re-publish existing
+        // ones (their trucks are already unpublished — see ModerationQueue).
+        if ($user->isBanned()) {
+            $this->toast('Your account is blocked from publishing trucks.', 'error');
+
+            return;
+        }
+
         $truck = $this->truck();
+
+        // Was this truck already held before this save? Used to email admins only
+        // on the *transition* into moderation, not on every edit of a held truck.
+        $alreadyHeld = $truck->screen_status === FoodTruck::SCREEN_FLAGGED;
+
+        // Auto-screen before going live: text now, images already screened at
+        // upload. Any flag holds the truck out of discovery (is_published =
+        // false) for admin review rather than publishing it. Clean trucks
+        // publish instantly, exactly as before.
+        $textFlags = $screenText(...$this->screenableText());
+        $imageFlagged = $truck->images()->where('screen_status', FoodTruck::SCREEN_FLAGGED)->exists();
+        $flagged = $textFlags !== [] || $imageFlagged;
+        $reason = $flagged ? $this->flagReason($textFlags, $imageFlagged) : null;
+
         $truck->update([
             'name' => $this->name,
             'description' => $this->description ?: null,
             // Saving is the vendor's "go live": a freshly added truck stays
-            // invisible (is_published = false) until its first save.
-            'is_published' => true,
+            // invisible until its first clean save; a flagged one stays held.
+            'is_published' => ! $flagged,
+            'screen_status' => $flagged ? FoodTruck::SCREEN_FLAGGED : FoodTruck::SCREEN_PASSED,
+            'moderation_reason' => $reason,
+            // A flag re-opens the truck for review; a clean save keeps whatever
+            // admin sign-off it already had (no re-queue spam on hours edits).
+            'reviewed_at' => $flagged ? null : $truck->reviewed_at,
         ]);
+
+        // Alert the admins when a truck newly enters moderation.
+        if ($flagged && ! $alreadyHeld) {
+            $this->notifyAdminsOfHold($truck->name, $user->email, (string) $reason);
+        }
 
         // Upsert today's operating window (the per-day vendor model).
         $truck->operatingHours()->updateOrCreate(
@@ -196,7 +236,71 @@ class TruckEditor extends Component
         $this->saveSocialLinks($truck);
 
         $this->dispatch('truck-saved', name: $truck->name)->to(ProfilePage::class);
-        $this->toast('Changes saved');
+
+        $flagged
+            ? $this->toast('Submitted for review — it’ll go live once approved.', 'info')
+            : $this->toast('Changes saved');
+    }
+
+    /**
+     * Every vendor-typed string that should run through the text screen: the
+     * truck name, description, and each menu item's name and description.
+     *
+     * @return list<string>
+     */
+    private function screenableText(): array
+    {
+        $texts = [$this->name, $this->description];
+
+        foreach ($this->menuItems as $item) {
+            $texts[] = (string) ($item['name'] ?? '');
+            $texts[] = (string) ($item['description'] ?? '');
+        }
+
+        return $texts;
+    }
+
+    /**
+     * A short human-readable reason for the moderation queue, capped to the
+     * column width. Names the matched text terms and/or notes a flagged image.
+     *
+     * @param  list<string>  $textFlags
+     */
+    private function flagReason(array $textFlags, bool $imageFlagged): string
+    {
+        $parts = [];
+
+        if ($textFlags !== []) {
+            $parts[] = 'Text: '.implode(', ', $textFlags);
+        }
+
+        if ($imageFlagged) {
+            $parts[] = 'Flagged image';
+        }
+
+        return Str::limit(implode('; ', $parts), 250, '');
+    }
+
+    /**
+     * Email the moderation admins that a truck was just held for review. Queued
+     * (the mailable is ShouldQueue), so it never blocks the save; a no-op when
+     * no admin emails are configured.
+     */
+    private function notifyAdminsOfHold(string $truckName, string $ownerEmail, string $reason): void
+    {
+        /** @var list<string> $admins */
+        $admins = config('admin.emails', []);
+
+        if ($admins === []) {
+            return;
+        }
+
+        Mail::to($admins)->send(new TruckHeldForReview(
+            truckName: $truckName,
+            ownerEmail: $ownerEmail,
+            reason: $reason,
+            reviewUrl: route('admin.trucks'),
+        ));
     }
 
     /**
@@ -389,15 +493,33 @@ class TruckEditor extends Component
         $truck->menuItems()->whereNotIn('id', $keptIds)->delete();
     }
 
-    public function uploadImage(StoreTruckImage $storeTruckImage): void
+    public function uploadImage(StoreTruckImage $storeTruckImage, ScreenImage $screenImage): void
     {
         $this->validate([
             'upload' => 'required|image|mimes:jpeg,png,webp|max:'.self::MAX_UPLOAD_KB,
         ]);
 
-        $storeTruckImage($this->truck(), $this->upload);
+        $image = $storeTruckImage($this->truck(), $this->upload);
+
+        // Screen the image once, here — the truck-level publish decision in
+        // save() aggregates this flag without re-screening. A flagged image is
+        // kept (private to the vendor/admins, never shown publicly) but holds
+        // the truck out of discovery until an admin approves it.
+        $labels = $screenImage((string) $this->upload->getRealPath());
 
         $this->reset('upload');
+
+        if ($labels !== []) {
+            $image->update([
+                'screen_status' => FoodTruck::SCREEN_FLAGGED,
+                'flag_labels' => Str::limit(implode(', ', $labels), 250, ''),
+            ]);
+
+            $this->toast('Photo added, but flagged for review — it won’t appear publicly until approved.', 'info');
+
+            return;
+        }
+
         $this->toast('Photo added');
     }
 

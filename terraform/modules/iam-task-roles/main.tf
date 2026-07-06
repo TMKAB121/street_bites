@@ -74,3 +74,21 @@ resource "aws_iam_role_policy" "task_ses" {
     }]
   })
 }
+
+# Content-moderation image screening: App\Actions\ScreenImage calls Rekognition
+# DetectModerationLabels via the SDK credential chain (same as S3/SES above),
+# gated by MODERATION_REKOGNITION_ENABLED. Rekognition's image operations don't
+# support resource-level permissions, so Resource must be "*".
+resource "aws_iam_role_policy" "task_rekognition" {
+  name = "${var.project}-ecs-task-rekognition"
+  role = aws_iam_role.task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["rekognition:DetectModerationLabels"]
+      Resource = "*"
+    }]
+  })
+}

@@ -39,3 +39,9 @@ variable "domain" {
   type        = string
   default     = "street-bites.org"
 }
+
+variable "admin_emails" {
+  description = "Comma-separated allowlist of content-moderation admins (ADMIN_EMAILS → config/admin.php → User::isAdmin(); the /admin/trucks queue). Not sensitive, so the prod value is the default — no tfvars/CI variable needed. Add ops addresses here without a code change."
+  type        = string
+  default     = "sayge.dev121@gmail.com"
+}

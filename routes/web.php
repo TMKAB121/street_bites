@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Actions\GenerateTruckMapImage;
 use App\Actions\GeocodeSearch;
+use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\RequireCookieConsent;
+use App\Livewire\Admin\ModerationQueue;
 use App\Livewire\Auth\EmailEntry;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\LoginVerify;
@@ -311,3 +313,13 @@ Route::middleware(RequireCookieConsent::class)->group(function (): void {
     Route::get('/auth/login', Login::class)->name('auth.login');
     Route::get('/auth/login/verify', LoginVerify::class)->name('auth.login.verify');
 });
+
+// Content-moderation admin surface. Behind auth + the config email allowlist
+// (EnsureAdmin → User::isAdmin()) + cookie consent (auth is cookie-backed). The
+// moderation queue lists every truck newest-first so an admin can review, remove
+// (soft-delete), or block offending vendors. robots.txt disallows /admin.
+Route::middleware(['auth', EnsureAdmin::class, RequireCookieConsent::class])
+    ->prefix('admin')
+    ->group(function (): void {
+        Route::get('/trucks', ModerationQueue::class)->name('admin.trucks');
+    });

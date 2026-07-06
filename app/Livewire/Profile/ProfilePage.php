@@ -42,6 +42,14 @@ class ProfilePage extends Component
 
     public function addTruck(): void
     {
+        // Blocked users can't add trucks (the CTA is hidden for them too, but
+        // re-check here so a crafted request can't slip through).
+        if ($this->user()->isBanned()) {
+            $this->dispatch('toast', message: 'Your account is blocked from adding trucks.', type: 'error');
+
+            return;
+        }
+
         $truck = $this->user()->foodTrucks()->create();
 
         // Open the new truck straight away so the vendor can fill it in.
@@ -104,6 +112,7 @@ class ProfilePage extends Component
         return view('livewire.profile.profile-page', [
             'trucks' => $this->trucks(),
             'favorites' => $this->favorites(),
+            'banned' => $this->user()->isBanned(),
         ]);
     }
 }

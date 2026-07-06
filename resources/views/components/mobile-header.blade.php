@@ -32,6 +32,15 @@
         'profile' => $account,
     ];
 
+    // Content-moderation admins get a link to the moderation queue.
+    if (auth()->user()?->isAdmin()) {
+        $items['moderation'] = [
+            'label' => 'Moderation',
+            'href' => route('admin.trucks'),
+            'icon' => '<path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/>',
+        ];
+    }
+
     // Inline SVG inner markup (viewBox 0 0 24 24); stroke styling comes from CSS.
     $icons = [
         'hamburger' => '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>',

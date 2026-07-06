@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 /**
@@ -22,11 +23,20 @@ use Illuminate\Support\Str;
  * the profile page hangs off this model: today's operating hours, gallery images,
  * and menu items.
  */
-#[Fillable(['name', 'description', 'latitude', 'longitude', 'location_label', 'located_at', 'timezone', 'is_published'])]
+#[Fillable(['name', 'description', 'latitude', 'longitude', 'location_label', 'located_at', 'timezone', 'is_published', 'screen_status', 'reviewed_at', 'moderation_reason'])]
 class FoodTruck extends Model
 {
     /** @use HasFactory<FoodTruckFactory> */
     use HasFactory;
+
+    // Removal is a soft-delete: an admin-removed truck vanishes from every query
+    // (the global scope) but its rows and image files are kept for evidence/undo.
+    use SoftDeletes;
+
+    /** Auto-screen states for `screen_status` (also used on truck_images). */
+    public const string SCREEN_PASSED = 'passed';
+
+    public const string SCREEN_FLAGGED = 'flagged';
 
     /**
      * @return array<string, string>
@@ -38,6 +48,7 @@ class FoodTruck extends Model
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'located_at' => 'datetime',
+            'reviewed_at' => 'datetime',
             'is_published' => 'boolean',
         ];
     }
