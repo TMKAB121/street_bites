@@ -21,7 +21,7 @@ resources/css/
     ├── header.css       # .mobile-header + .mobile-search (search form, submit magnifier + typeahead dropdown) + .mobile-menu
     ├── carousel.css     # .card-carousel (CSS scroll-snap)
     ├── filters.css      # .filter-row / .filter-pill
-    ├── map.css          # .truck-map (Leaflet homepage map: brand-icon pins w/ white-disc face + open/closed dimming, "you are here" marker, and unlayered restyle of Leaflet's popup + zoom control)
+    ├── map.css          # .truck-map (Leaflet homepage map: brand-icon pins w/ white-disc face + open/closed dimming, "you are here" marker, and unlayered restyle of Leaflet's popup + zoom control + markercluster count bubble → brand chili)
     ├── auth.css         # .auth-card + .field (login / sign-up form styling)
     ├── location-search.css # .location-search (home-page ZIP/address fallback; reuses .field__input)
     ├── profile.css      # .profile + .profile__support (config-gated Buy-Me-a-Coffee callout) + .fav-list (slim favourites rows) + .truck-disclosure (collapsible owned-truck cards)

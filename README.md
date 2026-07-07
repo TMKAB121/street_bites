@@ -359,9 +359,9 @@ authenticated home for two roles in one page:
   X, YouTube, Snapchat…); the app detects each platform from the link and shows the
   matching brand icon on the truck's page. Unknown links get a generic globe.
 - **Real-time presence** — a **Set my location** button pins the truck at the
-  vendor's current GPS position (and reverse-geocodes an area label); a **Now Open**
-  button stamps today's opening time. Both capture the browser timezone so times show
-  in the truck's local zone (the app runs in UTC).
+  vendor's current GPS position (and reverse-geocodes an area label); **Now Open**
+  and **Closing Up** buttons stamp today's opening and closing time with one tap. All
+  capture the browser timezone so times show in the truck's local zone (the app runs in UTC).
 
 Data is persisted in a normalized schema (`food_trucks`, `truck_operating_hours`,
 `menu_items`, `truck_images`, `truck_social_links`, and a `favorites` pivot). Photo uploads are
@@ -383,7 +383,8 @@ Trucks that are **serving right now** carry a red **"Now Open"** badge on their 
 and are listed **first** — the home page leads with open trucks (alphabetical), and once
 location is shared the cards re-sort to the **nearest open truck first**. The home page
 also shows an **interactive map** of pinned trucks that centres on the visitor's location,
-with pins that filter alongside the cuisine pills. Visitors who **decline the GPS
+with pins that filter alongside the cuisine pills and **cluster** into a count bubble
+where trucks gather (breweries, festivals, lots), expanding as you zoom in. Visitors who **decline the GPS
 prompt** get a fallback instead: a search card appears where they can enter a **ZIP
 code or address**, which is geocoded to rough coordinates — the map recenters and
 the cards re-sort just as if location had been shared.

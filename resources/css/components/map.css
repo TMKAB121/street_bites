@@ -172,3 +172,22 @@
     background: var(--color-bg);
     color: var(--color-accent-chili);
 }
+
+/* Cluster bubble (leaflet.markercluster) — retint the plugin's default
+   blue/green to the brand chili so a group of trucks reads on-brand, like the
+   red pins it collapses. Outer ring is a translucent halo; the inner disc is
+   the solid count chip. All three size variants (small/medium/large) share it. */
+.truck-map .marker-cluster {
+    background: rgb(from var(--color-accent-chili) r g b / 30%);
+}
+
+.truck-map .marker-cluster div {
+    background: var(--color-accent-chili);
+    color: var(--color-surface);
+}
+
+.truck-map .marker-cluster span {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    line-height: 30px;
+}

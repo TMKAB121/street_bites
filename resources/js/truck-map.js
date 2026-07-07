@@ -27,6 +27,12 @@
  */
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+// Collapses stacked pins into a count bubble at low zoom (breweries, festivals,
+// corporate lots where trucks group up) — expands back to individual brand pins
+// as the visitor zooms in. Patches the imported L in place.
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
 // The Street Bites master pin mark (public/images, served at the site root) —
 // the chili teardrop with the taco glyph, so every marker reads as the brand.
@@ -74,6 +80,7 @@ const popupFor = (pin) => {
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('truckMap', (pins) => ({
         map: null,
+        clusterGroup: null,
         markers: [],
         hereMarker: null,
         here: null,
@@ -92,14 +99,25 @@ document.addEventListener('alpine:init', () => {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             }).addTo(this.map);
 
+            // Pins live in a cluster group (not directly on the map) so grouped
+            // trucks collapse into a count bubble; refreshPins() owns each
+            // marker's membership as cuisine/radius filters change.
+            this.clusterGroup = L.markerClusterGroup();
+            this.map.addLayer(this.clusterGroup);
+
             this.markers = pins.map((pin) => ({
                 tags: pin.tags,
                 lat: pin.lat,
                 lng: pin.lng,
-                marker: L.marker([pin.lat, pin.lng], { icon: makeIcon(pin.open), alt: pin.name })
-                    .bindPopup(popupFor(pin))
-                    .addTo(this.map),
+                marker: L.marker([pin.lat, pin.lng], { icon: makeIcon(pin.open), alt: pin.name }).bindPopup(
+                    popupFor(pin)
+                ),
             }));
+
+            // Seed the cluster group — markers are no longer added at build
+            // time, so this initial pass populates the map (and later re-runs
+            // apply the cuisine/radius filters).
+            this.refreshPins();
 
             // Open at MAP_ZOOM rather than fitting every pin — outliers
             // shouldn't zoom the whole city out; they stay reachable by
@@ -194,9 +212,9 @@ document.addEventListener('alpine:init', () => {
                 const nearOk = this.here === null || !beyondRadius({ lat, lng }, this.here);
 
                 if (cuisineOk && nearOk) {
-                    marker.addTo(this.map);
+                    this.clusterGroup.addLayer(marker);
                 } else {
-                    marker.remove();
+                    this.clusterGroup.removeLayer(marker);
                 }
             });
         },

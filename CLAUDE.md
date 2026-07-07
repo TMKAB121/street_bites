@@ -114,9 +114,14 @@ zoomable OSM/Leaflet map (opens at `MAP_ZOOM = 12`, ~5-mile radius; free zoom up
 OSM's tile max) with **Street Bites brand-icon markers** (`/images/street-bites-icon.png`
 via `makeIcon(open)`, not an SVG divIcon; each pin payload carries `open` from
 `$truck->isOpenNow()`, and closed trucks get a `truck-map__pin--closed` modifier that
-dims the mark to muted grey so open/closed reads at a glance). `map.css` also restyles
-Leaflet's default popup and zoom control to the design tokens (unlayered overrides —
-see that file). `truckDistanceSort`
+dims the mark to muted grey so open/closed reads at a glance). Pins live in a
+**`leaflet.markercluster` group**, not directly on the map, so trucks that stack up in
+one spot (breweries, festivals, corporate lots) collapse into a brand-tinted count
+bubble that expands on zoom — `refreshPins()` owns each marker's cluster-group
+membership as the cuisine/radius filters change, and the "you are here" dot stays
+un-clustered. `map.css` also restyles
+Leaflet's default popup, zoom control, **and cluster bubble** to the design tokens
+(unlayered overrides — see that file). `truckDistanceSort`
 reorders a card list **open-first, then closest-first** (real DOM re-append) using each
 card's `data-open` + `data-lat`/`data-lng`; `truckRadiusFilter` applies the radius cap
 alone to lists that keep their server order (the Popular carousel, the search results
@@ -394,10 +399,14 @@ the heading, deliberately quieter than the "Add a food truck" CTA (see *Support 
   = true` only when clean; a flagged truck is held (`screen_status = 'flagged'`,
   unpublished) for admin review, and a banned vendor is blocked from publishing
   altogether. See *Content moderation*.
-- **Now Open + pin (real-time presence).** `goLiveNow()` stamps today's `opens_at` at
-  the current truck-local moment (replaces a manual open-time input); `setLocation()`
+- **Now Open / Closing Up + pin (real-time presence).** `goLiveNow()` stamps today's
+  `opens_at` at the current truck-local moment (replaces a manual open-time input) and
+  `closeNow()` is its mirror — stamps today's `closes_at` at the current moment so
+  `isOpenNow()` flips to closed immediately (a null `closes_at` otherwise reads as
+  "still open"). Both drive the two hours-section CTAs; the manual `closesAt` time input
+  stays for pre-setting a planned close. `setLocation()`
   writes `latitude`/`longitude`/`located_at` from the browser's geolocation and
-  reverse-geocodes `location_label`. Both capture the **browser IANA timezone** into
+  reverse-geocodes `location_label`. All three capture the **browser IANA timezone** into
   `food_trucks.timezone` (validated against `timezone_identifiers_list()`), which the
   UTC-running app uses to show pin/open times in truck-local time. See *Maps & geolocation*.
 - **Testing lazy components:** pass `['truckId' => …, 'lazy' => false]` to
@@ -454,8 +463,8 @@ an admin approves it. See *Content moderation*.
 ### Maps & geolocation
 
 All mapping is **OpenStreetMap — free, no API key, no billing** (dep
-`dantsu/php-osm-static-api` on PHP, `leaflet` on JS). Two rendering paths by where the
-map centre is known:
+`dantsu/php-osm-static-api` on PHP, `leaflet` + `leaflet.markercluster` on JS). Two
+rendering paths by where the map centre is known:
 
 - **Truck detail page — cached static PNG.** `App\Actions\GenerateTruckMapImage`
   renders OSM tiles (zoom 13, ~2.5-mile view) to a PNG on
@@ -472,8 +481,9 @@ map centre is known:
   (OSM tile policy).
 - **Home page — interactive Leaflet.** `<x-truck-map>` / `truck-map.js` — centres on the
   visitor's GPS (unknowable server-side) with filterable brand-icon pins (open vivid,
-  closed dimmed grey); opens at a ~5-mile radius (`MAP_ZOOM = 12`) and the visitor can
-  zoom freely. See *JavaScript / Alpine*.
+  closed dimmed grey) that **cluster** into a count bubble where trucks group up
+  (`leaflet.markercluster`); opens at a ~5-mile radius (`MAP_ZOOM = 12`) and the visitor
+  can zoom freely. See *JavaScript / Alpine*.
 
 **Reverse geocoding:** `App\Actions\ReverseGeocodeLabel` calls OSM **Nominatim** (keyless,
 identifying User-Agent) to turn a pin into `location_label` ("Road, City"). Used by

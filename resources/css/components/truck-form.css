@@ -31,8 +31,16 @@
         @apply grid grid-cols-2 items-start gap-3;
     }
 
-    /* "Opened at …" line under the Now Open button — tight to the button. */
-    .truck-form__opens-status {
+    /* "Opened at …" / "Closes at …" status line under each hours button. */
+    .truck-form__opens-status,
+    .truck-form__closes-status {
+        @apply mt-2;
+    }
+
+    /* The Closes column adds a manual time input under the Closing Up CTA;
+       space it off the button (and the Opens column has no input, so this
+       only ever affects Closes). */
+    .truck-form__hours .field__input {
         @apply mt-2;
     }
 
