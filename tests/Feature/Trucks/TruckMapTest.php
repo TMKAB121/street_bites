@@ -15,7 +15,7 @@ uses(RefreshDatabase::class);
  * below either pre-places the file or omits the coordinates.
  */
 
-it('shows the cached map with attribution when the truck has a pin', function (): void {
+it('shows the cached map when the truck has a pin', function (): void {
     Storage::fake('public');
 
     $truck = FoodTruck::factory()->published()->located()->create();
@@ -28,9 +28,7 @@ it('shows the cached map with attribution when the truck has a pin', function ()
         ->get(route('trucks.show', [$truck, $truck->slug]))
         ->assertOk()
         ->assertSee(Storage::disk('public')->url((string) $path), escape: false)
-        ->assertSee('truck-page__map', escape: false)
-        ->assertSee('https://www.openstreetmap.org/copyright', escape: false)
-        ->assertSee('OpenStreetMap');
+        ->assertSee('truck-page__map', escape: false);
 });
 
 it('hides the map when the truck has no pinned location', function (): void {

@@ -65,38 +65,29 @@
         @apply block h-auto w-full;
     }
 
-    /* Our own pin over the cached (marker-free) map. The map is rendered
-       centred on the truck's GPS point, so the pin tip must sit at the exact
-       image centre: the tip is at 21/24 of the icon height, hence -87.5%. */
+    /* The Street Bites brand pin over the cached (marker-free) map — the same
+       mark and white-disc treatment as the home map's .truck-map__pin. The map
+       is rendered centred on the truck's GPS point, so the pin tip must sit at
+       the exact image centre: the teardrop tip is ≈95% down the icon (matching
+       the home marker's 38/40 anchor), hence -95%. The radial disc fills the
+       icon's transparent circular face with white so map tiles don't show
+       through the burger glyph (see the note on .truck-map__pin in map.css). */
     .truck-page__pin {
         position: absolute;
         top: 50%;
         left: 50%;
-        width: 2rem;
-        height: 2rem;
+        width: 2.5rem;
+        height: 2.5rem;
         pointer-events: none;
-        color: var(--color-accent-chili);
-        filter: drop-shadow(0 1px 2px rgb(30 34 41 / 35%));
-        transform: translate(-50%, -87.5%);
+        background-image: radial-gradient(circle 12px at 50% 39%, #fff 96%, transparent 100%);
+        filter: drop-shadow(0 2px 3px rgb(30 34 41 / 35%));
+        transform: translate(-50%, -95%);
     }
 
-    .truck-page__pin svg {
+    .truck-page__pin img {
+        display: block;
         width: 100%;
         height: 100%;
-        fill: var(--color-surface);
-        stroke: currentcolor;
-        stroke-width: 2;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-    }
-
-    .truck-page__map-attribution {
-        @apply mt-1 text-right text-xs;
-        color: var(--color-text-muted);
-    }
-
-    .truck-page__map-attribution a {
-        text-decoration: underline;
     }
 
     /* Directions CTA under the map — extends .btn.btn-mustard (dark text on
@@ -150,6 +141,14 @@
         stroke-width: 1.75;
         stroke-linecap: round;
         stroke-linejoin: round;
+    }
+
+    /* Distance from the visitor, filled by JS once a location is known (hidden
+       otherwise via the `hidden` attribute). Emphasised over the muted location
+       line — it's the "should I walk there?" answer. */
+    .truck-page__distance {
+        @apply text-sm font-semibold;
+        color: var(--color-primary);
     }
 
     .truck-page__menu {

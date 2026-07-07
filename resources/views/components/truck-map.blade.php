@@ -20,6 +20,7 @@
             'name' => $truck->name,
             'lat' => (float) $truck->latitude,
             'lng' => (float) $truck->longitude,
+            'open' => $truck->isOpenNow(),
             'tags' => $truck->tags->pluck('slug')->all(),
             'url' => route('trucks.show', [$truck, $truck->slug]),
         ])

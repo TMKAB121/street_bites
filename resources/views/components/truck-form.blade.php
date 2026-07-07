@@ -7,6 +7,7 @@
     'locatedAt' => null,
     'locationLabel' => null,
     'opensAt' => null,
+    'closesAt' => null,
     'timezone' => 'UTC',
 ])
 
@@ -23,6 +24,7 @@
                   next to the Set-my-location CTA, in the truck's timezone.
     - $locationLabel: reverse-geocoded area name for the pin (string|null).
     - $opensAt:   today's opening time as "HH:MM" (truck-local wall clock) or null.
+    - $closesAt:  today's closing time as "HH:MM" (truck-local wall clock) or null.
     - $timezone:  the truck's IANA timezone, for rendering stamped times locally.
 --}}
 <form wire:submit="save" class="truck-form">
@@ -118,9 +120,30 @@
                 </p>
                 @error('opensAt') <p class="field__error">{{ $message }}</p> @enderror
             </div>
+            {{-- "Closing Up" mirrors "Now Open": one tap stamps the current
+                 truck-local time as today's close time (browser timezone →
+                 TruckEditor::closeNow). Kept visually secondary to Now Open,
+                 and the manual input stays for pre-setting a planned close. --}}
             <div class="field">
                 <label class="field__label" for="closes-{{ $truckId }}">Closes</label>
+                <button
+                    type="button"
+                    class="btn btn-primary"
+                    wire:loading.attr="disabled"
+                    wire:target="closeNow"
+                    @click="$wire.closeNow(Intl.DateTimeFormat().resolvedOptions().timeZone)"
+                >
+                    <span wire:loading.remove wire:target="closeNow">Closing Up</span>
+                    <span wire:loading wire:target="closeNow">Closing…</span>
+                </button>
                 <input id="closes-{{ $truckId }}" type="time" class="field__input" wire:model="closesAt">
+                <p class="truck-form__hint truck-form__closes-status">
+                    @if ($closesAt)
+                        Closes at {{ \Illuminate\Support\Carbon::createFromFormat('H:i', $closesAt)->format('g:i A') }}
+                    @else
+                        No close time set today.
+                    @endif
+                </p>
                 @error('closesAt') <p class="field__error">{{ $message }}</p> @enderror
             </div>
         </div>

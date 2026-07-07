@@ -14,6 +14,7 @@
         :located-at="$locatedAt"
         :location-label="$locationLabel"
         :opens-at="$opensAt"
+        :closes-at="$closesAt"
         :timezone="$timezone"
     />
 </div>

@@ -51,6 +51,10 @@
 
     <div class="food-truck-card__body">
         <h3 class="food-truck-card__title">{{ $name }}</h3>
+        {{-- Distance from the visitor — filled by refreshDistances() (truck-map.js)
+             once a location is known, reading coordinates from the discovery-card
+             wrapper's data-lat/data-lng. Hidden until then (and for unpinned trucks). --}}
+        <p class="food-truck-card__distance truck-distance" hidden></p>
         <a href="{{ $href }}" class="btn btn-mustard w-full">Find Now</a>
     </div>
 </article>

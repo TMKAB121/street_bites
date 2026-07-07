@@ -349,6 +349,40 @@ it('reuses the stored timezone when going live without a valid one', function ()
     $this->travelBack();
 });
 
+it('stamps today\'s closing time in the truck timezone when closing up', function (): void {
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+
+    // 15:30 UTC is 10:30 Central — the stamped close time must be the local one.
+    $this->travelTo(Date::parse('2026-07-01 15:30:00', 'UTC'));
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->call('closeNow', 'America/Chicago')
+        ->assertSet('closesAt', '10:30')
+        ->assertDispatched('toast', type: 'success');
+
+    $truck->refresh();
+    expect($truck->timezone)->toBe('America/Chicago')
+        ->and(substr((string) $truck->todayHours->closes_at, 0, 5))->toBe('10:30');
+
+    $this->travelBack();
+});
+
+it('reuses the stored timezone when closing up without a valid one', function (): void {
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create(['timezone' => 'America/Chicago']);
+
+    $this->travelTo(Date::parse('2026-07-01 15:30:00', 'UTC'));
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->call('closeNow', '')
+        ->assertSet('closesAt', '10:30');
+
+    $this->travelBack();
+});
+
 it('forbids pinning another vendor\'s truck via a tampered truckId', function (): void {
     $user = User::factory()->create();
     $mine = FoodTruck::factory()->for($user)->create();
