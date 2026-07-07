@@ -15,19 +15,19 @@ resources/css/
 ├── base.css             # body, ADA tap targets, focus-visible ring, [x-cloak]
 └── components/
     ├── button.css       # .btn / .btn-primary / .btn-accent / .btn-mustard
-    ├── card.css         # .food-truck-card (image + title + FIND NOW CTA; __status "Now Open" badge + pulsing dot)
+    ├── card.css         # .food-truck-card (image + title + FIND NOW CTA; __status "Now Open" badge + pulsing dot; __distance "X miles away" line, JS-filled)
     ├── favorite.css     # .fav-toggle (favourite star chip — chili when active; passes 3:1 non-text contrast on white, unlike mustard/tangerine)
     ├── nav.css          # .mobile-nav (bottom tab bar)
     ├── header.css       # .mobile-header + .mobile-search (search form, submit magnifier + typeahead dropdown) + .mobile-menu
     ├── carousel.css     # .card-carousel (CSS scroll-snap)
     ├── filters.css      # .filter-row / .filter-pill
-    ├── map.css          # .truck-map (Leaflet homepage map + custom pin / "you are here" markers)
+    ├── map.css          # .truck-map (Leaflet homepage map: brand-icon pins w/ white-disc face + open/closed dimming, "you are here" marker, and unlayered restyle of Leaflet's popup + zoom control + markercluster count bubble → brand chili)
     ├── auth.css         # .auth-card + .field (login / sign-up form styling)
     ├── location-search.css # .location-search (home-page ZIP/address fallback; reuses .field__input)
     ├── profile.css      # .profile + .profile__support (config-gated Buy-Me-a-Coffee callout) + .fav-list (slim favourites rows) + .truck-disclosure (collapsible owned-truck cards)
     ├── admin.css        # .moderation (admin queue: blocklist chips, truck rows, status badges + actions — chili flagged / mustard live / grey held)
     ├── truck-form.css   # .truck-form + .menu-row + .social-row + .truck-image (vendor edit form)
-    ├── truck-page.css   # .truck-page (public truck detail page: static map + pin, Get-directions CTA, hours, menu)
+    ├── truck-page.css   # .truck-page (public truck detail page: static map + brand-icon pin overlay matching the home map, Get-directions CTA, hours, __distance line, menu)
     ├── social-links.css # .social-links (truck detail page: single-tone brand-icon row of social profiles)
     ├── about.css        # .about-page (About us: pull-quote, prose rhythm, follow-along link cards)
     ├── tag-picker.css   # .tag-picker + .tag-pill (cuisine tag toggles in truck editor)

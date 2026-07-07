@@ -382,6 +382,33 @@ class TruckEditor extends Component
     }
 
     /**
+     * "Closing Up" — the mirror of goLiveNow(): stamp today's closing time at
+     * the current truck-local moment when the vendor stops serving. Persists
+     * straight away so isOpenNow() flips to closed immediately (a null
+     * closes_at otherwise reads as "still open").
+     */
+    public function closeNow(string $timezone = ''): void
+    {
+        $truck = $this->truck();
+        $tz = $this->resolveTimezone($timezone, $truck);
+
+        if ($tz !== $truck->timezone) {
+            $truck->update(['timezone' => $tz]);
+        }
+
+        $localNow = now()->setTimezone($tz);
+        $this->closesAt = $localNow->format('H:i');
+
+        // Same one-row-per-business-date window as goLiveNow()/save().
+        $truck->operatingHours()->updateOrCreate(
+            ['business_date' => today()],
+            ['closes_at' => $this->closesAt],
+        );
+
+        $this->toast('You’re closed — closed at '.$localNow->format('g:i A'));
+    }
+
+    /**
      * Pick a valid IANA timezone: the browser-supplied one if it's real,
      * otherwise the truck's stored timezone, otherwise the app default. Guards
      * against a tampered/garbage `timezone` payload reaching the database.

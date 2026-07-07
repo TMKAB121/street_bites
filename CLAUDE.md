@@ -111,7 +111,17 @@ reserve Livewire for server-backed interactivity.
 `truck-map.js` registers four Alpine components on `alpine:init` (so they use
 Livewire's bundled Alpine — never import Alpine): `truckMap(pins)` renders the
 zoomable OSM/Leaflet map (opens at `MAP_ZOOM = 12`, ~5-mile radius; free zoom up to
-OSM's tile max) with custom pin markers; `truckDistanceSort`
+OSM's tile max) with **Street Bites brand-icon markers** (`/images/street-bites-icon.png`
+via `makeIcon(open)`, not an SVG divIcon; each pin payload carries `open` from
+`$truck->isOpenNow()`, and closed trucks get a `truck-map__pin--closed` modifier that
+dims the mark to muted grey so open/closed reads at a glance). Pins live in a
+**`leaflet.markercluster` group**, not directly on the map, so trucks that stack up in
+one spot (breweries, festivals, corporate lots) collapse into a brand-tinted count
+bubble that expands on zoom — `refreshPins()` owns each marker's cluster-group
+membership as the cuisine/radius filters change, and the "you are here" dot stays
+un-clustered. `map.css` also restyles
+Leaflet's default popup, zoom control, **and cluster bubble** to the design tokens
+(unlayered overrides — see that file). `truckDistanceSort`
 reorders a card list **open-first, then closest-first** (real DOM re-append) using each
 card's `data-open` + `data-lat`/`data-lng`; `truckRadiusFilter` applies the radius cap
 alone to lists that keep their server order (the Popular carousel, the search results
@@ -134,6 +144,17 @@ immediately without their own GPS prompt — only the map writes the key, so the
 form's pin fallback (same event, but the *truck's* location, on a map-less page) never
 pollutes it. The cap is client-side only by necessity: the visitor's position is never
 known server-side.
+
+**Distance readouts:** `refreshDistances()` (module-level window listeners, not an Alpine
+component) fills every `.truck-distance` element with a "X miles away" label via
+`formatMiles` (tenths under 10 miles, whole beyond, "Less than 0.1 miles away" when almost
+on top, singular "mile" at exactly 1) once a location is known — reading coordinates from
+each element's nearest `[data-lat]` ancestor (the discovery-card wrapper on card grids, the
+element itself on the truck detail page). Wired to the same `user-located` event and
+session-remembered location as the sort/cap; hidden until a location arrives and for
+unpinned trucks (unknown ≠ near). Purely presentational — the radius cap and open-first
+sort are handled separately. Surfaces: `.food-truck-card__distance` (between the card title
+and CTA) and `.truck-page__distance` (under the detail page's location line).
 
 Two more Alpine components follow the same register-on-`alpine:init` pattern:
 `favoriteToggle(endpoint, favorited, csrf)` (`resources/js/favorites.js`) powers the
@@ -378,10 +399,14 @@ the heading, deliberately quieter than the "Add a food truck" CTA (see *Support 
   = true` only when clean; a flagged truck is held (`screen_status = 'flagged'`,
   unpublished) for admin review, and a banned vendor is blocked from publishing
   altogether. See *Content moderation*.
-- **Now Open + pin (real-time presence).** `goLiveNow()` stamps today's `opens_at` at
-  the current truck-local moment (replaces a manual open-time input); `setLocation()`
+- **Now Open / Closing Up + pin (real-time presence).** `goLiveNow()` stamps today's
+  `opens_at` at the current truck-local moment (replaces a manual open-time input) and
+  `closeNow()` is its mirror — stamps today's `closes_at` at the current moment so
+  `isOpenNow()` flips to closed immediately (a null `closes_at` otherwise reads as
+  "still open"). Both drive the two hours-section CTAs; the manual `closesAt` time input
+  stays for pre-setting a planned close. `setLocation()`
   writes `latitude`/`longitude`/`located_at` from the browser's geolocation and
-  reverse-geocodes `location_label`. Both capture the **browser IANA timezone** into
+  reverse-geocodes `location_label`. All three capture the **browser IANA timezone** into
   `food_trucks.timezone` (validated against `timezone_identifiers_list()`), which the
   UTC-running app uses to show pin/open times in truck-local time. See *Maps & geolocation*.
 - **Testing lazy components:** pass `['truckId' => …, 'lazy' => false]` to
@@ -438,8 +463,8 @@ an admin approves it. See *Content moderation*.
 ### Maps & geolocation
 
 All mapping is **OpenStreetMap — free, no API key, no billing** (dep
-`dantsu/php-osm-static-api` on PHP, `leaflet` on JS). Two rendering paths by where the
-map centre is known:
+`dantsu/php-osm-static-api` on PHP, `leaflet` + `leaflet.markercluster` on JS). Two
+rendering paths by where the map centre is known:
 
 - **Truck detail page — cached static PNG.** `App\Actions\GenerateTruckMapImage`
   renders OSM tiles (zoom 13, ~2.5-mile view) to a PNG on
@@ -447,11 +472,18 @@ map centre is known:
   `truck-maps/{truck}/{fingerprint}.png`. The **fingerprint** is a `sha1` of
   `(lat, lng, zoom, size)`, so moving the pin changes the path — the next page view
   regenerates and deletes the stale sibling (no schema, no cache table). Marker-free;
-  the pin is a **CSS overlay** centred on the image. Failures return `null` and hide
-  the map (never 500). Sends an identifying User-Agent (OSM tile policy).
+  the pin is a **CSS overlay** — the same Street Bites brand icon as the home markers,
+  centred with its tip at the image centre (`.truck-page__pin`, `truck-page.css`).
+  Attribution ("© OpenStreetMap contributors") is **baked into the image** by the
+  `TileLayer` credit, so the detail page shows **no separate caption** — it relies on
+  the in-image credit the same way the home map relies on Leaflet's own control.
+  Failures return `null` and hide the map (never 500). Sends an identifying User-Agent
+  (OSM tile policy).
 - **Home page — interactive Leaflet.** `<x-truck-map>` / `truck-map.js` — centres on the
-  visitor's GPS (unknowable server-side) with filterable pins; opens at a ~5-mile
-  radius (`MAP_ZOOM = 12`) and the visitor can zoom freely. See *JavaScript / Alpine*.
+  visitor's GPS (unknowable server-side) with filterable brand-icon pins (open vivid,
+  closed dimmed grey) that **cluster** into a count bubble where trucks group up
+  (`leaflet.markercluster`); opens at a ~5-mile radius (`MAP_ZOOM = 12`) and the visitor
+  can zoom freely. See *JavaScript / Alpine*.
 
 **Reverse geocoding:** `App\Actions\ReverseGeocodeLabel` calls OSM **Nominatim** (keyless,
 identifying User-Agent) to turn a pin into `location_label` ("Road, City"). Used by
