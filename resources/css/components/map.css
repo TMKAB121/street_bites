@@ -7,6 +7,14 @@
  | the container chrome and our custom pin/"you are here" markers.
  |
  |   <x-truck-map :trucks="$trucks" />
+ |
+ | Two kinds of rule live here:
+ |   - our own BEM classes (.truck-map*), inside @layer components as usual;
+ |   - overrides of Leaflet's built-in .leaflet-* chrome (popup, zoom control),
+ |     which stay OUTSIDE @layer — Leaflet's stylesheet is unlayered, and
+ |     unlayered CSS always wins over any @layer, so a layered override would
+ |     lose. They're scoped under .truck-map so their specificity also clears
+ |     Leaflet's single-class selectors regardless of stylesheet source order.
  */
 
 @layer components {
@@ -22,20 +30,25 @@
         height: 18rem;
     }
 
-    /* Truck pin — same silhouette and Chili colouring as .truck-page__pin. */
+    /* Truck pin — the Street Bites brand mark (an <img>, set in truck-map.js).
+       The icon is brand-red ink on transparency: its circular "face" (and the
+       gaps inside the taco glyph) are see-through, so map tiles would otherwise
+       show through them. A white radial disc painted behind the image fills just
+       that face — centred at 50%/39% of the 40px marker with a ~12px radius, so
+       it covers the transparent face and tucks under the opaque red ring while
+       leaving the square's corners transparent (no white block around the pin).
+       Then a soft drop-shadow lifts the whole mark off the tiles. */
     .truck-map__pin {
-        color: var(--color-accent-chili);
-        filter: drop-shadow(0 1px 2px rgb(30 34 41 / 35%));
+        background-image: radial-gradient(circle 12px at 50% 39%, #fff 96%, transparent 100%);
+        filter: drop-shadow(0 2px 3px rgb(30 34 41 / 35%));
     }
 
-    .truck-map__pin svg {
-        width: 100%;
-        height: 100%;
-        fill: var(--color-surface);
-        stroke: currentcolor;
-        stroke-width: 2;
-        stroke-linecap: round;
-        stroke-linejoin: round;
+    /* Closed truck — same mark, dimmed so open pins stand out at a glance. The
+       face goes light grey (kept light, not dark, so the red glyph stays legible)
+       and the whole pin is desaturated + faded to read as "not serving". */
+    .truck-map__pin--closed {
+        background-image: radial-gradient(circle 12px at 50% 39%, #d9dde1 96%, transparent 100%);
+        filter: grayscale(0.7) opacity(0.65) drop-shadow(0 2px 3px rgb(30 34 41 / 35%));
     }
 
     /* The visitor's own position (an SVG circleMarker, hence stroke/fill). */
@@ -45,4 +58,117 @@
         stroke: var(--color-surface);
         stroke-width: 2;
     }
+}
+
+/* -----------------------------------------------------------------------------
+ | Leaflet chrome overrides (unlayered — see the file header). Restyles the
+ | default popup and zoom control to the Street Bites design tokens.
+ | --------------------------------------------------------------------------- */
+
+/* Popup — a compact surface card instead of Leaflet's rounded white bubble. */
+.truck-map .leaflet-popup-content-wrapper {
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text-main);
+    box-shadow: 0 6px 20px rgb(30 34 41 / 18%);
+    border: 1px solid rgb(30 34 41 / 8%);
+}
+
+/* Right margin clears the close button so a long truck name never runs under it. */
+.truck-map .leaflet-popup-content {
+    margin: 0.5rem 1.75rem 0.5rem 0.875rem;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.3;
+}
+
+/* The truck-name link (built in truck-map.js) — chili, like other callouts. */
+.truck-map .leaflet-popup-content a {
+    color: var(--color-accent-chili);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.truck-map .leaflet-popup-content a:hover {
+    text-decoration: underline;
+}
+
+/* The little pointer under the bubble — match the surface, drop the border
+   (a bordered rotated square shows doubled edges); a soft shadow reads cleaner. */
+.truck-map .leaflet-popup-tip {
+    background: var(--color-surface);
+    box-shadow: 0 6px 20px rgb(30 34 41 / 12%);
+}
+
+/* Close button. The extra .leaflet-popup in the selector lifts specificity above
+   Leaflet's own `.leaflet-container a.leaflet-popup-close-button` (0,2,1); the
+   min-width/height:0 releases the global 48px ADA tap-target floor (base.css,
+   triggered by the control's role="button") that otherwise bloats this tiny
+   corner control, and flex centres the × in the box regardless of line-height. */
+.truck-map .leaflet-popup .leaflet-popup-close-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    top: 0.25rem;
+    right: 0.25rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    font-size: 1.125rem;
+    line-height: 1;
+    color: var(--color-text-muted);
+    border-radius: 9999px;
+    transition: var(--transition-fast);
+}
+
+.truck-map .leaflet-popup .leaflet-popup-close-button:hover {
+    background: var(--color-bg);
+    color: var(--color-accent-chili);
+}
+
+/* Zoom control — a soft rounded capsule of two token-coloured buttons, not
+   Leaflet's blocky bordered squares. The container carries both .leaflet-bar and
+   .leaflet-control-zoom, so chaining them (0,3,0) clears Leaflet's own
+   `.leaflet-touch .leaflet-bar` rounding. */
+.truck-map .leaflet-bar.leaflet-control-zoom {
+    border: none;
+    border-radius: 9999px;
+    box-shadow: 0 2px 8px rgb(30 34 41 / 18%);
+    overflow: hidden;
+}
+
+/* The .leaflet-bar ancestor lifts these to (0,3,0), above Leaflet's
+   `.leaflet-touch .leaflet-bar a` (0,2,1) — otherwise its line-height/size win
+   and the +/− sit high. Flex centres the glyph; min-*:0 drops the 48px ADA floor
+   (role="button") so these secondary controls aren't oversized. */
+.truck-map .leaflet-bar .leaflet-control-zoom-in,
+.truck-map .leaflet-bar .leaflet-control-zoom-out {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    min-width: 0;
+    min-height: 0;
+    line-height: 1;
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-indent: 0;
+    color: var(--color-primary);
+    background: var(--color-surface);
+    border: none;
+    transition: var(--transition-fast);
+}
+
+/* Hairline divider between the stacked buttons (replaces Leaflet's border). */
+.truck-map .leaflet-bar .leaflet-control-zoom-in {
+    border-bottom: 1px solid rgb(30 34 41 / 8%);
+}
+
+.truck-map .leaflet-bar .leaflet-control-zoom-in:hover,
+.truck-map .leaflet-bar .leaflet-control-zoom-out:hover {
+    background: var(--color-bg);
+    color: var(--color-accent-chili);
 }

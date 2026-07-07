@@ -3,9 +3,10 @@
  *
  * Registered as the Alpine component `truckMap(pins)` on `alpine:init` — that
  * event comes from Livewire's bundled Alpine (we never import Alpine ourselves,
- * see app.js). Each pin is `{ id, name, lat, lng, tags, url }`; markers use our
- * own SVG pin (a divIcon — Leaflet's default PNG icons break under bundlers and
- * wouldn't match the design system anyway). The Blade component forwards the
+ * see app.js). Each pin is `{ id, name, lat, lng, tags, url }`; markers use the
+ * Street Bites brand pin — the master icon served from public/images (NOT
+ * Leaflet's own bundled marker-icon.png, which breaks under bundlers). The Blade
+ * component forwards the
  * window `tag-filter` event dispatched by <x-truck-filters> to filterPins(), so
  * the pins follow the same client-side cuisine filtering as the results grid.
  *
@@ -27,9 +28,9 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Same pin path as .truck-page__pin on the detail page; coloured in map.css.
-const PIN_SVG =
-    '<svg viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
+// The Street Bites master pin mark (public/images, served at the site root) —
+// the chili teardrop with the taco glyph, so every marker reads as the brand.
+const PIN_ICON_URL = '/images/street-bites-icon.png';
 
 // Initial view: ≈5-mile radius around the visitor (the truck detail pages use
 // tighter ~2.5-mile static maps, GenerateTruckMapImage::ZOOM). The visitor can
@@ -48,13 +49,17 @@ const GEO_FIX_MAX_AGE_MS = 300000; // 5 minutes
 
 const HTTP_TOO_MANY_REQUESTS = 429;
 
-const truckIcon = L.divIcon({
-    html: PIN_SVG,
-    className: 'truck-map__pin',
-    iconSize: [32, 32],
-    iconAnchor: [16, 28], // the pin tip (21/24 of the icon height)
-    popupAnchor: [0, -26],
-});
+// Two variants of the same brand pin, distinguished only by a modifier class:
+// open trucks keep the vivid mark (white face), closed ones are dimmed to a
+// muted grey so open/closed reads at a glance — colouring lives in map.css.
+const makeIcon = (open) =>
+    L.icon({
+        iconUrl: PIN_ICON_URL,
+        className: open ? 'truck-map__pin' : 'truck-map__pin truck-map__pin--closed',
+        iconSize: [40, 40],
+        iconAnchor: [20, 38], // the teardrop tip (near the bottom of the icon)
+        popupAnchor: [0, -36], // popup sits just above the pin's crown
+    });
 
 // Popup content built via DOM (not an HTML string) so truck names never
 // inject markup.
@@ -91,7 +96,7 @@ document.addEventListener('alpine:init', () => {
                 tags: pin.tags,
                 lat: pin.lat,
                 lng: pin.lng,
-                marker: L.marker([pin.lat, pin.lng], { icon: truckIcon, alt: pin.name })
+                marker: L.marker([pin.lat, pin.lng], { icon: makeIcon(pin.open), alt: pin.name })
                     .bindPopup(popupFor(pin))
                     .addTo(this.map),
             }));
@@ -379,6 +384,42 @@ const beyondRadius = (point, here) => {
     return miles !== null && miles > MAX_RADIUS_MILES;
 };
 
+// Human-readable "how far" label for a distance readout. Tenths under 10 miles
+// (where the extra precision reads meaningfully), whole miles beyond; a very
+// close truck avoids a misleading "0 miles". Singular "mile" at exactly 1.
+const formatMiles = (miles) => {
+    if (miles < 0.1) {
+        return 'Less than 0.1 miles away';
+    }
+
+    const value = miles < 10 ? Math.round(miles * 10) / 10 : Math.round(miles);
+
+    return `${value} ${value === 1 ? 'mile' : 'miles'} away`;
+};
+
+// Fill every `.truck-distance` element with how far its truck is from the
+// visitor, once a location is known (the `user-located` event or one remembered
+// from earlier in the session). Each element reads coordinates from its nearest
+// `[data-lat]` ancestor — the discovery-card wrapper on card grids, the element
+// itself on the truck detail page. Hidden until a location arrives, and left
+// hidden for trucks without a pin (unknown ≠ near). Purely presentational: the
+// radius cap and open-first sorting are handled separately.
+const refreshDistances = (here) => {
+    document.querySelectorAll('.truck-distance').forEach((el) => {
+        const origin = el.closest('[data-lat]');
+        const miles = origin ? milesFrom(origin.dataset, here) : null;
+
+        if (miles === null) {
+            el.hidden = true;
+
+            return;
+        }
+
+        el.textContent = formatMiles(miles);
+        el.hidden = false;
+    });
+};
+
 // The last location the visitor shared, remembered for the browser session so
 // map-less pages (the search landing page) can apply the radius cap without
 // their own geolocation prompt, and revisits filter before the GPS fix lands.
@@ -403,3 +444,25 @@ const rememberLocation = (point) => {
         // still filters this page; only the cross-page memory is lost.
     }
 };
+
+// Wire the distance readouts to the same location signals the map and card
+// sorting use. Placed at the end of the module so the immediate stored-location
+// pass runs after storedLocation()/milesFrom() are initialised.
+window.addEventListener('user-located', (event) => refreshDistances(event.detail));
+
+const applyStoredDistances = () => {
+    const stored = storedLocation();
+
+    if (stored) {
+        refreshDistances(stored);
+    }
+};
+
+// A location remembered from earlier in the session fills the readouts on load,
+// before (or without) a fresh GPS fix. Guarded on readyState so the query runs
+// against a parsed DOM whether this module executes before or after it.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyStoredDistances);
+} else {
+    applyStoredDistances();
+}

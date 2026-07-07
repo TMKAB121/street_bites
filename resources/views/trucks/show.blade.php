@@ -62,9 +62,12 @@
 
         {{-- Cached OSM static map of the pin's surroundings. The pin is our
              own overlay (the cached image is marker-free), centred because the
-             map is rendered centred on the truck's GPS point. --}}
+             map is rendered centred on the truck's GPS point. OSM attribution is
+             baked into the image by GenerateTruckMapImage (the TileLayer credit),
+             so no separate caption is needed — the home map relies on Leaflet's
+             own built-in control the same way. --}}
         @if ($mapUrl)
-            <figure class="truck-page__map">
+            <div class="truck-page__map">
                 <div class="truck-page__map-frame">
                     <img
                         src="{{ $mapUrl }}"
@@ -75,16 +78,10 @@
                         loading="lazy"
                     >
                     <span class="truck-page__pin" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/>
-                            <circle cx="12" cy="10" r="2.5"/>
-                        </svg>
+                        <img src="/images/street-bites-icon.png" alt="">
                     </span>
                 </div>
-                <figcaption class="truck-page__map-attribution">
-                    &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors
-                </figcaption>
-            </figure>
+            </div>
         @endif
 
         {{-- Google Maps directions deep link — omitting the origin makes Google
@@ -140,6 +137,18 @@
                 </svg>
                 {{ $truck->location_label }}
             </p>
+        @endif
+
+        {{-- Distance from the visitor — filled by refreshDistances() (truck-map.js)
+             once a location is known (GPS or a remembered session location), reading
+             the pin coordinates below. Hidden until then, and for an unpinned truck. --}}
+        @if ($truck->latitude !== null && $truck->longitude !== null)
+            <p
+                class="truck-page__distance truck-distance"
+                data-lat="{{ $truck->latitude }}"
+                data-lng="{{ $truck->longitude }}"
+                hidden
+            ></p>
         @endif
     </section>
 

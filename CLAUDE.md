@@ -111,7 +111,12 @@ reserve Livewire for server-backed interactivity.
 `truck-map.js` registers four Alpine components on `alpine:init` (so they use
 Livewire's bundled Alpine — never import Alpine): `truckMap(pins)` renders the
 zoomable OSM/Leaflet map (opens at `MAP_ZOOM = 12`, ~5-mile radius; free zoom up to
-OSM's tile max) with custom pin markers; `truckDistanceSort`
+OSM's tile max) with **Street Bites brand-icon markers** (`/images/street-bites-icon.png`
+via `makeIcon(open)`, not an SVG divIcon; each pin payload carries `open` from
+`$truck->isOpenNow()`, and closed trucks get a `truck-map__pin--closed` modifier that
+dims the mark to muted grey so open/closed reads at a glance). `map.css` also restyles
+Leaflet's default popup and zoom control to the design tokens (unlayered overrides —
+see that file). `truckDistanceSort`
 reorders a card list **open-first, then closest-first** (real DOM re-append) using each
 card's `data-open` + `data-lat`/`data-lng`; `truckRadiusFilter` applies the radius cap
 alone to lists that keep their server order (the Popular carousel, the search results
@@ -134,6 +139,17 @@ immediately without their own GPS prompt — only the map writes the key, so the
 form's pin fallback (same event, but the *truck's* location, on a map-less page) never
 pollutes it. The cap is client-side only by necessity: the visitor's position is never
 known server-side.
+
+**Distance readouts:** `refreshDistances()` (module-level window listeners, not an Alpine
+component) fills every `.truck-distance` element with a "X miles away" label via
+`formatMiles` (tenths under 10 miles, whole beyond, "Less than 0.1 miles away" when almost
+on top, singular "mile" at exactly 1) once a location is known — reading coordinates from
+each element's nearest `[data-lat]` ancestor (the discovery-card wrapper on card grids, the
+element itself on the truck detail page). Wired to the same `user-located` event and
+session-remembered location as the sort/cap; hidden until a location arrives and for
+unpinned trucks (unknown ≠ near). Purely presentational — the radius cap and open-first
+sort are handled separately. Surfaces: `.food-truck-card__distance` (between the card title
+and CTA) and `.truck-page__distance` (under the detail page's location line).
 
 Two more Alpine components follow the same register-on-`alpine:init` pattern:
 `favoriteToggle(endpoint, favorited, csrf)` (`resources/js/favorites.js`) powers the
@@ -447,11 +463,17 @@ map centre is known:
   `truck-maps/{truck}/{fingerprint}.png`. The **fingerprint** is a `sha1` of
   `(lat, lng, zoom, size)`, so moving the pin changes the path — the next page view
   regenerates and deletes the stale sibling (no schema, no cache table). Marker-free;
-  the pin is a **CSS overlay** centred on the image. Failures return `null` and hide
-  the map (never 500). Sends an identifying User-Agent (OSM tile policy).
+  the pin is a **CSS overlay** — the same Street Bites brand icon as the home markers,
+  centred with its tip at the image centre (`.truck-page__pin`, `truck-page.css`).
+  Attribution ("© OpenStreetMap contributors") is **baked into the image** by the
+  `TileLayer` credit, so the detail page shows **no separate caption** — it relies on
+  the in-image credit the same way the home map relies on Leaflet's own control.
+  Failures return `null` and hide the map (never 500). Sends an identifying User-Agent
+  (OSM tile policy).
 - **Home page — interactive Leaflet.** `<x-truck-map>` / `truck-map.js` — centres on the
-  visitor's GPS (unknowable server-side) with filterable pins; opens at a ~5-mile
-  radius (`MAP_ZOOM = 12`) and the visitor can zoom freely. See *JavaScript / Alpine*.
+  visitor's GPS (unknowable server-side) with filterable brand-icon pins (open vivid,
+  closed dimmed grey); opens at a ~5-mile radius (`MAP_ZOOM = 12`) and the visitor can
+  zoom freely. See *JavaScript / Alpine*.
 
 **Reverse geocoding:** `App\Actions\ReverseGeocodeLabel` calls OSM **Nominatim** (keyless,
 identifying User-Agent) to turn a pin into `location_label` ("Road, City"). Used by

@@ -86,4 +86,12 @@
         @apply text-md font-semibold;
         color: var(--color-primary);
     }
+
+    /* Distance-from-visitor line, filled by JS once a location is known (hidden
+       otherwise via the `hidden` attribute). Sits between the title and the CTA;
+       the body's flex gap already spaces it, so it carries no margins. */
+    .food-truck-card__distance {
+        @apply -mt-1 text-sm font-medium;
+        color: var(--color-text-muted);
+    }
 }
