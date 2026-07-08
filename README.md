@@ -188,8 +188,9 @@ steet_bites/
 │   │                           #   .card-carousel, .filter-row, .profile, .truck-form, .toast, ...
 │   ├── js/
 │   │   ├── app.js              # imports the JS modules below (Alpine is bundled by Livewire 4)
-│   │   ├── echo.js             # Laravel Echo / Reverb client config
-│   │   ├── truck-map.js        # Leaflet home-page map + closest-first card sorting
+│   │   ├── echo.js             # Laravel Echo / Reverb client config (not imported until a
+│   │   │                       #   realtime feature ships — keeps pusher-js out of the bundle)
+│   │   ├── truck-map.js        # Leaflet home-page map (lazy-loaded chunk) + closest-first card sorting
 │   │   │                       #   + 100-mile radius cap + ZIP/address location-search fallback
 │   │   ├── favorites.js        # favourite star toggle (optimistic Alpine + fetch)
 │   │   └── search.js           # header search typeahead dropdown

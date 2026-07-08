@@ -27,6 +27,12 @@
         ->values();
 @endphp
 
+{{-- The first map tile is typically the page's LCP, but Leaflet only requests
+     tiles after its lazy-loaded chunk runs — open the tile-server connection
+     early so that request skips DNS + TLS setup. No crossorigin attribute:
+     tile <img>s are plain no-cors requests. --}}
+<link rel="preconnect" href="https://tile.openstreetmap.org">
+
 <div
     {{ $attributes->class('truck-map') }}
     x-data="truckMap({{ Js::from($pins) }})"

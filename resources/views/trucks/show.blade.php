@@ -18,10 +18,15 @@
     <div class="-mx-4 mb-2">
         <x-card-carousel label="Photos of {{ $truck->name }}">
             @forelse ($truck->images as $image)
+                {{-- 250×250 from StoreTruckImage; the first shot is likely the
+                     page's LCP, so only the rest load lazily. --}}
                 <img
                     src="{{ $image->url }}"
                     alt="Photo of {{ $truck->name }}"
                     class="truck-page__photo"
+                    width="250"
+                    height="250"
+                    @if (!$loop->first) loading="lazy" @endif
                 >
             @empty
                 <div class="truck-page__photo truck-page__photo--placeholder" aria-hidden="true">
@@ -78,7 +83,7 @@
                         loading="lazy"
                     >
                     <span class="truck-page__pin" aria-hidden="true">
-                        <img src="/images/street-bites-icon.png" alt="">
+                        <img src="/images/street-bites-icon-128.png" alt="" width="128" height="128">
                     </span>
                 </div>
             </div>

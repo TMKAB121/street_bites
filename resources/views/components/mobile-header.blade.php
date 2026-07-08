@@ -80,10 +80,14 @@
 
             {{-- Brand logo (pin + wordmark) — /public/images, vector so it stays crisp. --}}
             <a href="/" class="mobile-header__brand">
+                {{-- width/height mirror the SVG viewBox so the aspect ratio is
+                     known pre-load; CSS still scales it to 3rem tall. --}}
                 <img
                     src="/images/street-bites-logo.svg"
                     alt="Street Bites"
                     class="mobile-header__brand-logo"
+                    width="2141"
+                    height="939"
                 >
             </a>
         </div>

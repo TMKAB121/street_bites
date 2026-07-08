@@ -191,7 +191,12 @@
                             locating = false;
                             gpsFailed = true;
                             $dispatch('toast', { message: 'We couldn’t get your location — enter your spot below instead.', type: 'error' });
-                        }
+                        },
+                        // The timeout matters: when the OS location service
+                        // can't produce a fix at all (macOS kCLErrorLocationUnknown),
+                        // neither callback may ever fire without one — leaving
+                        // this button stuck on 'Locating…'.
+                        { timeout: 10000 }
                     );
                 "
             >
