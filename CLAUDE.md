@@ -256,7 +256,8 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   (fixed header + bottom nav + `<x-toast>`) into a reusable layout for app pages.
 - `/admin/trucks` → `App\Livewire\Admin\ModerationQueue` (`auth` + `EnsureAdmin` +
   consent) — the **content-moderation queue** (see *Content moderation*): every
-  truck newest-first with review / removed tabs, the editable blocklist panel, and
+  truck newest-first with review / removed tabs, the editable blocklist panel, the
+  cuisine-tag deletion panel, and
   approve / remove / restore / block-vendor actions. Admin-only; disallowed in
   `robots.txt`.
 - `/styleguide` → `styleguide.blade.php` — living style guide demoing every token
@@ -399,8 +400,12 @@ the heading, deliberately quieter than the "Add a food truck" CTA (see *Support 
   `$newTagName`. The form shows a pill-checkbox grid (`.tag-picker`) of all `Tag`
   rows; checked pills sync on `save()` via `$truck->tags()->sync(...)`. The "Add"
   button calls `addTag()`, which does `Tag::firstOrCreate(['slug' => Str::slug(…)])`
-  and appends the new ID to `$selectedTagIds`. CSS-only active state via
-  `:has(input:checked)` — no Alpine needed in the picker.
+  and appends the new ID to `$selectedTagIds`. **A blocklisted tag name is denied
+  outright** (`tagNameBlocked()` — both `addTag()` and the typed-but-not-Added path
+  in `save()`): tags are shared public taxonomy, so there's no held-for-review
+  middle ground — the row is never created and the vendor gets a `newTagName`
+  validation error. The slug is screened alongside the raw name ("c.u.m" → "cum").
+  CSS-only active state via `:has(input:checked)` — no Alpine needed in the picker.
 - **Social links.** `TruckEditor` holds `$socialLinks` (array of `['id', 'url']`
   rows). The form shows repeatable URL inputs (`addSocialLink()`/`removeSocialLink()`,
   same reconcile-on-save pattern as the menu); each URL is validated `url:http,https`.
@@ -610,7 +615,11 @@ catching offensive text/images, without gating every truck behind manual review.
   only JPEG/PNG bytes, so `ScreenImage` re-encodes the (WebP) source to JPEG first.
   A flagged upload **holds the truck immediately** (`uploadImage` calls the shared
   `holdForReview()` too, not just `save()`), so an offensive photo can never sit on an
-  already-live truck until the vendor's next save. **Local testing without AWS:**
+  already-live truck until the vendor's next save. **Cuisine tags are the exception
+  to hold-flagged-only:** a blocklisted tag name is **denied outright** at authoring
+  (never created, a `newTagName` validation error — see *Profile & vendor
+  management*, Cuisine tags) because tags are shared public taxonomy, not
+  truck-scoped content an admin can hold. **Local testing without AWS:**
   when Rekognition is off, `ScreenImage` falls back to a filename stand-in — set
   `MODERATION_IMAGE_FILENAME_TRIGGERS` (e.g. `nsfw,explicit`) and any upload whose
   name contains a trigger is flagged (off unless set; ignored when Rekognition is on).
@@ -633,7 +642,12 @@ catching offensive text/images, without gating every truck behind manual review.
   flags** so a later vendor save doesn't re-hold it on the same approved photos),
   **remove** (soft-delete + reason — hidden everywhere via the `SoftDeletes` global
   scope, rows/images kept as evidence), **restore** (comes back unpublished +
-  unreviewed), and **block vendor**.
+  unreviewed), and **block vendor**. A **"Cuisine tags" panel** (chips with usage
+  counts, mirroring the blocked-words panel) lets an admin **delete a tag** from
+  the shared taxonomy — the cleanup for tags that slipped past the blocklist or
+  predate an addition to it (authoring already denies blocklisted names). Hard
+  delete behind a `wire:confirm`; the `food_truck_tag` FK cascade detaches it
+  from every truck.
 - **Blocking a vendor** stamps `users.banned_at`/`ban_reason` (set with `forceFill`,
   never mass-assignable) and unpublishes **all** their trucks at once. A ban stops
   `ProfilePage::addTruck()` and `TruckEditor::save()` only — the user can still sign
@@ -645,7 +659,8 @@ catching offensive text/images, without gating every truck behind manual review.
 Env: `ADMIN_EMAILS`, `MODERATION_REKOGNITION_ENABLED` (+ optional
 `MODERATION_REKOGNITION_MIN_CONFIDENCE`, `_REGION`, and `MODERATION_TEXT_BLOCKLIST`)
 — see `.env.example`. Tests: `tests/Feature/Admin/ModerationQueueTest.php` (access
-control, queue filters, approve/remove/restore/block, blocklist editing) and
+control, queue filters, approve/remove/restore/block, blocklist editing, tag
+deletion) and
 `tests/Feature/Moderation/ScreeningTest.php` (text/image flagging, ban guards) —
 they set `config(['admin.emails' => …])` and mock the non-final `ScreenImage`.
 

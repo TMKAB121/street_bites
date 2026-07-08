@@ -7,6 +7,7 @@ use App\Livewire\Admin\ModerationQueue;
 use App\Models\CookieConsent;
 use App\Models\FoodTruck;
 use App\Models\ModerationTerm;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -159,6 +160,30 @@ it('lets an admin remove a blocked word', function (): void {
 
     expect(ModerationTerm::query()->count())->toBe(0)
         ->and(app(ScreenText::class)('gadzooks burger'))->toBe([]);
+});
+
+it('lists cuisine tags with their usage counts', function (): void {
+    $tag = Tag::create(['name' => 'Gross Tag']);
+    FoodTruck::factory()->published()->create()->tags()->attach($tag);
+
+    Livewire::actingAs(moderationAdmin())
+        ->test(ModerationQueue::class)
+        ->assertSee('Gross Tag (1)');
+});
+
+it('lets an admin delete a tag, detaching it from every truck', function (): void {
+    $tag = Tag::create(['name' => 'Gross Tag']);
+    $truck = FoodTruck::factory()->published()->create();
+    $truck->tags()->attach($tag);
+
+    Livewire::actingAs(moderationAdmin())
+        ->test(ModerationQueue::class)
+        ->call('deleteTag', $tag->id)
+        ->assertDispatched('toast', message: 'Tag removed', type: 'success');
+
+    expect(Tag::query()->count())->toBe(0)
+        // The pivot FK cascade cleaned the truck's reference too.
+        ->and($truck->tags()->count())->toBe(0);
 });
 
 it('blocks a vendor and unpublishes all their trucks', function (): void {
