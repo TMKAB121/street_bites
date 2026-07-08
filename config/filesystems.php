@@ -72,6 +72,14 @@ return [
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
             'report' => false,
+            // Stamped onto every object written to this disk. Everything the
+            // app stores here is content-addressed (uuid image names,
+            // fingerprinted map paths — a changed file is a new URL), which is
+            // what makes "cache forever" safe. Keep new write paths
+            // content-unique or scope them their own options.
+            'options' => [
+                'CacheControl' => 'public, max-age=31536000, immutable',
+            ],
         ],
 
     ],

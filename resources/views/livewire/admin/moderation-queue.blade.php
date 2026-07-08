@@ -45,6 +45,36 @@
         </form>
     </section>
 
+    {{-- Vendor-authored cuisine taxonomy. Authoring already denies blocklisted
+         names; this is the cleanup for tags that slipped past the list (or
+         predate an addition to it). Deleting is hard and immediate — the pivot
+         FK cascade detaches the tag from every truck — hence the confirm. --}}
+    @if ($tags->isNotEmpty())
+        <section class="moderation__terms">
+            <h2 class="moderation__terms-title">Cuisine tags</h2>
+            <p class="moderation__terms-note">
+                Every tag vendors have authored, with how many trucks use it.
+                Removing one deletes it from the taxonomy and detaches it from
+                every truck — for tags that slipped past the blocked words.
+            </p>
+
+            <div class="moderation__chips">
+                @foreach ($tags as $tag)
+                    <span class="moderation__chip" wire:key="tag-{{ $tag->id }}">
+                        {{ $tag->name }} ({{ $tag->food_trucks_count }})
+                        <button
+                            type="button"
+                            class="moderation__chip-remove"
+                            aria-label="Remove tag {{ $tag->name }}"
+                            wire:click="deleteTag({{ $tag->id }})"
+                            wire:confirm="Delete the “{{ $tag->name }}” tag? It will be removed from {{ $tag->food_trucks_count }} {{ Str::plural('truck', $tag->food_trucks_count) }}."
+                        >&times;</button>
+                    </span>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     <div class="moderation__tabs">
         <button
             type="button"

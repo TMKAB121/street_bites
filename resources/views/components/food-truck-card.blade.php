@@ -35,7 +35,17 @@
             </span>
         @endif
         @if ($image)
-            <img src="{{ $image }}" alt="{{ $name }}" class="food-truck-card__image">
+            {{-- 250×250 is StoreTruckImage's square; the attrs reserve the
+                 aspect ratio pre-load (CSS owns the rendered size), and cards
+                 sit in scrolled lists so offscreen ones load lazily. --}}
+            <img
+                src="{{ $image }}"
+                alt="{{ $name }}"
+                class="food-truck-card__image"
+                width="250"
+                height="250"
+                loading="lazy"
+            >
         @else
             {{-- Placeholder until real images are provided. --}}
             <div class="food-truck-card__placeholder" aria-hidden="true">

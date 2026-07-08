@@ -181,6 +181,16 @@ class TruckEditor extends Component
 
         $this->validate($this->rules());
 
+        // A typed-but-not-Added tag would be created by saveTags() below —
+        // deny a blocklisted name outright before anything persists (same
+        // guard as addTag(); tags are shared public taxonomy, so there is no
+        // held-for-review middle ground).
+        if (trim($this->newTagName) !== '' && $this->tagNameBlocked($screenText, trim($this->newTagName))) {
+            $this->addError('newTagName', 'That tag name isn’t allowed.');
+
+            return;
+        }
+
         /** @var User $user */
         $user = auth()->user();
 
@@ -427,11 +437,17 @@ class TruckEditor extends Component
      * selection. Called from the "Add" button in the tag picker fieldset so the
      * vendor doesn't have to wait until Save to see the new pill appear.
      */
-    public function addTag(): void
+    public function addTag(ScreenText $screenText): void
     {
         $name = trim($this->newTagName);
 
         if ($name === '') {
+            return;
+        }
+
+        if ($this->tagNameBlocked($screenText, $name)) {
+            $this->addError('newTagName', 'That tag name isn’t allowed.');
+
             return;
         }
 
@@ -445,6 +461,18 @@ class TruckEditor extends Component
         }
 
         $this->newTagName = '';
+    }
+
+    /**
+     * Tags are shared public taxonomy — every visitor sees them as filter
+     * pills — so a blocklisted name is denied outright rather than held for
+     * review: the tag row is simply never created. The slug is screened
+     * alongside the raw name because slugging collapses punctuation
+     * ("c.u.m" → "cum"), catching what the raw text can hide.
+     */
+    private function tagNameBlocked(ScreenText $screenText, string $name): bool
+    {
+        return $screenText($name, Str::slug($name)) !== [];
     }
 
     /**

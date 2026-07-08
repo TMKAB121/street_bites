@@ -9,6 +9,7 @@ use App\Livewire\Profile\TruckEditor;
 use App\Mail\TruckHeldForReview;
 use App\Models\FoodTruck;
 use App\Models\ModerationTerm;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -44,6 +45,76 @@ it('screens against admin-managed DB terms on top of the env baseline', function
 
     expect($screen('totally gadzooks tacos'))->toContain('gadzooks')
         ->and($screen('porn tacos'))->toContain('porn');
+});
+
+it('denies a blocklisted tag name outright from addTag', function (): void {
+    config(['moderation.text_blocklist' => ['porn']]);
+
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->set('newTagName', 'Porn Tacos')
+        ->call('addTag')
+        ->assertHasErrors('newTagName')
+        ->assertSet('selectedTagIds', []);
+
+    // Denied means never created — tags are shared public taxonomy, so there
+    // is no held-for-review middle ground.
+    expect(Tag::query()->count())->toBe(0);
+});
+
+it('denies a tag name whose slug collapses to a blocklisted term', function (): void {
+    config(['moderation.text_blocklist' => ['porn']]);
+
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->set('newTagName', 'P.o.r.n')
+        ->call('addTag')
+        ->assertHasErrors('newTagName');
+
+    expect(Tag::query()->count())->toBe(0);
+});
+
+it('denies a blocklisted pending tag name on save without persisting anything', function (): void {
+    config(['moderation.text_blocklist' => ['porn']]);
+
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create(['name' => 'Curry Cart']);
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->set('name', 'Waffle Wagon')
+        ->set('newTagName', 'porn')
+        ->call('save')
+        ->assertHasErrors('newTagName')
+        ->assertNotDispatched('toast');
+
+    // The save aborted before anything was written.
+    expect(Tag::query()->count())->toBe(0)
+        ->and($truck->fresh()->name)->toBe('Curry Cart');
+});
+
+it('adds a clean tag through addTag', function (): void {
+    config(['moderation.text_blocklist' => ['porn']]);
+
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+
+    $component = Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->set('newTagName', 'Korean BBQ')
+        ->call('addTag')
+        ->assertHasNoErrors()
+        ->assertSet('newTagName', '');
+
+    $tag = Tag::query()->where('slug', 'korean-bbq')->first();
+    expect($tag)->not->toBeNull();
+    $component->assertSet('selectedTagIds', [$tag->id]);
 });
 
 it('holds a truck for review when its text is flagged on save', function (): void {
