@@ -25,18 +25,33 @@
  * browser session (sessionStorage) so map-less pages — the search landing
  * page — filter too, without their own geolocation prompt.
  */
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-// Collapses stacked pins into a count bubble at low zoom (breweries, festivals,
-// corporate lots where trucks group up) — expands back to individual brand pins
-// as the visitor zooms in. Patches the imported L in place.
-import 'leaflet.markercluster';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+// Leaflet is the heaviest dependency in the bundle and only pages that render
+// <x-truck-map> need it, so it's loaded on demand from truckMap's init() —
+// the dynamic import()s below make Vite split it (JS + CSS) into its own
+// chunk that map-less pages never download. Import order matters: the
+// markercluster plugin patches the Leaflet module in place (collapses stacked
+// pins into a count bubble at low zoom), so Leaflet must be evaluated first.
+const loadLeaflet = async () => {
+    const [{ default: leaflet }] = await Promise.all([import('leaflet'), import('leaflet/dist/leaflet.css')]);
 
-// The Street Bites master pin mark (public/images, served at the site root) —
-// the chili teardrop with the taco glyph, so every marker reads as the brand.
-const PIN_ICON_URL = '/images/street-bites-icon.png';
+    await Promise.all([
+        import('leaflet.markercluster'),
+        import('leaflet.markercluster/dist/MarkerCluster.css'),
+        import('leaflet.markercluster/dist/MarkerCluster.Default.css'),
+    ]);
+
+    return leaflet;
+};
+
+// Assigned by truckMap's init() once loadLeaflet() resolves; makeIcon and the
+// component methods below only run after that.
+let L = null;
+
+// The Street Bites pin mark (public/images, served at the site root) — the
+// chili teardrop with the taco glyph, so every marker reads as the brand.
+// The 128px raster (not the 512px master) — markers render at 40px, so 128
+// covers 3x displays at a fraction of the bytes.
+const PIN_ICON_URL = '/images/street-bites-icon-128.png';
 
 // Initial view: ≈5-mile radius around the visitor (the truck detail pages use
 // tighter ~2.5-mile static maps, GenerateTruckMapImage::ZOOM). The visitor can
@@ -52,6 +67,13 @@ const MAX_RADIUS_MILES = 100;
 // A cached GPS fix this recent is accurate enough for a 100-mile radius cap —
 // skip the slow fresh-fix round-trip when the browser has one.
 const GEO_FIX_MAX_AGE_MS = 300000; // 5 minutes
+
+// Without a timeout, getCurrentPosition can hang forever when the OS location
+// service can't produce a fix at all (macOS logs "kCLErrorLocationUnknown" —
+// desktop Macs with Wi-Fi scanning off do this routinely) — the error callback
+// never fires and the ZIP fallback never reveals. Ten seconds is plenty for a
+// real fix; past that, fail over to the search form.
+const GEO_TIMEOUT_MS = 10000;
 
 const HTTP_TOO_MANY_REQUESTS = 429;
 
@@ -86,7 +108,12 @@ document.addEventListener('alpine:init', () => {
         here: null,
         activeTag: 'all',
 
-        init() {
+        async init() {
+            // Leaflet arrives in its own chunk (see loadLeaflet). Events that
+            // land while it's in flight are safe: filterPins/refreshPins only
+            // walk this.markers, still [] until the map below exists.
+            L = await loadLeaflet();
+
             // Zoomable map: opens at MAP_ZOOM (~5-mile radius) and the visitor
             // can zoom in/out from there (controls, wheel, pinch, double-click
             // — Leaflet's defaults). Capped at OSM's deepest tile level.
@@ -167,10 +194,10 @@ document.addEventListener('alpine:init', () => {
                         })
                     );
                 },
-                // Denied/unavailable — keep the pin-centred view and reveal
-                // the ZIP/address fallback instead.
+                // Denied/unavailable/timed out — keep the pin-centred view and
+                // reveal the ZIP/address fallback instead.
                 () => window.dispatchEvent(new CustomEvent('user-location-denied')),
-                { maximumAge: GEO_FIX_MAX_AGE_MS }
+                { maximumAge: GEO_FIX_MAX_AGE_MS, timeout: GEO_TIMEOUT_MS }
             );
         },
 

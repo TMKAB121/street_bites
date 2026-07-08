@@ -78,7 +78,10 @@ Blade components** (a CSS partial + a `.blade.php` file) in
 mark), `favicon.ico` (16/32/48 fallback), `apple-touch-icon.png` (180², opaque),
 and `public/images/` (`street-bites-logo.svg` — the master pin + wordmark used in
 the header — plus transparent `street-bites-logo.png` / `street-bites-icon.png`
-rasters, and `og-image.jpg` — the 1200×630 / 1.91:1 social share card, the default
+rasters, `street-bites-icon-128.png` — a 128² resize of the 512² icon master used
+wherever the mark renders small (map markers, the detail page's pin overlay; 128
+covers 3× displays at a fraction of the bytes — don't point those at the master),
+and `og-image.jpg` — the 1200×630 / 1.91:1 social share card, the default
 `og:image`; keep re-exports under ~300 KB, the strictest crawler preview cap).
 The SVGs are the masters (traced from the original art with potrace);
 their fill is the logo's own brand red `#C72F2E` — close to but deliberately
@@ -98,8 +101,12 @@ The cross-cutting Alpine/Livewire rules and the route→view map stay here:
 
 ### JavaScript / Alpine
 
-`resources/js/app.js` imports `echo.js` (Reverb) and `truck-map.js` (the Leaflet
-home-page map). **Do not import or start Alpine here.** Livewire 4 bundles its own
+`resources/js/app.js` imports `truck-map.js` (the Leaflet home-page map),
+`favorites.js`, and `search.js`. `echo.js` (the Reverb client) exists but is
+**deliberately not imported** — nothing subscribes to `window.Echo` yet, and the
+import drags laravel-echo + pusher-js (~90 KB minified) into every page; re-add
+the import when the first realtime feature lands. **Do not import or start
+Alpine here.** Livewire 4 bundles its own
 Alpine and starts it automatically; running a second instance (the standalone
 `alpinejs` package) triggers a "multiple instances of Alpine" conflict that
 silently breaks every `wire:` directive. Livewire's bundled Alpine scans the whole
@@ -111,7 +118,7 @@ reserve Livewire for server-backed interactivity.
 `truck-map.js` registers four Alpine components on `alpine:init` (so they use
 Livewire's bundled Alpine — never import Alpine): `truckMap(pins)` renders the
 zoomable OSM/Leaflet map (opens at `MAP_ZOOM = 12`, ~5-mile radius; free zoom up to
-OSM's tile max) with **Street Bites brand-icon markers** (`/images/street-bites-icon.png`
+OSM's tile max) with **Street Bites brand-icon markers** (`/images/street-bites-icon-128.png`
 via `makeIcon(open)`, not an SVG divIcon; each pin payload carries `open` from
 `$truck->isOpenNow()`, and closed trucks get a `truck-map__pin--closed` modifier that
 dims the mark to muted grey so open/closed reads at a glance). Pins live in a
@@ -126,12 +133,22 @@ reorders a card list **open-first, then closest-first** (real DOM re-append) usi
 card's `data-open` + `data-lat`/`data-lng`; `truckRadiusFilter` applies the radius cap
 alone to lists that keep their server order (the Popular carousel, the search results
 grid); `locationSearch(endpoint)` is the ZIP/address fallback form
-(see *Maps & geolocation*). It also imports `leaflet/dist/leaflet.css`. The visitor's
+(see *Maps & geolocation*). **Leaflet + markercluster (JS and CSS) are loaded via
+dynamic `import()` inside `truckMap`'s async `init()`** (`loadLeaflet()` — Leaflet
+first, then the plugin that patches it in place), so Vite splits them into their
+own chunk that map-less pages (`/search`, `/about`, auth, profile) never download;
+`app.js` itself carries none of Leaflet. Events that land during the chunk load are
+safe — `filterPins`/`refreshPins` walk a still-empty `this.markers`. The visitor's
 position flows through two **window events** that decouple the pieces:
 `user-located` `{ lat, lng }` (dispatched by the GPS success callback **and** by
 `locationSearch` — `truckMap` listens and recenters/moves the "you are here" dot,
 `truckDistanceSort` reorders) and `user-location-denied` (dispatched when GPS is
-declined or missing — `locationSearch` reveals itself on it).
+declined, missing, **or times out** — both `getCurrentPosition` call sites pass a
+10-second `timeout` (`GEO_TIMEOUT_MS` here, inline in the truck form's
+Set-my-location CTA) because a browser whose OS location service can't produce a
+fix (macOS logs `kCLErrorLocationUnknown`) may otherwise never invoke either
+callback, leaving the fallback hidden forever — `locationSearch` reveals itself
+on it).
 
 **100-mile radius cap:** once a location is known, every result surface hides trucks
 beyond `MAX_RADIUS_MILES` (100, in `truck-map.js`) — `truckDistanceSort` and
@@ -239,7 +256,8 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   (fixed header + bottom nav + `<x-toast>`) into a reusable layout for app pages.
 - `/admin/trucks` → `App\Livewire\Admin\ModerationQueue` (`auth` + `EnsureAdmin` +
   consent) — the **content-moderation queue** (see *Content moderation*): every
-  truck newest-first with review / removed tabs, the editable blocklist panel, and
+  truck newest-first with review / removed tabs, the editable blocklist panel, the
+  cuisine-tag deletion panel, and
   approve / remove / restore / block-vendor actions. Admin-only; disallowed in
   `robots.txt`.
 - `/styleguide` → `styleguide.blade.php` — living style guide demoing every token
@@ -382,8 +400,12 @@ the heading, deliberately quieter than the "Add a food truck" CTA (see *Support 
   `$newTagName`. The form shows a pill-checkbox grid (`.tag-picker`) of all `Tag`
   rows; checked pills sync on `save()` via `$truck->tags()->sync(...)`. The "Add"
   button calls `addTag()`, which does `Tag::firstOrCreate(['slug' => Str::slug(…)])`
-  and appends the new ID to `$selectedTagIds`. CSS-only active state via
-  `:has(input:checked)` — no Alpine needed in the picker.
+  and appends the new ID to `$selectedTagIds`. **A blocklisted tag name is denied
+  outright** (`tagNameBlocked()` — both `addTag()` and the typed-but-not-Added path
+  in `save()`): tags are shared public taxonomy, so there's no held-for-review
+  middle ground — the row is never created and the vendor gets a `newTagName`
+  validation error. The slug is screened alongside the raw name ("c.u.m" → "cum").
+  CSS-only active state via `:has(input:checked)` — no Alpine needed in the picker.
 - **Social links.** `TruckEditor` holds `$socialLinks` (array of `['id', 'url']`
   rows). The form shows repeatable URL inputs (`addSocialLink()`/`removeSocialLink()`,
   same reconcile-on-save pattern as the menu); each URL is validated `url:http,https`.
@@ -593,7 +615,11 @@ catching offensive text/images, without gating every truck behind manual review.
   only JPEG/PNG bytes, so `ScreenImage` re-encodes the (WebP) source to JPEG first.
   A flagged upload **holds the truck immediately** (`uploadImage` calls the shared
   `holdForReview()` too, not just `save()`), so an offensive photo can never sit on an
-  already-live truck until the vendor's next save. **Local testing without AWS:**
+  already-live truck until the vendor's next save. **Cuisine tags are the exception
+  to hold-flagged-only:** a blocklisted tag name is **denied outright** at authoring
+  (never created, a `newTagName` validation error — see *Profile & vendor
+  management*, Cuisine tags) because tags are shared public taxonomy, not
+  truck-scoped content an admin can hold. **Local testing without AWS:**
   when Rekognition is off, `ScreenImage` falls back to a filename stand-in — set
   `MODERATION_IMAGE_FILENAME_TRIGGERS` (e.g. `nsfw,explicit`) and any upload whose
   name contains a trigger is flagged (off unless set; ignored when Rekognition is on).
@@ -616,7 +642,12 @@ catching offensive text/images, without gating every truck behind manual review.
   flags** so a later vendor save doesn't re-hold it on the same approved photos),
   **remove** (soft-delete + reason — hidden everywhere via the `SoftDeletes` global
   scope, rows/images kept as evidence), **restore** (comes back unpublished +
-  unreviewed), and **block vendor**.
+  unreviewed), and **block vendor**. A **"Cuisine tags" panel** (chips with usage
+  counts, mirroring the blocked-words panel) lets an admin **delete a tag** from
+  the shared taxonomy — the cleanup for tags that slipped past the blocklist or
+  predate an addition to it (authoring already denies blocklisted names). Hard
+  delete behind a `wire:confirm`; the `food_truck_tag` FK cascade detaches it
+  from every truck.
 - **Blocking a vendor** stamps `users.banned_at`/`ban_reason` (set with `forceFill`,
   never mass-assignable) and unpublishes **all** their trucks at once. A ban stops
   `ProfilePage::addTruck()` and `TruckEditor::save()` only — the user can still sign
@@ -628,7 +659,8 @@ catching offensive text/images, without gating every truck behind manual review.
 Env: `ADMIN_EMAILS`, `MODERATION_REKOGNITION_ENABLED` (+ optional
 `MODERATION_REKOGNITION_MIN_CONFIDENCE`, `_REGION`, and `MODERATION_TEXT_BLOCKLIST`)
 — see `.env.example`. Tests: `tests/Feature/Admin/ModerationQueueTest.php` (access
-control, queue filters, approve/remove/restore/block, blocklist editing) and
+control, queue filters, approve/remove/restore/block, blocklist editing, tag
+deletion) and
 `tests/Feature/Moderation/ScreeningTest.php` (text/image flagging, ban guards) —
 they set `config(['admin.emails' => …])` and mock the non-final `ScreenImage`.
 
@@ -797,12 +829,20 @@ that matter while touching app code:
 
 - **`Dockerfile` + `docker/`** build one production image; ECS runs it as
   three services (`web`, `reverb`, `queue-worker` — mirrors the `.lando.yml`
-  split) that differ only in container command.
+  split) that differ only in container command. `docker/nginx.conf` owns
+  compression and browser caching (nothing upstream compresses — the ALB passes
+  bytes through): gzip for text responses, `Cache-Control: immutable, 1 year`
+  on `/build/` (safe because Vite fingerprints those filenames), a week on
+  `/images/` and the favicons.
 - **`config('filesystems.public_disk')`** (`config/filesystems.php`, env
   `FILESYSTEM_PUBLIC_DISK`) is what every truck-image/map-cache call site
   resolves through instead of a hardcoded `'public'` disk name — `public`
   (local disk) here in Lando, `s3` in production. Never hardcode `'public'` in
-  new code that writes to the public disk; use the config key.
+  new code that writes to the public disk; use the config key. The `s3` disk's
+  `options` stamp `CacheControl: immutable, 1 year` on every object written —
+  safe because all current write paths are content-addressed (uuid image names,
+  fingerprinted map paths); keep new write paths content-unique or scope them
+  their own options.
 - **`terraform/`** — `bootstrap/` (applied once, by hand, never by CI) creates
   the state backend and the two GitHub OIDC IAM roles;
   `environments/prod/` is the actual infrastructure, built from

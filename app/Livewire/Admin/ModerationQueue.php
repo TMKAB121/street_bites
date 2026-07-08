@@ -6,6 +6,7 @@ namespace App\Livewire\Admin;
 
 use App\Models\FoodTruck;
 use App\Models\ModerationTerm;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -77,6 +78,21 @@ class ModerationQueue extends Component
         ModerationTerm::query()->whereKey($termId)->first()?->delete();
 
         $this->toast('Blocked word removed');
+    }
+
+    /**
+     * Delete a vendor-authored cuisine tag from the shared taxonomy — the
+     * cleanup for tags that slipped past the blocklist (authoring denies
+     * blocklisted names, but the list can grow after a tag exists). A hard
+     * delete: the food_truck_tag FK cascade detaches it from every truck.
+     */
+    public function deleteTag(int $tagId): void
+    {
+        $this->authorizeAdmin();
+
+        Tag::query()->whereKey($tagId)->first()?->delete();
+
+        $this->toast('Tag removed');
     }
 
     public function approve(int $truckId): void
@@ -154,6 +170,7 @@ class ModerationQueue extends Component
         return view('livewire.admin.moderation-queue', [
             'trucks' => $this->trucks(),
             'terms' => ModerationTerm::query()->orderBy('term')->get(),
+            'tags' => Tag::query()->withCount('foodTrucks')->orderBy('name')->get(),
         ]);
     }
 

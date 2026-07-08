@@ -24,6 +24,12 @@
         <env name="DB_CONNECTION" value="mariadb"/>
         <env name="DB_DATABASE" value="steet_bites_testing"/>
         <env name="MAIL_MAILER" value="array"/>
+        <!-- The real default blocklist overlaps Faker's Latin lorem words
+             ("cum"), so factory-generated descriptions randomly flag trucks
+             and hold them out of publishing — a flaky suite. Pin a term no
+             generator will ever produce; screening tests set their own terms
+             via config(['moderation.text_blocklist' => ...]). -->
+        <env name="MODERATION_TEXT_BLOCKLIST" value="fixture-only-blocked-term"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
