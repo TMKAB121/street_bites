@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\FoodTruck;
+use App\Models\Post;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -30,7 +31,8 @@ it('serves valid XML with the static pages', function (): void {
     }
 
     expect($locs)->toContain(route('home'))
-        ->toContain(route('about'));
+        ->toContain(route('about'))
+        ->toContain(route('news.index'));
 });
 
 it('lists published trucks with their canonical slug URL and lastmod', function (): void {
@@ -48,6 +50,23 @@ it('excludes unpublished trucks', function (): void {
     $this->get('/sitemap.xml')
         ->assertOk()
         ->assertDontSee(route('trucks.show', [$truck, $truck->slug]), false);
+});
+
+it('lists published posts with their canonical slug URL and lastmod', function (): void {
+    $post = Post::factory()->published()->create(['title' => 'Taco Festival Recap']);
+
+    $response = $this->get('/sitemap.xml')->assertOk();
+
+    $response->assertSee(route('news.show', [$post, $post->slug]), false);
+    $response->assertSee('<lastmod>'.$post->updated_at?->toAtomString().'</lastmod>', false);
+});
+
+it('excludes draft posts', function (): void {
+    $post = Post::factory()->create(['title' => 'Hidden Draft Story']);
+
+    $this->get('/sitemap.xml')
+        ->assertOk()
+        ->assertDontSee(route('news.show', [$post, $post->slug]), false);
 });
 
 it('reflects a newly published truck immediately', function (): void {

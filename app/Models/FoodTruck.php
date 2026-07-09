@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\EscapesLikePatterns;
 use Database\Factories\FoodTruckFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -26,6 +27,8 @@ use Illuminate\Support\Str;
 #[Fillable(['name', 'description', 'latitude', 'longitude', 'location_label', 'located_at', 'timezone', 'is_published', 'screen_status', 'reviewed_at', 'moderation_reason'])]
 class FoodTruck extends Model
 {
+    use EscapesLikePatterns;
+
     /** @use HasFactory<FoodTruckFactory> */
     use HasFactory;
 
@@ -134,15 +137,6 @@ class FoodTruck extends Model
     public function favoritedState(): ?bool
     {
         return auth()->check() ? (bool) $this->getAttribute('is_favorited') : null;
-    }
-
-    /**
-     * A LIKE pattern that matches the term literally anywhere in a column —
-     * user-typed wildcards (%, _) are escaped, not interpreted.
-     */
-    public static function likePattern(string $term): string
-    {
-        return '%'.addcslashes($term, '\\%_').'%';
     }
 
     /**

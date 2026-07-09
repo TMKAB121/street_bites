@@ -1,0 +1,259 @@
+/*
+ | -----------------------------------------------------------------------------
+ | News & events
+ | -----------------------------------------------------------------------------
+ | Three blocks (multi-block precedent: profile.css):
+ |   .news-search — the /news landing page's own GET search form.
+ |   .news-card   — a listing row on /news: cover thumb, title, meta, excerpt.
+ |   .news-page   — the public story page: cover, byline, event call-out, and
+ |                  the prose rules for the rendered Markdown body (Tailwind
+ |                  preflight strips h2/ul/etc. styling, so __body restores it).
+ |   .news-admin  — the /admin/news form extras; the page otherwise reuses the
+ |                  .moderation row/badge/action classes (admin.css).
+ */
+
+@layer components {
+    /* --- /news search form ------------------------------------------------ */
+
+    .news-search {
+        @apply flex gap-2;
+    }
+
+    .news-search .field__input {
+        @apply flex-1;
+    }
+
+    /* --- Listing rows ------------------------------------------------------ */
+
+    .news-list {
+        @apply flex flex-col gap-4;
+    }
+
+    .news-card {
+        @apply flex gap-3 rounded-md p-3 md:gap-4 md:p-4;
+        background: var(--color-surface);
+        border: 1px solid rgb(30 34 41 / 8%);
+        box-shadow: 0 4px 12px rgb(30 34 41 / 4%);
+    }
+
+    /* 1.91:1 thumb — the same aspect as the stored 1200×630 cover. */
+    .news-card__thumb {
+        @apply flex-none rounded-sm object-cover;
+        width: 7rem;
+        aspect-ratio: 1200 / 630;
+        height: auto;
+        align-self: flex-start;
+    }
+
+    @media (width >= 48rem) {
+        .news-card__thumb {
+            width: 10rem;
+        }
+    }
+
+    .news-card__thumb--placeholder {
+        @apply flex items-center justify-center;
+        background: var(--color-bg);
+        color: var(--color-text-muted);
+    }
+
+    .news-card__thumb--placeholder svg {
+        width: 2rem;
+        height: 2rem;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .news-card__body {
+        @apply min-w-0 flex-1;
+    }
+
+    .news-card__title {
+        @apply font-semibold;
+        color: var(--color-primary);
+    }
+
+    .news-card__title a {
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .news-card__title a:hover {
+        text-decoration: underline;
+    }
+
+    .news-card__meta {
+        @apply text-sm;
+        color: var(--color-text-muted);
+    }
+
+    .news-card__event {
+        @apply mt-1 text-sm font-semibold;
+        color: var(--color-accent-chili);
+    }
+
+    .news-card__excerpt {
+        @apply mt-1 text-sm;
+        color: var(--color-text-main);
+    }
+
+    /* --- Story page ---------------------------------------------------------- */
+
+    .news-page__back {
+        @apply mb-4 inline-block text-sm font-semibold;
+        color: var(--color-accent-chili);
+        text-decoration: none;
+    }
+
+    .news-page__back:hover {
+        text-decoration: underline;
+    }
+
+    .news-page__cover {
+        @apply mb-4 w-full rounded-md object-cover;
+        height: auto;
+    }
+
+    .news-page__meta {
+        @apply mt-1 text-sm;
+        color: var(--color-text-muted);
+    }
+
+    /* Event call-out: a card surface with a chili bar (the about-page quote
+       pattern), calendar icon in mustard on Asphalt Dark — the dark-surface
+       exception to the mustard dark-text-only rule. */
+    .news-page__event {
+        @apply mb-6 flex items-center gap-3 rounded-md p-4;
+        background: var(--color-surface);
+        border-left: 4px solid var(--color-accent-chili);
+        box-shadow: 0 4px 12px rgb(30 34 41 / 4%);
+    }
+
+    .news-page__event svg {
+        @apply flex-none rounded-full p-2;
+        width: 2.5rem;
+        height: 2.5rem;
+        background: var(--color-primary);
+        color: var(--color-accent-mustard);
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .news-page__event-date {
+        @apply font-semibold;
+        color: var(--color-primary);
+    }
+
+    .news-page__event-location {
+        @apply text-sm;
+        color: var(--color-text-muted);
+    }
+
+    /* Rendered-Markdown prose — Tailwind preflight zeroes heading/list/quote
+       styling, so the story body restores a readable rhythm. Scoped to
+       __body: these element rules must never leak into the app chrome. */
+    .news-page__body {
+        color: var(--color-text-main);
+    }
+
+    .news-page__body h2,
+    .news-page__body h3 {
+        @apply mt-6 mb-2 font-semibold;
+        color: var(--color-primary);
+    }
+
+    .news-page__body h2 {
+        @apply text-lg;
+    }
+
+    .news-page__body h3 {
+        @apply text-md;
+    }
+
+    .news-page__body p {
+        @apply mb-3;
+    }
+
+    .news-page__body ul,
+    .news-page__body ol {
+        @apply mb-3 pl-6;
+    }
+
+    .news-page__body ul {
+        list-style: disc;
+    }
+
+    .news-page__body ol {
+        list-style: decimal;
+    }
+
+    .news-page__body li {
+        @apply mb-1;
+    }
+
+    .news-page__body a {
+        color: var(--color-accent-chili);
+        text-decoration: underline;
+    }
+
+    .news-page__body blockquote {
+        @apply mb-3 rounded-md p-4 italic;
+        background: var(--color-surface);
+        border-left: 4px solid var(--color-accent-chili);
+    }
+
+    .news-page__body code {
+        @apply rounded-sm px-1 text-sm;
+        background: var(--color-surface);
+    }
+
+    .news-page__body hr {
+        @apply my-6;
+        border-color: rgb(30 34 41 / 12%);
+    }
+
+    /* --- Admin form extras (page reuses .moderation for rows/badges) -------- */
+
+    .news-admin__form {
+        @apply flex flex-col;
+    }
+
+    .news-admin__label {
+        @apply mt-3 mb-1 text-sm font-semibold;
+        color: var(--color-primary);
+    }
+
+    .news-admin__body {
+        min-height: 16rem;
+        resize: vertical;
+    }
+
+    .news-admin__event-fields {
+        @apply grid gap-x-4 md:grid-cols-2;
+    }
+
+    .news-admin__hint {
+        @apply mt-1 text-xs;
+        color: var(--color-text-muted);
+    }
+
+    .news-admin__error {
+        @apply mt-1 text-xs font-semibold;
+        color: var(--color-accent-chili);
+    }
+
+    .news-admin__file {
+        @apply text-sm;
+        color: var(--color-text-muted);
+    }
+
+    .news-admin__form-actions {
+        @apply mt-4 flex items-center gap-3;
+    }
+}

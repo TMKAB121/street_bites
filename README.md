@@ -1,4 +1,4 @@
-# Steet Bites
+# Street Bites
 
 A full-stack Laravel application built with Livewire, real-time WebSockets via Reverb, Redis-backed queues and sessions, and Tailwind CSS. Developed as part of a YouTube series — the project follows a structured build from initial scaffolding through a complete feature set.
 
@@ -41,8 +41,8 @@ No local PHP, Composer, or Node needed — everything runs inside containers.
 
 ```bash
 # 1. Clone the repo
-git clone <repo-url> steet_bites
-cd steet_bites
+git clone <repo-url> street_bites
+cd street_bites
 
 # 2. Start Lando (boots all containers)
 lando start
@@ -60,7 +60,7 @@ lando artisan storage:link
 
 ## Running the Development Server
 
-The app is served by nginx at https://steet-bites.lndo.site as soon as Lando is
+The app is served by nginx at https://street-bites.lndo.site as soon as Lando is
 up — there is no `artisan serve` step. Reverb also runs automatically as the
 `reverb` service (don't start it manually — see the Reverb note below). Run the
 remaining dev-time services individually, each in its own Lando command:
@@ -85,10 +85,10 @@ lando queue:work       # Redis queue worker
 
 | Service | URL |
 |---|---|
-| App | https://steet-bites.lndo.site |
-| Vite Dev Server | https://vite.steet-bites.lndo.site:5173 |
+| App | https://street-bites.lndo.site |
+| Vite Dev Server | https://vite.street-bites.lndo.site:5173 |
 | Reverb WebSocket | ws://localhost:8080 |
-| Mailpit (email UI) | http://localhost:8025 (or https://mailpit.steet-bites.lndo.site) |
+| Mailpit (email UI) | http://localhost:8025 (or https://mailpit.street-bites.lndo.site) |
 
 ---
 
@@ -111,7 +111,7 @@ lando redis-cli        # Open a Redis shell
 ## Running Tests
 
 Tests are written with [Pest](https://pestphp.com/) (running on top of PHPUnit).
-The suite runs against a separate MariaDB database (`steet_bites_testing`) on the
+The suite runs against a separate MariaDB database (`street_bites_testing`) on the
 same container, created automatically on `lando start` — no extra setup needed.
 DB-touching tests `use RefreshDatabase` (migrate fresh, roll back per test).
 
@@ -159,7 +159,7 @@ hook — run it on demand and review its diff before committing.
 ## Project Structure
 
 ```
-steet_bites/
+street_bites/
 ├── app/
 │   ├── Actions/                # single-purpose actions (StoreTruckImage, GenerateTruckMapImage,
 │   │                           #   ReverseGeocodeLabel, GeocodeSearch, ScreenText, ScreenImage)
@@ -238,7 +238,7 @@ Styling uses **Tailwind CSS 4**, configured CSS-first (no `tailwind.config.js`).
 The "Urban Vibrant" design system is encoded as Tailwind `@theme` tokens in
 `resources/css/theme.css` — each token generates both a CSS variable and utility
 classes from a single source of truth. A living style guide renders at
-[`/styleguide`](https://steet-bites.lndo.site/styleguide).
+[`/styleguide`](https://street-bites.lndo.site/styleguide).
 
 Branding is vector-first: the Street Bites logo (map pin + wordmark) ships as an
 SVG in `public/images/` and renders in the app header, and every page links the
@@ -248,7 +248,7 @@ meta description, canonical, and the Open Graph / Twitter tags that make shared
 links render as rich previews (backed by the 1200×630 share card
 `public/images/og-image.jpg`). Truck detail pages share with the truck's own name
 and description; auth pages, the styleguide, and search results are `noindex`. A
-dynamic [`/sitemap.xml`](https://steet-bites.lndo.site/sitemap.xml) (advertised by
+dynamic [`/sitemap.xml`](https://street-bites.lndo.site/sitemap.xml) (advertised by
 `public/robots.txt`) lists the home page, `/about`, and every published truck's
 detail page for search-engine crawlers — generated per request, so a newly
 published truck appears immediately.
@@ -270,7 +270,7 @@ lando npm run build   # production build (minified, hashed)
 lando npm run dev     # dev server with HMR
 ```
 
-The dev server serves **HTTPS** at `https://vite.steet-bites.lndo.site:5173`
+The dev server serves **HTTPS** at `https://vite.street-bites.lndo.site:5173`
 (directly on a published host port — the Lando proxy won't route Vite's custom
 port). HTTPS is required because the app is HTTPS and browsers block mixed
 content; the `node` service's `ssl: true` provides a CA-trusted cert at `/certs`
@@ -460,9 +460,9 @@ is off by default and turns on with `MODERATION_REKOGNITION_ENABLED`. See
 ### Database Credentials
 
 ```
-DB_DATABASE=steet_bites
-DB_USERNAME=steet_bites
-DB_PASSWORD=steet_bites
+DB_DATABASE=street_bites
+DB_USERNAME=street_bites
+DB_PASSWORD=street_bites
 ```
 
 ### Reverb Host Split

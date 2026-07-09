@@ -3,6 +3,8 @@
     'description' => null,
     'robots' => null,
     'active' => 'home',
+    'image' => null,
+    'type' => 'website',
 ])
 
 <!DOCTYPE html>
@@ -10,7 +12,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <x-seo-meta :title="$title" :description="$description" :robots="$robots" />
+        <x-seo-meta :title="$title" :description="$description" :robots="$robots" :image="$image" :type="$type" />
 
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="icon" href="/favicon.ico" sizes="48x48">

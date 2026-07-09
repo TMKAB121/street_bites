@@ -7,6 +7,7 @@ use App\Actions\GeocodeSearch;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\RequireCookieConsent;
 use App\Livewire\Admin\ModerationQueue;
+use App\Livewire\Admin\NewsManager;
 use App\Livewire\Auth\EmailEntry;
 use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
@@ -18,6 +19,7 @@ use App\Livewire\Auth\VerifyCode;
 use App\Livewire\Profile\ProfilePage;
 use App\Models\CookieConsent;
 use App\Models\FoodTruck;
+use App\Models\Post;
 use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Contracts\View\Factory;
@@ -226,30 +228,72 @@ Route::post('/api/favorites/{truck}', function (Request $request, string $truck)
     return response()->json(['favorited' => $changes['attached'] !== []]);
 })->whereNumber('truck')->middleware(['auth', 'throttle:60,1'])->name('favorites.toggle');
 
+// News & events landing page — a full-size search page for posts. Unlike
+// /search (which prompts on an empty query), an empty q lists everything
+// newest-first: the page doubles as the news feed. Matching is by title or
+// body (Post::search()); query-filtered views are noindex in the view, the
+// bare listing is crawlable.
+Route::get('/news', function (Request $request): Factory|View {
+    $term = trim($request->string('q')->toString());
+
+    $posts = Post::query()
+        ->where('is_published', true)
+        ->when($term !== '', fn ($query) => $query->search($term))
+        ->latest('published_at')
+        ->latest('id')
+        ->get();
+
+    return view('news.index', ['posts' => $posts, 'term' => $term]);
+})->name('news.index');
+
+// Public story page — mirrors trucks.show: the id identifies the post, the
+// slug segment is descriptive and must match the title-derived slug exactly
+// (a wrong or stale slug 404s, so every URL that renders is the canonical
+// one). Drafts stay invisible (404), matching the /news listing.
+Route::get('/news/{post}/{slug}', function (string $post, string $slug): Factory|View {
+    $post = Post::query()
+        ->where('is_published', true)
+        ->findOrFail($post);
+
+    abort_unless($slug === $post->slug, 404);
+
+    return view('news.show', ['post' => $post]);
+})->whereNumber('post')->name('news.show');
+
 // Public "About us" page — the mission, the developer, and where to follow the
 // build. Static Blade view on the shared shell chrome, linked from the
 // hamburger menu (and the desktop header nav).
 Route::view('/about', 'about')->name('about');
 
 // XML sitemap for search engines (advertised by public/robots.txt). Lists the
-// public crawlable pages: home, about, and every published truck's detail page
-// (lastmod = the truck's last update, so crawlers re-fetch renamed/edited
-// trucks). Generated per request — a truck published moments ago is already in
-// the next fetch, with no file to rebuild or cache to bust; the query is three
-// columns over published trucks and crawlers fetch sitemaps rarely. Future
-// public surfaces (e.g. a news feed) join by concat()ing their own URL entries.
+// public crawlable pages: home, about, the /news listing, and every published
+// truck's and post's detail page (lastmod = the row's last update, so crawlers
+// re-fetch renamed/edited entries). Generated per request — content published
+// moments ago is already in the next fetch, with no file to rebuild or cache
+// to bust; the queries are a few columns over published rows and crawlers
+// fetch sitemaps rarely. Future public surfaces join by concat()ing their own
+// URL entries.
 Route::get('/sitemap.xml', function (): Response {
     $trucks = FoodTruck::query()
         ->where('is_published', true)
         ->orderBy('id')
         ->get(['id', 'name', 'updated_at']);
 
+    $posts = Post::query()
+        ->where('is_published', true)
+        ->orderBy('id')
+        ->get(['id', 'title', 'updated_at']);
+
     $urls = collect([
         ['loc' => route('home')],
         ['loc' => route('about')],
+        ['loc' => route('news.index')],
     ])->concat($trucks->map(fn (FoodTruck $truck): array => [
         'loc' => route('trucks.show', [$truck, $truck->slug]),
         'lastmod' => $truck->updated_at?->toAtomString(),
+    ]))->concat($posts->map(fn (Post $post): array => [
+        'loc' => route('news.show', [$post, $post->slug]),
+        'lastmod' => $post->updated_at?->toAtomString(),
     ]));
 
     // The XML declaration is prepended here, in plain PHP, rather than living in
@@ -371,4 +415,6 @@ Route::middleware(['auth', EnsureAdmin::class, RequireCookieConsent::class])
     ->prefix('admin')
     ->group(function (): void {
         Route::get('/trucks', ModerationQueue::class)->name('admin.trucks');
+        // News & events authoring — the only way posts are created/edited.
+        Route::get('/news', NewsManager::class)->name('admin.news');
     });

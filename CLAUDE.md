@@ -1,4 +1,4 @@
-# steet-bites
+# street-bites
 
 Laravel 13 · Livewire 4 · Reverb 1 · MariaDB 10.11 · Redis 7 · Vite/Node 20
 
@@ -229,6 +229,20 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   static-map render failure). The route eager-loads `images`, `tags`, `menuItems`,
   `todayHours`, and `socialLinks` and passes `$mapUrl` from `GenerateTruckMapImage`.
   Unpublished/missing trucks 404. See *Maps & geolocation* and *Social links*.
+- `/news` → `news/index.blade.php` (`news.index`) — the **news & events landing page**:
+  a full-size search page for posts that doubles as the feed — an empty `q` lists
+  every published post newest-first (unlike `/search`, which prompts). The page
+  carries its **own GET search form** (the header search stays trucks-only);
+  matching is title or body via `Post::search()`. Bare listing is indexable;
+  query-filtered views pass `robots="noindex"`. See *News & events*.
+- `/news/{post}/{slug}` → `news/show.blade.php` (`news.show`, `whereNumber` on the
+  id) — the **public story page**, an exact `trucks.show` mirror: published-only
+  `findOrFail`, the slug is the title-derived `Post::slug` accessor and **must
+  match exactly or the page 404s** (every rendering URL is its own canonical).
+  Generate links with `route('news.show', [$post, $post->slug])`. Plain Blade:
+  optional cover (also the og:image, via the shell layout's `image`/`type`
+  props), byline date, an event call-out when `event_date` is set, and the
+  safe-mode-rendered Markdown body (`Post::bodyHtml()`). See *News & events*.
 - `/about` → `about.blade.php` (`about`) — public **"About us"** page: the mission
   (founding question as a pull-quote), the developer intro, and follow-along link
   cards (YouTube / GitHub / LinkedIn) — plus, when configured, an optional
@@ -239,11 +253,11 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   engines fetch, advertised by `public/robots.txt` (whose `Sitemap:` line is the
   absolute production URL — the directive requires one; robots.txt also disallows
   the non-indexable surfaces: profile, favorites, auth, api, search, styleguide).
-  Generated fresh on every request — no cron, no cached file to rebuild — so a
-  newly published truck is in the very next fetch: home, `/about`, and every
-  published truck's canonical slug URL with `lastmod` = the truck's `updated_at`.
-  The route builds `['loc' => …, 'lastmod' => ?]` entries and the view only prints
-  the `<urlset>` body, so future public surfaces (e.g. a news feed) join by
+  Generated fresh on every request — no cron, no cached file to rebuild — so
+  newly published content is in the very next fetch: home, `/about`, `/news`, and
+  every published truck's and news post's canonical slug URL with `lastmod` = the
+  row's `updated_at`. The route builds `['loc' => …, 'lastmod' => ?]` entries and
+  the view only prints the `<urlset>` body, so future public surfaces join by
   `concat()`ing their own entries in the route. Plain XML view — no layout, no
   `<x-seo-meta>`. **The `<?xml` prolog is prepended in the route (plain PHP), never
   written in the Blade view** — a literal prolog compiles to a cached PHP file
@@ -260,6 +274,11 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   cuisine-tag deletion panel, and
   approve / remove / restore / block-vendor actions. Admin-only; disallowed in
   `robots.txt`.
+- `/admin/news` → `App\Livewire\Admin\NewsManager` (same `auth` + `EnsureAdmin` +
+  consent stack) — the **news & events authoring page**, the only way posts are
+  created or edited (see *News & events*): one editor form (Markdown body,
+  optional event date/location, optional cover upload) plus the full post list
+  with publish / unpublish / edit / remove-cover / delete actions.
 - `/styleguide` → `styleguide.blade.php` — living style guide demoing every token
   and component in isolation (route in `routes/web.php`).
 
@@ -449,6 +468,7 @@ Seven create migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*` + `2026_0
 | `tags` + `food_truck_tag` | Cuisine taxonomy. `tags`: `name`, `slug` (unique, auto-generated from name via `Str::slug()` on creating). `food_truck_tag`: composite PK pivot — no timestamps, cascade deletes on both FKs |
 | `truck_social_links` | `url` + `platform` + `sort_order`. The vendor only pastes a `url`; `platform` is **derived from its host on save** (`App\Enums\SocialPlatform::fromUrl`, cast to the enum) so the detail page renders the brand icon without re-parsing. Unrecognised hosts store `Website` (generic globe). See *Social links* |
 | `moderation_terms` | Admin-managed blocklist words (`term`, unique), layered on top of the env/config baseline. Edited from the moderation page, effective immediately (`ModerationTerm` busts a cache on every write). Not truck-scoped. See *Content moderation* |
+| `posts` | News & events (one type — an `event_date` makes a post an event; see *News & events*): `user_id` author (**nullable, `nullOnDelete`** — posts are site content and outlive the account, unlike trucks' cascade), `title`, `body` (Markdown source), nullable `event_date` (**pure date** — times belong in the body; dodges the UTC/timezone problem) + `event_location` label, nullable `cover_image_path` (1200×630 JPEG), `is_published`, `published_at` (stamped on first publish, never reset — the byline + `/news` sort key). **No SoftDeletes** — authors are the moderators |
 
 Plus `users` gained nullable `banned_at` + `ban_reason` (the vendor block — see *Content moderation*).
 
@@ -461,9 +481,13 @@ signed-in user from the `is_favorited` withExists flag, null for guests),
 `MenuItem` (`price` accessor), `Tag` (`foodTrucks`),
 `TruckSocialLink` (`foodTruck`; `platform` cast to the `App\Enums\SocialPlatform`
 enum), and `ModerationTerm` (admin-managed blocklist words — see *Content
-moderation*); `User` gained `foodTrucks()`, `favorites()`, plus `isAdmin()`
+moderation*), and `Post` (`user`; `isEvent()`, the derived `slug`/`excerpt`/
+`bodyHtml` accessors and `coverUrl()` — see *News & events*); `User` gained
+`foodTrucks()`, `favorites()`, plus `isAdmin()`
 (config email allowlist) and `isBanned()` (`banned_at`). `FoodTruck` uses
 `SoftDeletes`, so every discovery query already excludes admin-removed trucks.
+`likePattern()` (LIKE-wildcard escaping) lives in the shared
+`App\Models\Concerns\EscapesLikePatterns` trait, used by `FoodTruck` and `Post`.
 
 ### Image pipeline
 
@@ -544,7 +568,9 @@ random crowd of eater favourites so the Popular carousel has a meaningful order 
 the box, and the smoke-test account (`test@example.com`) always favourites a few so
 `/favorites` and the profile page have content on first sign-in. Fixture images live in
 `database/seeders/fixtures/images/` and are processed through `StoreTruckImage` (same
-pipeline as live uploads). Re-seed with:
+pipeline as live uploads). `NewsSeeder` follows it, seeding the `/news` section
+(six published posts — two events — plus a draft, covers via `StorePostCoverImage`;
+see *News & events*). Re-seed with:
 
 ```bash
 lando artisan migrate:fresh --seed
@@ -590,6 +616,57 @@ component (`resources/js/search.js`) layers a **typeahead dropdown** on top.
   (same ordering as home); the header input stays pre-filled with the term.
 
 Tests live in `tests/Feature/SearchTest.php`.
+
+## News & events
+
+One content type (`Post`) covers both: a post with an `event_date` is an event, one
+without is a plain story. Public surfaces are `/news` (search + newest-first feed
+in one page) and `/news/{post}/{slug}` (see *Pages*); nav is the header-only
+**News** entry in `<x-mobile-header>` (like About — deliberately **not** a bottom
+`<x-mobile-nav>` tab). Published posts join the sitemap via the route's `concat()`.
+
+- **Authoring is admin-only, via a form — deliberately not an API.** `/admin/news`
+  (`App\Livewire\Admin\NewsManager`) sits behind the same `auth` + `EnsureAdmin`
+  (the `ADMIN_EMAILS` allowlist) + consent stack as the moderation queue; every
+  action re-checks `isAdmin()` through the shared
+  `App\Livewire\Admin\Concerns\AuthorizesAdmin` trait (also used by
+  `ModerationQueue`). An IP-allowlisted API was considered and rejected: behind
+  the ALB the client IP is an `X-Forwarded-For` header, residential IPs churn,
+  and it would add a token/client to manage — while the admin form already rides
+  the email-OTP 2FA sign-in. **No moderation pass** on posts: the authors *are*
+  the moderators (also why `posts` has no SoftDeletes — no evidence trail needed;
+  `deletePost` clears the cover directory and hard-deletes).
+- **The body is Markdown, rendered in safe mode.** `Post::bodyHtml()` wraps
+  `Str::markdown($body, ['html_input' => 'strip', 'allow_unsafe_links' => false])`
+  (CommonMark ships with Laravel — no extra dependency), so raw HTML in the source
+  is stripped and `javascript:` links dropped — the story page's `{!! !!}` print is
+  not an XSS surface. Rendered on the fly, deliberately uncached (admin-authored
+  volume). `.news-page__body` in `news.css` owns the prose rules Tailwind preflight
+  strips. `slug` (title-derived, no column — mirrors `FoodTruck::slug`) and
+  `excerpt` (rendered body, tags stripped, 160 chars — the teaser and meta
+  description) are accessors, so they never go stale.
+- **Draft → publish is a two-step.** `save()` creates/updates (new posts are
+  drafts); `publish()` flips `is_published` and stamps `published_at` **only on
+  the first publish** (re-publishing after an unpublish keeps the original byline
+  date). `/news` orders by `published_at` desc.
+- **The cover is one 1200×630 JPEG that doubles as og:image.**
+  `App\Actions\StorePostCoverImage` (a `StoreTruckImage` sibling): centre-crop to
+  1200×630 → `JpegEncoder(quality: 75)` → `post-covers/{post}/{uuid}.jpg` on
+  `config('filesystems.public_disk')`. JPEG (not WebP) on purpose — it's the one
+  format every link-preview crawler renders, and q75 stays under the ~300 KB
+  crawler cap. Replacing/removing a cover deletes the old file (the caller's
+  job — the action only stores). The story page passes `coverUrl()` +
+  `type="article"` through the shell layout's `image`/`type` props (added for
+  this — they forward to `<x-seo-meta>`); no cover → the default branded card.
+- **Search:** `Post::search()` (title or body contains) mirrors
+  `FoodTruck::search()`, sharing the `EscapesLikePatterns` trait. No typeahead —
+  `/news`'s own GET form is the whole search surface.
+
+Env: nothing new. Tests: `tests/Feature/News/` (listing/search + story page,
+including the HTML-strip and unsafe-link assertions) and
+`tests/Feature/Admin/NewsManagerTest.php` (access control, CRUD, publish
+stamping, cover pipeline). `NewsSeeder` (called by `DatabaseSeeder`) seeds six
+published posts — two events, real Markdown bodies, a few covers — plus a draft.
 
 ## Content moderation
 
@@ -736,9 +813,9 @@ Do not collapse `REVERB_HOST` and `VITE_REVERB_HOST` into one variable.
 ## Database credentials
 
 ```
-DB_DATABASE=steet_bites
-DB_USERNAME=steet_bites
-DB_PASSWORD=steet_bites
+DB_DATABASE=street_bites
+DB_USERNAME=street_bites
+DB_PASSWORD=street_bites
 ```
 
 Default Laravel recipe credentials (`laravel/laravel`) are overridden.
@@ -749,7 +826,7 @@ default.
 
 ### Test database
 
-`phpunit.xml` points the suite at a separate **`steet_bites_testing`** database on
+`phpunit.xml` points the suite at a separate **`street_bites_testing`** database on
 the same MariaDB container (driver `mariadb`; host/user/password inherited from
 `.env`). A `run_as_root` step on the `database` service in `.lando.yml` creates it
 (idempotently) on every `lando start`, so a fresh clone needs no manual setup.
@@ -762,10 +839,10 @@ database only needs to *exist*; its contents are rebuilt automatically per run.
 
 | | URL |
 |---|---|
-| App | `https://steet-bites.lndo.site` |
-| Mailpit UI | `http://localhost:8025` (or `https://mailpit.steet-bites.lndo.site`) |
+| App | `https://street-bites.lndo.site` |
+| Mailpit UI | `http://localhost:8025` (or `https://mailpit.street-bites.lndo.site`) |
 | Reverb WebSocket (browser) | `ws://localhost:8080` |
-| Vite dev server | `https://vite.steet-bites.lndo.site:5173` |
+| Vite dev server | `https://vite.street-bites.lndo.site:5173` |
 
 ## Running Vite
 
@@ -774,7 +851,7 @@ lando npm run dev
 ```
 
 Run Vite in the `node` service. The browser loads dev assets from
-**`https://vite.steet-bites.lndo.site:5173`** — Vite serving **HTTPS directly**
+**`https://vite.street-bites.lndo.site:5173`** — Vite serving **HTTPS directly**
 on its published host port, **not** the Lando proxy. This took deliberate setup;
 the moving parts (all already wired) must stay in sync:
 
@@ -787,19 +864,19 @@ the moving parts (all already wired) must stay in sync:
    only `<service>.internal` / `node` / `localhost` / `127.0.0.1` — **not** the
    `*.lndo.site` name the browser uses — so Chrome rejects it
    (`NET::ERR_CERT_COMMON_NAME_INVALID`) and forces a manual bypass. The fix is a
-   `node` entry in the `proxy:` block (`vite.steet-bites.lndo.site:5173`), present
+   `node` entry in the `proxy:` block (`vite.street-bites.lndo.site:5173`), present
    **solely** to inject that hostname into the cert SANs. After changing it,
    `lando rebuild -s node` reissues the cert; verify with
    `lando ssh -s node -c "openssl x509 -in /certs/cert.crt -noout -ext subjectAltName"`.
 3. **Published port, not the proxy.** The Lando proxy will **not** route to
    Vite's custom port (returns a Traefik 404), so `node` publishes `5173:5173`
-   via `overrides.ports`. The browser hits `vite.steet-bites.lndo.site` (which
+   via `overrides.ports`. The browser hits `vite.street-bites.lndo.site` (which
    resolves to `127.0.0.1` via lndo.site DNS) on `:5173` directly. The `proxy:`
    entry from point 2 is **not** used for routing — only for the cert SAN — so
    the Traefik 404 never matters.
 4. **`allowedHosts`.** Vite 8 returns `403 Blocked request` for non-allow-listed
    `Host` headers; `vite.config.js` allows `.lndo.site`.
-5. **`origin`.** `server.origin` is `https://vite.steet-bites.lndo.site:5173`, so
+5. **`origin`.** `server.origin` is `https://vite.street-bites.lndo.site:5173`, so
    `laravel-vite-plugin` writes exactly that into `public/hot` and `@vite()`
    generates browser-correct asset URLs.
 

@@ -67,9 +67,9 @@ jobs:
         image: mariadb:10.11
         env:
           MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: steet_bites_testing
-          MARIADB_USER: steet_bites
-          MARIADB_PASSWORD: steet_bites
+          MARIADB_DATABASE: street_bites_testing
+          MARIADB_USER: street_bites
+          MARIADB_PASSWORD: street_bites
         ports:
           - 3306:3306
         options: >-
@@ -112,8 +112,8 @@ jobs:
       - name: Pest (tests)
         env:
           DB_HOST: 127.0.0.1
-          DB_USERNAME: steet_bites
-          DB_PASSWORD: steet_bites
+          DB_USERNAME: street_bites
+          DB_PASSWORD: street_bites
         run: ./vendor/bin/pest tests/Feature
 
   eslint:
