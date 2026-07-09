@@ -3,7 +3,7 @@
 Tests use **Pest** (on PHPUnit). Run: `lando pest` (or `lando composer test`).
 
 - **DB tests `use RefreshDatabase`** — the schema is migrated fresh and each test
-  runs in a transaction that is rolled back. The separate `steet_bites_testing`
+  runs in a transaction that is rolled back. The separate `street_bites_testing`
   database only needs to *exist* (created on `lando start`); never seed it manually.
 - **Lazy Livewire components:** pass `['truckId' => …, 'lazy' => false]` to
   `Livewire::test()` so `mount()` runs immediately instead of deferring (e.g.

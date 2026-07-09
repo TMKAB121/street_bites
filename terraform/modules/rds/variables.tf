@@ -32,12 +32,12 @@ variable "allocated_storage" {
 
 variable "db_name" {
   type    = string
-  default = "steet_bites"
+  default = "street_bites"
 }
 
 variable "username" {
   type    = string
-  default = "steet_bites"
+  default = "street_bites"
 }
 
 variable "password" {

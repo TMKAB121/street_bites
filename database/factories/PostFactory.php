@@ -22,8 +22,8 @@ class PostFactory extends Factory
             'user_id' => User::factory(),
             'title' => rtrim(fake()->sentence(4), '.'),
             // Real Markdown, so rendering assertions are meaningful.
-            'body' => "## ".rtrim(fake()->sentence(3), '.')."\n\n"
-                .fake()->paragraph()." **".fake()->words(2, true)."** "
+            'body' => '## '.rtrim(fake()->sentence(3), '.')."\n\n"
+                .fake()->paragraph().' **'.fake()->words(2, true).'** '
                 .fake()->paragraph()."\n\n- ".fake()->words(3, true)
                 ."\n- ".fake()->words(3, true),
             'is_published' => false,

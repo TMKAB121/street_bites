@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
@@ -25,6 +26,9 @@ use Illuminate\Support\Str;
  * deliberately uncached, since admin-authored volume never justifies a
  * body_html column. The slug and excerpt are derived accessors (no columns),
  * so they can never go stale after a title or body edit.
+ *
+ * @property ?Carbon $event_date the pure event date; a `date` cast Larastan
+ *                               otherwise reads as a string off the `date` column
  */
 #[Fillable(['user_id', 'title', 'body', 'event_date', 'event_location', 'cover_image_path', 'is_published', 'published_at'])]
 class Post extends Model
@@ -84,6 +88,8 @@ class Post extends Model
      * is stripped (never parsed) and unsafe link/image schemes are dropped, so
      * the {!! !!} print on the story page can't become an XSS vector even if an
      * admin pastes something hostile.
+     *
+     * @return Attribute<HtmlString, never>
      */
     protected function bodyHtml(): Attribute
     {

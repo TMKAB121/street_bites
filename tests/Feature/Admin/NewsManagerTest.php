@@ -207,7 +207,9 @@ it('replaces the old cover file when a new one is uploaded', function (): void {
 it('removes the cover file and column', function (): void {
     Storage::fake(config('filesystems.public_disk'));
 
-    Livewire::actingAs(newsAdmin())
+    $admin = newsAdmin();
+
+    Livewire::actingAs($admin)
         ->test(NewsManager::class)
         ->set('title', 'Cover Gone')
         ->set('body', 'Body.')
@@ -217,7 +219,7 @@ it('removes the cover file and column', function (): void {
     $post = Post::query()->sole();
     $path = (string) $post->cover_image_path;
 
-    Livewire::actingAs(newsAdmin())
+    Livewire::actingAs($admin)
         ->test(NewsManager::class)
         ->call('removeCover', $post->id);
 
@@ -228,7 +230,9 @@ it('removes the cover file and column', function (): void {
 it('deletes a post and its cover directory', function (): void {
     Storage::fake(config('filesystems.public_disk'));
 
-    Livewire::actingAs(newsAdmin())
+    $admin = newsAdmin();
+
+    Livewire::actingAs($admin)
         ->test(NewsManager::class)
         ->set('title', 'Doomed Post')
         ->set('body', 'Body.')
@@ -238,7 +242,7 @@ it('deletes a post and its cover directory', function (): void {
     $post = Post::query()->sole();
     $path = (string) $post->cover_image_path;
 
-    Livewire::actingAs(newsAdmin())
+    Livewire::actingAs($admin)
         ->test(NewsManager::class)
         ->call('deletePost', $post->id)
         ->assertDispatched('toast', type: 'success');

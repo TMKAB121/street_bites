@@ -21,12 +21,12 @@ variable "image_tag" {
 
 variable "db_name" {
   type    = string
-  default = "steet_bites"
+  default = "street_bites"
 }
 
 variable "db_username" {
   type    = string
-  default = "steet_bites"
+  default = "street_bites"
 }
 
 variable "reverb_port" {

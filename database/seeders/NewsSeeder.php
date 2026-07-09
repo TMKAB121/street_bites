@@ -39,16 +39,16 @@ class NewsSeeder extends Seeder
                     ."- Find trucks near you on the live map\n"
                     ."- Check menus and today's hours before you head out\n"
                     ."- Star your favorites so they're one tap away\n\n"
-                    ."Vendors: adding your truck takes about two minutes from your profile page.",
+                    .'Vendors: adding your truck takes about two minutes from your profile page.',
                 'published_at' => now()->subWeeks(5),
                 'cover' => true,
             ],
             [
                 'title' => 'Six new trucks joined this month',
                 'body' => "The lineup keeps growing — six new kitchens rolled onto the map this month.\n\n"
-                    ."From wood-fired pizza in the Crossroads to Korean BBQ bowls out at the Legends, "
+                    .'From wood-fired pizza in the Crossroads to Korean BBQ bowls out at the Legends, '
                     ."there's a lot of new ground to cover. *Open-now* trucks always sort to the top, "
-                    ."so check the map around lunch.",
+                    .'so check the map around lunch.',
                 'published_at' => now()->subWeeks(4),
                 'cover' => true,
             ],
@@ -59,7 +59,7 @@ class NewsSeeder extends Seeder
                     ."- Smokin' Wheels BBQ\n"
                     ."- Taco Libre\n"
                     ."- Waffle Wagon\n\n"
-                    ."Live music from 6, trucks serving until close. Bring cash for shorter lines.",
+                    .'Live music from 6, trucks serving until close. Bring cash for shorter lines.',
                 'published_at' => now()->subWeeks(3),
                 'event_date' => now()->subWeeks(2)->toDateString(),
                 'event_location' => 'City Market, River Market',
@@ -71,24 +71,24 @@ class NewsSeeder extends Seeder
                     ."It's your stars. Every favorite counts as a vote, and the ten most-starred "
                     ."trucks make the row — open-now trucks first. No paid placement, no editor's "
                     ."thumb on the scale.\n\n"
-                    ."So if your go-to truck deserves the spotlight: star it.",
+                    .'So if your go-to truck deserves the spotlight: star it.',
                 'published_at' => now()->subWeeks(2),
             ],
             [
                 'title' => 'Vendor tip: go live the moment you park',
-                'body' => "The single biggest thing a vendor can do on Street Bites: tap **Now Open** "
+                'body' => 'The single biggest thing a vendor can do on Street Bites: tap **Now Open** '
                     ."when you park.\n\n"
                     ."1. Open your truck from the profile page\n"
                     ."2. Tap *Set my location* so the pin lands where you are\n"
                     ."3. Tap *Now Open*\n\n"
-                    ."Your truck jumps to the front of every list and lights up on the map.",
+                    .'Your truck jumps to the front of every list and lights up on the map.',
                 'published_at' => now()->subWeek(),
             ],
             [
                 'title' => 'Summer Street Eats Festival',
-                'body' => "Mark the calendar: the **Summer Street Eats Festival** brings twenty-plus "
+                'body' => 'Mark the calendar: the **Summer Street Eats Festival** brings twenty-plus '
                     ."trucks together for one weekend.\n\n"
-                    ."Wristbands get you tasting portions across every truck; kids eat free before "
+                    .'Wristbands get you tasting portions across every truck; kids eat free before '
                     ."noon. Watch this page — we'll post the full lineup as trucks confirm.",
                 'published_at' => now()->subDays(3),
                 'event_date' => now()->addWeeks(3)->toDateString(),
@@ -97,7 +97,7 @@ class NewsSeeder extends Seeder
             ],
             [
                 'title' => 'Draft: rainy-day guide',
-                'body' => "Where to find covered seating near the regular truck spots. *Still gathering photos.*",
+                'body' => 'Where to find covered seating near the regular truck spots. *Still gathering photos.*',
                 'draft' => true,
             ],
         ];

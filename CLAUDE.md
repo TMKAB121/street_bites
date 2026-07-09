@@ -1,4 +1,4 @@
-# steet-bites
+# street-bites
 
 Laravel 13 · Livewire 4 · Reverb 1 · MariaDB 10.11 · Redis 7 · Vite/Node 20
 
@@ -813,9 +813,9 @@ Do not collapse `REVERB_HOST` and `VITE_REVERB_HOST` into one variable.
 ## Database credentials
 
 ```
-DB_DATABASE=steet_bites
-DB_USERNAME=steet_bites
-DB_PASSWORD=steet_bites
+DB_DATABASE=street_bites
+DB_USERNAME=street_bites
+DB_PASSWORD=street_bites
 ```
 
 Default Laravel recipe credentials (`laravel/laravel`) are overridden.
@@ -826,7 +826,7 @@ default.
 
 ### Test database
 
-`phpunit.xml` points the suite at a separate **`steet_bites_testing`** database on
+`phpunit.xml` points the suite at a separate **`street_bites_testing`** database on
 the same MariaDB container (driver `mariadb`; host/user/password inherited from
 `.env`). A `run_as_root` step on the `database` service in `.lando.yml` creates it
 (idempotently) on every `lando start`, so a fresh clone needs no manual setup.
@@ -839,10 +839,10 @@ database only needs to *exist*; its contents are rebuilt automatically per run.
 
 | | URL |
 |---|---|
-| App | `https://steet-bites.lndo.site` |
-| Mailpit UI | `http://localhost:8025` (or `https://mailpit.steet-bites.lndo.site`) |
+| App | `https://street-bites.lndo.site` |
+| Mailpit UI | `http://localhost:8025` (or `https://mailpit.street-bites.lndo.site`) |
 | Reverb WebSocket (browser) | `ws://localhost:8080` |
-| Vite dev server | `https://vite.steet-bites.lndo.site:5173` |
+| Vite dev server | `https://vite.street-bites.lndo.site:5173` |
 
 ## Running Vite
 
@@ -851,7 +851,7 @@ lando npm run dev
 ```
 
 Run Vite in the `node` service. The browser loads dev assets from
-**`https://vite.steet-bites.lndo.site:5173`** — Vite serving **HTTPS directly**
+**`https://vite.street-bites.lndo.site:5173`** — Vite serving **HTTPS directly**
 on its published host port, **not** the Lando proxy. This took deliberate setup;
 the moving parts (all already wired) must stay in sync:
 
@@ -864,19 +864,19 @@ the moving parts (all already wired) must stay in sync:
    only `<service>.internal` / `node` / `localhost` / `127.0.0.1` — **not** the
    `*.lndo.site` name the browser uses — so Chrome rejects it
    (`NET::ERR_CERT_COMMON_NAME_INVALID`) and forces a manual bypass. The fix is a
-   `node` entry in the `proxy:` block (`vite.steet-bites.lndo.site:5173`), present
+   `node` entry in the `proxy:` block (`vite.street-bites.lndo.site:5173`), present
    **solely** to inject that hostname into the cert SANs. After changing it,
    `lando rebuild -s node` reissues the cert; verify with
    `lando ssh -s node -c "openssl x509 -in /certs/cert.crt -noout -ext subjectAltName"`.
 3. **Published port, not the proxy.** The Lando proxy will **not** route to
    Vite's custom port (returns a Traefik 404), so `node` publishes `5173:5173`
-   via `overrides.ports`. The browser hits `vite.steet-bites.lndo.site` (which
+   via `overrides.ports`. The browser hits `vite.street-bites.lndo.site` (which
    resolves to `127.0.0.1` via lndo.site DNS) on `:5173` directly. The `proxy:`
    entry from point 2 is **not** used for routing — only for the cert SAN — so
    the Traefik 404 never matters.
 4. **`allowedHosts`.** Vite 8 returns `403 Blocked request` for non-allow-listed
    `Host` headers; `vite.config.js` allows `.lndo.site`.
-5. **`origin`.** `server.origin` is `https://vite.steet-bites.lndo.site:5173`, so
+5. **`origin`.** `server.origin` is `https://vite.street-bites.lndo.site:5173`, so
    `laravel-vite-plugin` writes exactly that into `public/hot` and `@vite()`
    generates browser-correct asset URLs.
 

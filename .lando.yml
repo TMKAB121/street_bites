@@ -1,4 +1,4 @@
-name: steet-bites
+name: street-bites
 recipe: laravel
 config:
   php: '8.3'
@@ -20,9 +20,9 @@ services:
 
   database:
     creds:
-      user: steet_bites
-      password: steet_bites
-      database: steet_bites
+      user: street_bites
+      password: street_bites
+      database: street_bites
     portforward: 3306
     # Create the test database (used by phpunit.xml) on every start. Idempotent
     # via IF NOT EXISTS; the schema/data inside it are managed automatically by
@@ -31,8 +31,8 @@ services:
     run_as_root:
       - |
         until mysqladmin -uroot ping --silent 2>/dev/null; do sleep 1; done
-        mysql -uroot -e "CREATE DATABASE IF NOT EXISTS steet_bites_testing;
-          GRANT ALL PRIVILEGES ON steet_bites_testing.* TO 'steet_bites'@'%';
+        mysql -uroot -e "CREATE DATABASE IF NOT EXISTS street_bites_testing;
+          GRANT ALL PRIVILEGES ON street_bites_testing.* TO 'street_bites'@'%';
           FLUSH PRIVILEGES;"
 
   cache:
@@ -89,14 +89,14 @@ services:
 
 proxy:
   reverb:
-    - reverb.steet-bites.lndo.site:8080
+    - reverb.street-bites.lndo.site:8080
   mailpit:
     # Mailpit's web UI is on container port 80 (Lando's default proxy target),
     # so no explicit port suffix is needed here.
-    - mailpit.steet-bites.lndo.site
+    - mailpit.street-bites.lndo.site
   # node/Vite is listed here for ONE reason only: Lando derives a service's TLS
   # cert SANs from its proxy hostnames, so this entry puts
-  # vite.steet-bites.lndo.site into the cert Vite serves at /certs — without it
+  # vite.street-bites.lndo.site into the cert Vite serves at /certs — without it
   # the cert covers only node.internal/localhost/127.0.0.1 and Chrome rejects
   # the lndo.site hostname (NET::ERR_CERT_COMMON_NAME_INVALID), forcing a manual
   # bypass. The browser still loads assets directly from the published host port
@@ -105,7 +105,7 @@ proxy:
   # fine because we never route through it. After changing this, `lando rebuild`
   # to reissue the cert with the new SAN.
   node:
-    - vite.steet-bites.lndo.site:5173
+    - vite.street-bites.lndo.site:5173
 
 tooling:
   php:
@@ -137,7 +137,7 @@ tooling:
     description: Start a Redis queue worker (foreground)
   mariadb:
     service: database
-    cmd: mariadb -u steet_bites -psteet_bites steet_bites
+    cmd: mariadb -u street_bites -pstreet_bites street_bites
     description: Open a MariaDB shell
   redis-cli:
     service: cache
