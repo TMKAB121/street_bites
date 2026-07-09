@@ -30,6 +30,7 @@ resources/css/
     ├── truck-page.css   # .truck-page (public truck detail page: static map + brand-icon pin overlay matching the home map, Get-directions CTA, hours, __distance line, menu)
     ├── social-links.css # .social-links (truck detail page: single-tone brand-icon row of social profiles)
     ├── about.css        # .about-page (About us: pull-quote, prose rhythm, follow-along link cards)
+    ├── news.css         # .news-search + .news-card (/news rows) + .news-page (story page: cover, event call-out, __body Markdown prose) + .news-admin (authoring form extras)
     ├── tag-picker.css   # .tag-picker + .tag-pill (cuisine tag toggles in truck editor)
     ├── toast.css        # .toast / .toast-stack (transient save/upload confirmations)
     └── cookie-consent.css # .cookie-consent (GDPR banner + preferences fab; Accept/Decline share one equal-prominence class)

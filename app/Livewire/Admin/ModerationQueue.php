@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdmin;
 use App\Models\FoodTruck;
 use App\Models\ModerationTerm;
 use App\Models\Tag;
@@ -30,6 +31,8 @@ use Livewire\Component;
 #[Layout('layouts::shell', ['active' => 'profile', 'title' => 'Moderation', 'robots' => 'noindex'])]
 class ModerationQueue extends Component
 {
+    use AuthorizesAdmin;
+
     /** Working set cap — most-recent trucks; pagination is a later concern. */
     private const int LIMIT = 50;
 
@@ -209,17 +212,5 @@ class ModerationQueue extends Component
         $this->authorizeAdmin();
 
         return FoodTruck::withTrashed()->with('user')->findOrFail($truckId);
-    }
-
-    private function authorizeAdmin(): void
-    {
-        $user = auth()->user();
-
-        abort_unless($user instanceof User && $user->isAdmin(), 403);
-    }
-
-    private function toast(string $message, string $type = 'success'): void
-    {
-        $this->dispatch('toast', message: $message, type: $type);
     }
 }

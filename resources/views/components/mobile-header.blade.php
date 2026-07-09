@@ -5,7 +5,7 @@
 
 {{--
     Mobile top header bar.
-    - $active: which menu link is current — 'home' | 'favorites' | 'about' | 'profile'.
+    - $active: which menu link is current — 'home' | 'favorites' | 'news' | 'about' | 'profile'.
     - $fixed: pin to the viewport top and hide on >= md (real-app default).
              Pass :fixed="false" to render in-flow (e.g. the styleguide demo).
     The hamburger toggles a full-screen Asphalt Dark menu via Alpine (x-data).
@@ -28,6 +28,11 @@
     $items = [
         'home' => ['label' => 'Home', 'href' => '/'],
         'favorites' => ['label' => 'Favorites', 'href' => route('favorites')],
+        'news' => [
+            'label' => 'News',
+            'href' => route('news.index'),
+            'icon' => '<path d="M16 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8h-5z"/><path d="M16 4v14"/><path d="M6 8h7"/><path d="M6 12h7"/><path d="M6 16h7"/>',
+        ],
         'about' => ['label' => 'About us', 'href' => route('about')],
         // Optional Buy Me a Coffee support link (config/external-links.php) —
         // external, so it opens in a new tab. Omitted entirely when unset.
@@ -42,12 +47,17 @@
         'profile' => $account,
     ];
 
-    // Content-moderation admins get a link to the moderation queue.
+    // Admins get links to the moderation queue and the news authoring page.
     if (auth()->user()?->isAdmin()) {
         $items['moderation'] = [
             'label' => 'Moderation',
             'href' => route('admin.trucks'),
             'icon' => '<path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/>',
+        ];
+        $items['news-admin'] = [
+            'label' => 'News admin',
+            'href' => route('admin.news'),
+            'icon' => '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
         ];
     }
 
