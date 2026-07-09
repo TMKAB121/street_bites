@@ -22,7 +22,7 @@
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="mariadb"/>
-        <env name="DB_DATABASE" value="steet_bites_testing"/>
+        <env name="DB_DATABASE" value="street_bites_testing"/>
         <env name="MAIL_MAILER" value="array"/>
         <!-- The real default blocklist overlaps Faker's Latin lorem words
              ("cum"), so factory-generated descriptions randomly flag trucks

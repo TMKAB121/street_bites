@@ -39,11 +39,11 @@ export default defineConfig({
         // 403 "Blocked request"). Allow the Lando hostnames. Dev-server only.
         allowedHosts: ['.lndo.site'],
         // URL written to public/hot — what the browser loads assets from. The
-        // node service publishes 5173 on the host; vite.steet-bites.lndo.site
+        // node service publishes 5173 on the host; vite.street-bites.lndo.site
         // resolves to 127.0.0.1 and the cert covers it, so this is valid HTTPS.
-        origin: 'https://vite.steet-bites.lndo.site:5173',
+        origin: 'https://vite.street-bites.lndo.site:5173',
         hmr: {
-            host: 'vite.steet-bites.lndo.site',
+            host: 'vite.street-bites.lndo.site',
             protocol: 'wss',
             clientPort: 5173,
         },

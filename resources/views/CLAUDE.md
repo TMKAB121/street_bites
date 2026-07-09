@@ -1,7 +1,8 @@
 # resources/views — Blade views & components
 
 Full-page views live here (`welcome.blade.php`, `trucks/show.blade.php`,
-`favorites.blade.php`, `search.blade.php`, `about.blade.php`, `livewire/**`,
+`favorites.blade.php`, `search.blade.php`, `news/index.blade.php`,
+`news/show.blade.php`, `about.blade.php`, `livewire/**`,
 `styleguide.blade.php`, `layouts/**`) alongside reusable
 **anonymous Blade components** in `components/`. Each component pairs a CSS partial
 (`resources/css/components/`, visuals only) with a `.blade.php` file (markup +
@@ -14,9 +15,12 @@ by the favicon links: `/favicon.svg` (`type="image/svg+xml"`), `/favicon.ico`
 (`sizes="48x48"` fallback), and `/apple-touch-icon.png`. Include all four in any
 new full-page view (brand-asset detail is in the root `CLAUDE.md`, *Front-end /
 design system*). Shell-layout pages don't touch the head directly — they pass
-`title` / `description` / `robots` props through `<x-layouts::shell>`
+`title` / `description` / `robots` / `image` / `type` props through
+`<x-layouts::shell>`
 (`trucks/show` derives its description from the truck; `search` passes
-`robots="noindex"` — internal search results shouldn't be indexed; the auth
+`robots="noindex"` — internal search results shouldn't be indexed, and `/news`
+does the same only when query-filtered; `news/show` passes the post's cover as
+`image` and `type="article"` for its og tags; the auth
 layout hardcodes `noindex` for the whole sign-in/OTP flow).
 
 ## Blade components
@@ -24,7 +28,7 @@ layout hardcodes `noindex` for the whole sign-in/OTP flow).
 | Component | CSS partial | Notes |
 |---|---|---|
 | `<x-mobile-nav>` | `nav.css` | Bottom tab bar (Home/Favorites + auth-aware slot: **Login** when guest, **Profile** when signed in) |
-| `<x-mobile-header>` | `header.css` | Top bar: hamburger + brand + search; hamburger opens a full-screen Alpine menu (Home / Favorites / **About us** / the auth-aware Login-or-Profile slot; `$active` accepts those four keys). When `BUYMEACOFFEE_URL` is set, a config-gated **Buy me a coffee** link is spread into `$items` after **About us** (an `external => true` entry that gets `target="_blank" rel="noopener noreferrer"`); it renders in the hamburger menu only — the desktop top-nav `@continue`s past it (alongside `profile`) so it doesn't crowd the header — see root `CLAUDE.md` *Support link*. Signed-in **admins** (`auth()->user()?->isAdmin()`) also get a **Moderation** link — see root `CLAUDE.md` *Content moderation*. Signed-in users also get a **Sign out** row — an `@auth` CSRF `POST` form (not a link) styled as a `.mobile-menu__link`, posting to `route('logout')` (see root `CLAUDE.md` *Authentication*). The brand is the SVG logo (`/images/street-bites-logo.svg`, sized by `.mobile-header__brand-logo`), not text — keep `alt="Street Bites"` on the `<img>`. The search bar is a real GET form to `/search` (Enter + the magnifier submit button work without JS); the `truckSearch` Alpine component (`resources/js/search.js`) adds the typeahead dropdown from `GET /api/search`, pre-filled from `request('q')` on the landing page |
+| `<x-mobile-header>` | `header.css` | Top bar: hamburger + brand + search; hamburger opens a full-screen Alpine menu (Home / Favorites / **News** / **About us** / the auth-aware Login-or-Profile slot; `$active` accepts those five keys). When `BUYMEACOFFEE_URL` is set, a config-gated **Buy me a coffee** link is spread into `$items` after **About us** (an `external => true` entry that gets `target="_blank" rel="noopener noreferrer"`); it renders in the hamburger menu only — the desktop top-nav `@continue`s past it (alongside `profile`) so it doesn't crowd the header — see root `CLAUDE.md` *Support link*. Signed-in **admins** (`auth()->user()?->isAdmin()`) also get **Moderation** and **News admin** links — see root `CLAUDE.md` *Content moderation* and *News & events*. Signed-in users also get a **Sign out** row — an `@auth` CSRF `POST` form (not a link) styled as a `.mobile-menu__link`, posting to `route('logout')` (see root `CLAUDE.md` *Authentication*). The brand is the SVG logo (`/images/street-bites-logo.svg`, sized by `.mobile-header__brand-logo`), not text — keep `alt="Street Bites"` on the `<img>`. The search bar is a real GET form to `/search` (Enter + the magnifier submit button work without JS); the `truckSearch` Alpine component (`resources/js/search.js`) adds the typeahead dropdown from `GET /api/search`, pre-filled from `request('q')` on the landing page |
 | `<x-food-truck-card>` | `card.css` | Image + title + Mustard FIND NOW CTA; `image` prop, graceful placeholder when null. The `<img>` carries `width="250" height="250"` (StoreTruckImage's square — reserves the aspect ratio pre-load; CSS owns the rendered size) and `loading="lazy"` (cards live in scrolled lists, never the LCP — that's the map tiles). Discovery cards link to `/trucks/{id}/{name-slug}`. `open` prop (default `false`) overlays a red **"Now Open"** badge with a pulsing dot on the image — the home page passes `$truck->isOpenNow()`. Carries a `.truck-distance` "X miles away" line (`__distance`) between title and CTA, filled by `refreshDistances()` (`truck-map.js`) once a location is known — reads coords from the `<x-discovery-card>` wrapper's `data-lat`/`data-lng`; hidden until then and for unpinned trucks. `truck-id` + `favorited` overlay the `<x-favorite-toggle>` star top-right; `favorited` null (the guest default) hides the star entirely |
 | `<x-favorite-toggle>` | `favorite.css` | The favourite star — the one interactive "favorite" control, shared by discovery cards (overlay), the truck detail page (in-flow beside the title), and the profile favourites list. Signed-in only; server-rendered initial state (no flash), then the `favoriteToggle` Alpine component (`resources/js/favorites.js`) keeps it live via `POST /api/favorites/{truck}` with optimistic flip + rollback. Props: `truck-id`, `favorited`, `label`; positioning utilities on the call site |
 | `<x-discovery-card>` | — (composes `<x-food-truck-card>`) | A discovery result: the card wrapped in the `data-open`/`data-lat`/`data-lng` attributes the client-side location logic reads (`truckDistanceSort` / `truckRadiusFilter`). Derives the card props from the model (`favorited` via `FoodTruck::favoritedState()` — null for guests); extra attributes (the grid's cuisine-filter `x-show`, `x-transition`) pass through to the wrapper. Used by the home carousel, the discovery grid, and the search results grid. Props: `truck`, `open` |
