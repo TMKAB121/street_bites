@@ -92,10 +92,41 @@
         @endforelse
 
         @if ($banned)
-            <p class="profile__empty mt-4">
-                Your account has been blocked from adding or publishing food trucks.
-                If you think this is a mistake, please get in touch.
-            </p>
+            <div class="profile__empty mt-4 space-y-3 text-left">
+                <p>
+                    Your account has been blocked from adding or publishing food trucks.
+                </p>
+
+                @if ($reinstatementPending)
+                    {{-- A request is already awaiting an admin decision. --}}
+                    <p class="text-sm text-text-muted">
+                        Your reinstatement request is under review. We’ll restore your
+                        access if it’s approved — you’ll then need to re-add your trucks.
+                    </p>
+                @else
+                    {{-- Let the vendor ask an admin to lift the ban. Optional
+                         message; a duplicate request is ignored server-side. --}}
+                    <form wire:submit="requestReinstatement" class="space-y-2">
+                        <label for="reinstatement-message" class="text-sm text-text-muted">
+                            Think this is a mistake? Tell us why and request reinstatement.
+                        </label>
+                        <textarea
+                            id="reinstatement-message"
+                            class="field__input w-full"
+                            rows="3"
+                            maxlength="1000"
+                            placeholder="Add anything that helps us review (optional)…"
+                            wire:model="reinstatementMessage"
+                        ></textarea>
+                        @error('reinstatementMessage')
+                            <p class="text-sm text-accent-chili">{{ $message }}</p>
+                        @enderror
+                        <button type="submit" class="btn btn-mustard w-full">
+                            Request reinstatement
+                        </button>
+                    </form>
+                @endif
+            </div>
         @else
             <button type="button" class="btn btn-primary mt-4 w-full" wire:click="addTruck">
                 + Add a food truck

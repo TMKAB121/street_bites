@@ -173,12 +173,16 @@ unpinned trucks (unknown ≠ near). Purely presentational — the radius cap and
 sort are handled separately. Surfaces: `.food-truck-card__distance` (between the card title
 and CTA) and `.truck-page__distance` (under the detail page's location line).
 
-Two more Alpine components follow the same register-on-`alpine:init` pattern:
+Three more Alpine components follow the same register-on-`alpine:init` pattern:
 `favoriteToggle(endpoint, favorited, csrf)` (`resources/js/favorites.js`) powers the
 `<x-favorite-toggle>` star — optimistic flip, then settles on the JSON answer from
-`POST /api/favorites/{truck}`, rolling back on failure; `truckSearch(endpoint,
-initial)` (`resources/js/search.js`) is the header search typeahead (see *Search*).
-Both are imported by `app.js` alongside `truck-map.js`.
+`POST /api/favorites/{truck}`, rolling back on failure; `reportToggle(endpoint,
+reported, csrf)` (`resources/js/report.js`) powers the `<x-report-truck>` megaphone —
+a one-way commit (no un-report), so **not** optimistic: it flips to "Reported" only
+once `POST /api/trucks/{truck}/report` confirms (see *Content moderation*, Public
+reports); `truckSearch(endpoint, initial)` (`resources/js/search.js`) is the header
+search typeahead (see *Search*). All three are imported by `app.js` alongside
+`truck-map.js`.
 
 Because Livewire owns the JS, every full-page view must include `@livewireStyles`
 in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
@@ -226,9 +230,13 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   `dir/?api=1&destination={lat},{lng}` deep link — **no origin**, so Google routes
   from the visitor's current location and deep-links the native maps app on mobile;
   it's gated on the truck having a pin (not on `$mapUrl`, so directions survive a
-  static-map render failure). The route eager-loads `images`, `tags`, `menuItems`,
-  `todayHours`, and `socialLinks` and passes `$mapUrl` from `GenerateTruckMapImage`.
-  Unpublished/missing trucks 404. See *Maps & geolocation* and *Social links*.
+  static-map render failure). A quiet **`<x-report-truck>` megaphone** sits in the
+  footer (any visitor can flag the truck as offensive — surface-only; hidden for the
+  owner and admins see their **Moderation** panel below it). The route eager-loads
+  `images`, `tags`, `menuItems`, `todayHours`, and `socialLinks`, passes `$mapUrl`
+  from `GenerateTruckMapImage`, and computes `$isFavorited` / `$isReported` for
+  signed-in visitors. Unpublished/missing trucks 404. See *Content moderation*
+  (Public reports), *Maps & geolocation*, and *Social links*.
 - `/news` → `news/index.blade.php` (`news.index`) — the **news & events landing page**:
   a full-size search page for posts that doubles as the feed — an empty `q` lists
   every published post newest-first (unlike `/search`, which prompts). The page
@@ -270,10 +278,12 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   (fixed header + bottom nav + `<x-toast>`) into a reusable layout for app pages.
 - `/admin/trucks` → `App\Livewire\Admin\ModerationQueue` (`auth` + `EnsureAdmin` +
   consent) — the **content-moderation queue** (see *Content moderation*): every
-  truck newest-first with review / removed tabs, the editable blocklist panel, the
-  cuisine-tag deletion panel, and
-  approve / remove / restore / block-vendor actions. Admin-only; disallowed in
-  `robots.txt`.
+  truck newest-first with review / removed / reinstatement tabs, the editable
+  blocklist panel, the cuisine-tag deletion panel, and
+  approve / remove / restore / block-vendor + reinstate/dismiss actions. Admin-only;
+  disallowed in `robots.txt`. Sibling **plain CSRF POST** routes
+  `admin.trucks.remove` / `admin.trucks.block` back the admin panel on the public
+  truck detail page (`trucks/show`).
 - `/admin/news` → `App\Livewire\Admin\NewsManager` (same `auth` + `EnsureAdmin` +
   consent stack) — the **news & events authoring page**, the only way posts are
   created or edited (see *News & events*): one editor form (Markdown body,
@@ -439,7 +449,9 @@ the heading, deliberately quieter than the "Add a food truck" CTA (see *Support 
   (text via a word-list, images already screened at upload) and sets `is_published
   = true` only when clean; a flagged truck is held (`screen_status = 'flagged'`,
   unpublished) for admin review, and a banned vendor is blocked from publishing
-  altogether. See *Content moderation*.
+  altogether. A banned vendor's profile shows a **"Request reinstatement" form**
+  (`requestReinstatement()`) in place of the "Add a food truck" CTA. See
+  *Content moderation*.
 - **Now Open / Closing Up + pin (real-time presence).** `goLiveNow()` stamps today's
   `opens_at` at the current truck-local moment (replaces a manual open-time input) and
   `closeNow()` is its mirror — stamps today's `closes_at` at the current moment so
@@ -469,6 +481,8 @@ Seven create migrations (`2026_06_29_0000xx_*` + `2026_06_30_000001_*` + `2026_0
 | `truck_social_links` | `url` + `platform` + `sort_order`. The vendor only pastes a `url`; `platform` is **derived from its host on save** (`App\Enums\SocialPlatform::fromUrl`, cast to the enum) so the detail page renders the brand icon without re-parsing. Unrecognised hosts store `Website` (generic globe). See *Social links* |
 | `moderation_terms` | Admin-managed blocklist words (`term`, unique), layered on top of the env/config baseline. Edited from the moderation page, effective immediately (`ModerationTerm` busts a cache on every write). Not truck-scoped. See *Content moderation* |
 | `posts` | News & events (one type — an `event_date` makes a post an event; see *News & events*): `user_id` author (**nullable, `nullOnDelete`** — posts are site content and outlive the account, unlike trucks' cascade), `title`, `body` (Markdown source), nullable `event_date` (**pure date** — times belong in the body; dodges the UTC/timezone problem) + `event_location` label, nullable `cover_image_path` (1200×630 JPEG), `is_published`, `published_at` (stamped on first publish, never reset — the byline + `/news` sort key). **No SoftDeletes** — authors are the moderators |
+| `reinstatement_requests` | A blocked vendor's request to have their ban lifted (`2026_07_10_000001_*`): `user_id` (`cascadeOnDelete`), nullable `message`, `status` (`pending`/`approved`/`dismissed`), nullable `reviewed_at`. Its own table (not a users column) so the request carries the vendor's message + an audit trail of each decision. Created from the profile, reviewed on the moderation queue's Reinstatement tab — see *Content moderation* |
+| `truck_reports` | Public "this truck is offensive" flags (`2026_07_10_000002_*`): `food_truck_id` (`cascadeOnDelete`), nullable `user_id` (`nullOnDelete` — signed-in reporter), nullable `reporter_hash` (**hashed IP** for anonymous dedupe/abuse), `status` (`open`/`dismissed`), nullable `reviewed_at`. Written by `POST /api/trucks/{truck}/report` (guest-accessible); open rows surface the truck on the moderation queue's Reported tab. **Surface-only — a report never unpublishes the truck.** See *Content moderation* |
 
 Plus `users` gained nullable `banned_at` + `ban_reason` (the vendor block — see *Content moderation*).
 
@@ -481,10 +495,14 @@ signed-in user from the `is_favorited` withExists flag, null for guests),
 `MenuItem` (`price` accessor), `Tag` (`foodTrucks`),
 `TruckSocialLink` (`foodTruck`; `platform` cast to the `App\Enums\SocialPlatform`
 enum), and `ModerationTerm` (admin-managed blocklist words — see *Content
-moderation*), and `Post` (`user`; `isEvent()`, the derived `slug`/`excerpt`/
-`bodyHtml` accessors and `coverUrl()` — see *News & events*); `User` gained
-`foodTrucks()`, `favorites()`, plus `isAdmin()`
-(config email allowlist) and `isBanned()` (`banned_at`). `FoodTruck` uses
+moderation*), `Post` (`user`; `isEvent()`, the derived `slug`/`excerpt`/
+`bodyHtml` accessors and `coverUrl()` — see *News & events*), `ReinstatementRequest` (`user`; the `STATUS_*` constants — see *Content
+moderation*), and `TruckReport` (`foodTruck`, `user`; the `STATUS_*`
+constants — the public report rows, see *Content moderation*); `FoodTruck`
+also gained `reports()`. `User` gained
+`foodTrucks()`, `favorites()`, `reinstatementRequests()`, plus `isAdmin()`
+(config email allowlist), `isBanned()` (`banned_at`), and
+`hasPendingReinstatementRequest()`. `FoodTruck` uses
 `SoftDeletes`, so every discovery query already excludes admin-removed trucks.
 `likePattern()` (LIKE-wildcard escaping) lives in the shared
 `App\Models\Concerns\EscapesLikePatterns` trait, used by `FoodTruck` and `Post`.
@@ -712,9 +730,18 @@ catching offensive text/images, without gating every truck behind manual review.
   `ModerationTerm::cachedTerms()` caches the DB terms and the model busts that cache
   on any save/delete, so an added or removed word takes effect on the next screen —
   **no redeploy**.
-- **The queue (`/admin/trucks`).** Newest-first, flagged surfaced first. Default
-  "Needs review" tab = `reviewed_at IS NULL` (held flags **and** newly published
-  trucks awaiting a human pass); a "Removed" tab lists soft-deleted trucks. Actions:
+- **The queue (`/admin/trucks`).** Newest-first, flagged surfaced first. The
+  `$filter` is `#[Url]`-bound (deep-linkable, e.g. `?filter=removed`). The
+  "Needs review" tab is an **exception queue** — `is_published = false AND
+  reviewed_at IS NULL`, i.e. only trucks that need a human decision: held
+  (auto-flagged) trucks and restored trucks awaiting a fresh call. **A clean save
+  publishes instantly, so clean trucks never enter the queue** (moderation is
+  exception-driven, not a spot-check of every new truck). A "Removed" tab lists
+  soft-deleted trucks; a
+  "Reported" tab (with a count badge) lists **live trucks carrying open public
+  reports**, most-reported first (see *Public reports* below); a
+  "Reinstatement" tab (with a pending-count badge) lists open unban requests (see
+  *Reinstatement requests* below). Actions:
   **approve** (`reviewed_at = now()`, publish the held truck, **and clear its images'
   flags** so a later vendor save doesn't re-hold it on the same approved photos),
   **remove** (soft-delete + reason — hidden everywhere via the `SoftDeletes` global
@@ -724,12 +751,48 @@ catching offensive text/images, without gating every truck behind manual review.
   the shared taxonomy — the cleanup for tags that slipped past the blocklist or
   predate an addition to it (authoring already denies blocklisted names). Hard
   delete behind a `wire:confirm`; the `food_truck_tag` FK cascade detaches it
-  from every truck.
-- **Blocking a vendor** stamps `users.banned_at`/`ban_reason` (set with `forceFill`,
-  never mass-assignable) and unpublishes **all** their trucks at once. A ban stops
-  `ProfilePage::addTruck()` and `TruckEditor::save()` only — the user can still sign
-  in, browse, and favourite. Their profile hides the "Add a food truck" CTA and shows
-  a notice.
+  from every truck. **`remove()`/`blockOwner()` delegate to the shared
+  `App\Actions\RemoveTruck` / `App\Actions\BlockVendor`** so the identical actions
+  on the public truck detail page can't drift from the queue.
+- **Moderator controls on the truck detail page.** People are creative, and some
+  offensive content is only spotted live on the page — so `trucks/show` carries an
+  **admin-only "Moderation" panel** (`@if (auth()->user()?->isAdmin())`, invisible to
+  everyone else): **Remove this truck** and **Block this vendor**. The detail page is
+  plain Blade (not Livewire), so these are **plain CSRF `POST` routes** in the `admin`
+  group (`admin.trucks.remove` / `admin.trucks.block`, `whereNumber`), running the same
+  guards and the same shared actions the queue uses. Each button is gated behind a
+  **two-click Alpine confirm** (the profile delete-account reveal pattern) so a mis-tap
+  can't fire. Both 404 the truck as a side effect, so each redirects to the queue:
+  remove → the Removed tab (`?filter=removed`), block → review.
+- **Public reports (`<x-report-truck>` → `POST /api/trucks/{truck}/report`).** A quiet
+  megaphone in the truck detail-page footer lets **any visitor — signed-in or not —**
+  flag a truck as offensive (one tap, no form; the `reportToggle` Alpine component in
+  `resources/js/report.js` settles it into a "Reported" state; hidden for the truck's own
+  owner). Reporting is **surface-only**: it writes a `truck_reports` row and lists the
+  truck on the queue's Reported tab, but **never unpublishes it** — so a single click, or a
+  pile-on, can't be a takedown lever. The endpoint is **guest-accessible** (not `auth`),
+  throttled (`throttle:10,1`), published-trucks-only (404), and lives under `/api` (JSON
+  errors). **Deduped per reporter** — by `user_id` when signed in, else by a hashed IP
+  (`sha256`, mirroring `cookie_consents` — data minimisation) — so counts can't be
+  inflated; a repeat click is an idempotent no-op. The admin acts from the Reported tab:
+  **dismiss reports** (`dismissReports()` — a false alarm; marks the truck's open reports
+  `dismissed`, truck stays live) or the existing **remove** / **block vendor** when the
+  reports were justified (a removed truck keeps its report rows as evidence).
+- **Blocking a vendor** (`App\Actions\BlockVendor`) stamps `users.banned_at`/`ban_reason`
+  (set with `forceFill`, never mass-assignable) and unpublishes **all** their trucks at
+  once. A ban stops `ProfilePage::addTruck()` and `TruckEditor::save()` only — the user
+  can still sign in, browse, favourite, and **request reinstatement** from their profile.
+  Their profile hides the "Add a food truck" CTA and shows the reinstatement form.
+- **Reinstatement requests.** A blocked vendor can ask to be unblocked from their own
+  profile: the old dead-end ban notice is now a **"Request reinstatement" form**
+  (`ProfilePage::requestReinstatement()` — banned-only, one pending request at a time,
+  optional message ≤ 1000 chars), which creates a `reinstatement_requests` row
+  (`App\Models\ReinstatementRequest`). Admins review them on the queue's Reinstatement
+  tab: **reinstate** (`reinstate()` — `forceFill` clears `banned_at`/`ban_reason`, marks
+  the request approved) or **dismiss** (`dismissRequest()` — marks it dismissed, the ban
+  stands; the vendor may submit a fresh request). **Reinstating lifts the ban only** —
+  the vendor's previously-unpublished trucks stay down until they re-save each one (which
+  re-runs the content screen), so nothing offensive silently comes back.
 - **Nav:** an admins-only "Moderation" link appears in `<x-mobile-header>` (`$items`,
   gated by `auth()->user()?->isAdmin()`).
 
@@ -737,7 +800,14 @@ Env: `ADMIN_EMAILS`, `MODERATION_REKOGNITION_ENABLED` (+ optional
 `MODERATION_REKOGNITION_MIN_CONFIDENCE`, `_REGION`, and `MODERATION_TEXT_BLOCKLIST`)
 — see `.env.example`. Tests: `tests/Feature/Admin/ModerationQueueTest.php` (access
 control, queue filters, approve/remove/restore/block, blocklist editing, tag
-deletion) and
+deletion), `tests/Feature/Admin/DetailPageModerationTest.php` (the detail-page
+admin panel visibility + the remove/block POST routes and their 403 guards),
+`tests/Feature/Admin/ReinstatementTest.php` (request → reinstate/dismiss lifecycle,
+banned-only + one-pending guards),
+`tests/Feature/Admin/ReportedQueueTest.php` (Reported tab listing/ordering, the
+count badge, dismiss-reports, remove-from-reported),
+`tests/Feature/Trucks/ReportTruckTest.php` (the report control + endpoint: guest
+report, IP dedupe, signed-in attribution, published-only, owner-hidden), and
 `tests/Feature/Moderation/ScreeningTest.php` (text/image flagging, ban guards) —
 they set `config(['admin.emails' => …])` and mock the non-final `ScreenImage`.
 

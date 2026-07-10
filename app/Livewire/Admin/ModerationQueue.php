@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin;
 
+use App\Actions\BlockVendor;
+use App\Actions\RemoveTruck;
 use App\Livewire\Admin\Concerns\AuthorizesAdmin;
 use App\Models\FoodTruck;
 use App\Models\ModerationTerm;
+use App\Models\ReinstatementRequest;
 use App\Models\Tag;
+use App\Models\TruckReport;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -19,10 +24,17 @@ use Livewire\Component;
  * can catch offensive content that slipped past the auto-screen (or was never
  * screened), and act on it:
  *
- *  - approve()    — sign off (reviewed_at) and publish a held truck.
- *  - remove()     — soft-delete (hidden everywhere, rows/images kept as evidence).
- *  - restore()    — undo a removal; the truck returns unpublished, back in queue.
- *  - blockOwner() — ban the vendor and unpublish all their trucks at once.
+ *  - approve()        — sign off (reviewed_at) and publish a held truck.
+ *  - remove()         — soft-delete (hidden everywhere, rows/images kept as evidence).
+ *  - dismissReports() — clear a live truck's open public reports (false alarm).
+ *  - restore()        — undo a removal; the truck returns unpublished, back in queue.
+ *  - blockOwner()     — ban the vendor and unpublish all their trucks at once.
+ *  - reinstate()      — lift a ban in response to the vendor's reinstatement request.
+ *  - dismissRequest() — decline a reinstatement request without lifting the ban.
+ *
+ * remove()/blockOwner() delegate to the shared App\Actions\RemoveTruck /
+ * App\Actions\BlockVendor so the identical moderation actions on the public
+ * truck detail page (plain CSRF POST routes) can never drift from the queue.
  *
  * Access is gated by the EnsureAdmin middleware on the route; every action
  * re-checks isAdmin() as well, mirroring TruckEditor's ownership re-check, so a
@@ -36,7 +48,13 @@ class ModerationQueue extends Component
     /** Working set cap — most-recent trucks; pagination is a later concern. */
     private const int LIMIT = 50;
 
-    /** Which list to show: 'review' (unreviewed) or 'removed' (soft-deleted). */
+    /**
+     * Which list to show: 'review' (held/unpublished awaiting a decision),
+     * 'reported' (live trucks with open public reports), 'removed' (soft-deleted),
+     * or 'reinstatement' (pending unban requests). URL-bound so the detail-page
+     * remove action can deep-link straight to the Removed tab (?filter=removed).
+     */
+    #[Url]
     public string $filter = 'review';
 
     /** A new blocklist word being added from the panel. */
@@ -45,11 +63,12 @@ class ModerationQueue extends Component
     public function mount(): void
     {
         $this->authorizeAdmin();
+        $this->setFilter($this->filter);
     }
 
     public function setFilter(string $filter): void
     {
-        $this->filter = $filter === 'removed' ? 'removed' : 'review';
+        $this->filter = in_array($filter, ['reported', 'removed', 'reinstatement'], true) ? $filter : 'review';
     }
 
     /**
@@ -123,18 +142,28 @@ class ModerationQueue extends Component
         $this->toast('Truck approved');
     }
 
-    public function remove(int $truckId): void
+    public function remove(int $truckId, RemoveTruck $removeTruck): void
+    {
+        // Take it out of discovery, then soft-delete (rows + image files kept).
+        $removeTruck($this->truck($truckId));
+
+        $this->toast('Truck removed');
+    }
+
+    /**
+     * Clear the open public reports on a truck without touching the truck — the
+     * "false alarm" action for the Reported tab. The truck stays live; use
+     * remove()/blockOwner() instead if the reports were justified.
+     */
+    public function dismissReports(int $truckId): void
     {
         $truck = $this->truck($truckId);
 
-        // Take it out of discovery, then soft-delete (rows + image files kept).
-        $truck->update([
-            'is_published' => false,
-            'moderation_reason' => $truck->moderation_reason ?: 'Removed by moderator',
-        ]);
-        $truck->delete();
+        $truck->reports()
+            ->where('status', TruckReport::STATUS_OPEN)
+            ->update(['status' => TruckReport::STATUS_DISMISSED, 'reviewed_at' => now()]);
 
-        $this->toast('Truck removed');
+        $this->toast('Reports dismissed — truck left live');
     }
 
     public function restore(int $truckId): void
@@ -148,39 +177,88 @@ class ModerationQueue extends Component
         $this->toast('Truck restored — unpublished, back in the review queue');
     }
 
-    public function blockOwner(int $truckId): void
+    public function blockOwner(int $truckId, BlockVendor $blockVendor): void
     {
-        $truck = $this->truck($truckId);
-
         /** @var User $owner */
-        $owner = $truck->user;
+        $owner = $this->truck($truckId)->user;
 
-        // forceFill (not update) — banned_at/ban_reason are deliberately kept out
-        // of User's fillable so no form can ever mass-assign a ban.
-        $owner->forceFill(['banned_at' => now(), 'ban_reason' => 'Offensive content'])->save();
-
-        // Immediately hide every truck this vendor owns (the global soft-delete
-        // scope already excludes any removed ones).
-        FoodTruck::query()
-            ->where('user_id', $owner->id)
-            ->update(['is_published' => false]);
+        $blockVendor($owner);
 
         $this->toast('Vendor blocked and all their trucks unpublished');
     }
 
+    /**
+     * Lift a vendor's ban in response to their reinstatement request. Only the
+     * ban is cleared — their previously-unpublished trucks stay down until they
+     * re-save each one (which re-runs the content screen), so nothing offensive
+     * silently comes back.
+     */
+    public function reinstate(int $requestId): void
+    {
+        $this->authorizeAdmin();
+
+        $request = ReinstatementRequest::query()->with('user')->findOrFail($requestId);
+
+        /** @var User $owner */
+        $owner = $request->user;
+
+        // forceFill mirrors BlockVendor — banned_at/ban_reason are out of fillable.
+        $owner->forceFill(['banned_at' => null, 'ban_reason' => null])->save();
+
+        $request->update([
+            'status' => ReinstatementRequest::STATUS_APPROVED,
+            'reviewed_at' => now(),
+        ]);
+
+        $this->toast('Vendor reinstated — they can add trucks again');
+    }
+
+    /**
+     * Decline a reinstatement request without lifting the ban. The vendor may
+     * submit a fresh request afterwards.
+     */
+    public function dismissRequest(int $requestId): void
+    {
+        $this->authorizeAdmin();
+
+        ReinstatementRequest::query()->whereKey($requestId)->update([
+            'status' => ReinstatementRequest::STATUS_DISMISSED,
+            'reviewed_at' => now(),
+        ]);
+
+        $this->toast('Reinstatement request dismissed');
+    }
+
     public function render(): View
     {
+        $pendingRequests = ReinstatementRequest::query()
+            ->where('status', ReinstatementRequest::STATUS_PENDING)
+            ->with('user')
+            ->latest()
+            ->get();
+
+        // Distinct live trucks with at least one open report — the Reported tab's
+        // badge count.
+        $reportedCount = FoodTruck::query()
+            ->whereHas('reports', fn ($q) => $q->where('status', TruckReport::STATUS_OPEN))
+            ->count();
+
         return view('livewire.admin.moderation-queue', [
-            'trucks' => $this->trucks(),
+            'trucks' => $this->filter === 'reinstatement' ? new Collection : $this->trucks(),
+            'reinstatements' => $pendingRequests,
+            'pendingReinstatements' => $pendingRequests->count(),
+            'reportedCount' => $reportedCount,
             'terms' => ModerationTerm::query()->orderBy('term')->get(),
             'tags' => Tag::query()->withCount('foodTrucks')->orderBy('name')->get(),
         ]);
     }
 
     /**
-     * The list for the current filter. "Review" is every unreviewed truck
-     * (auto-held flags + newly published trucks awaiting a human pass), flagged
-     * ones surfaced first, then newest. "Removed" is the soft-deleted trucks.
+     * The list for the current filter. "Review" is the exception queue: trucks
+     * that need a human decision — held (auto-flagged) trucks and restored trucks
+     * awaiting a fresh call — i.e. anything not live and not yet signed off.
+     * Clean, auto-published trucks never enter it; flagged ones surface first,
+     * then newest. "Removed" is the soft-deleted trucks.
      *
      * @return Collection<int, FoodTruck>
      */
@@ -195,7 +273,23 @@ class ModerationQueue extends Component
                 ->get();
         }
 
-        return $query->whereNull('reviewed_at')
+        if ($this->filter === 'reported') {
+            // Live trucks carrying open public reports, most-reported first. The
+            // report is surface-only, so these are still published — an admin
+            // decides whether to dismiss the reports or remove/block.
+            return $query->whereHas('reports', fn ($q) => $q->where('status', TruckReport::STATUS_OPEN))
+                ->withCount(['reports as open_reports_count' => fn ($q) => $q->where('status', TruckReport::STATUS_OPEN)])
+                ->orderByDesc('open_reports_count')
+                ->latest('id')
+                ->limit(self::LIMIT)
+                ->get();
+        }
+
+        // Only trucks that actually need review: not published and not yet
+        // reviewed. A clean save publishes instantly (is_published = true), so it
+        // is excluded — the queue is exceptions, not every new truck.
+        return $query->where('is_published', false)
+            ->whereNull('reviewed_at')
             // Flagged (held) trucks first — the literal is a constant, not user
             // input, so the raw fragment is safe.
             ->orderByRaw("(screen_status = '".FoodTruck::SCREEN_FLAGGED."') desc")

@@ -48,11 +48,33 @@ class User extends Authenticatable
 
     /**
      * Whether this user has been blocked from adding or publishing trucks
-     * (see App\Livewire\Admin\ModerationQueue::blockOwner).
+     * (see App\Actions\BlockVendor).
      */
     public function isBanned(): bool
     {
         return $this->banned_at !== null;
+    }
+
+    /**
+     * Whether this user has a reinstatement request still awaiting an admin
+     * decision — used to swap the profile's "request reinstatement" form for an
+     * "under review" note and to block a second, duplicate request.
+     */
+    public function hasPendingReinstatementRequest(): bool
+    {
+        return $this->reinstatementRequests()
+            ->where('status', ReinstatementRequest::STATUS_PENDING)
+            ->exists();
+    }
+
+    /**
+     * This user's reinstatement requests (see ReinstatementRequest).
+     *
+     * @return HasMany<ReinstatementRequest, $this>
+     */
+    public function reinstatementRequests(): HasMany
+    {
+        return $this->hasMany(ReinstatementRequest::class);
     }
 
     /**

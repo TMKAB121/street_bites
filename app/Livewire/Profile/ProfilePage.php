@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Profile;
 
 use App\Models\FoodTruck;
+use App\Models\ReinstatementRequest;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -27,6 +28,9 @@ class ProfilePage extends Component
      * @var array<int, int>
      */
     public array $expanded = [];
+
+    /** A blocked vendor's optional message on their reinstatement request. */
+    public string $reinstatementMessage = '';
 
     /**
      * The signed-in user. The route is behind the auth middleware, so this is
@@ -54,6 +58,33 @@ class ProfilePage extends Component
 
         // Open the new truck straight away so the vendor can fill it in.
         $this->expanded[] = $truck->id;
+    }
+
+    /**
+     * A blocked vendor asks an admin to lift their ban. Banned users only, and
+     * one open request at a time (a duplicate is silently ignored). Admins review
+     * it on the moderation page (ModerationQueue::reinstate / dismissRequest).
+     */
+    public function requestReinstatement(): void
+    {
+        $user = $this->user();
+
+        // Only a blocked vendor can request reinstatement, and not twice over.
+        if (! $user->isBanned() || $user->hasPendingReinstatementRequest()) {
+            return;
+        }
+
+        $this->validate([
+            'reinstatementMessage' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $user->reinstatementRequests()->create([
+            'message' => trim($this->reinstatementMessage) ?: null,
+            'status' => ReinstatementRequest::STATUS_PENDING,
+        ]);
+
+        $this->reinstatementMessage = '';
+        $this->dispatch('toast', message: 'Reinstatement request submitted for review.', type: 'success');
     }
 
     /**
@@ -113,6 +144,7 @@ class ProfilePage extends Component
             'trucks' => $this->trucks(),
             'favorites' => $this->favorites(),
             'banned' => $this->user()->isBanned(),
+            'reinstatementPending' => $this->user()->hasPendingReinstatementRequest(),
         ]);
     }
 }

@@ -194,6 +194,17 @@ class FoodTruck extends Model
     }
 
     /**
+     * Public "this truck is offensive" reports (see TruckReport). Open ones
+     * surface the truck on the moderation queue's Reported tab.
+     *
+     * @return HasMany<TruckReport, $this>
+     */
+    public function reports(): HasMany
+    {
+        return $this->hasMany(TruckReport::class);
+    }
+
+    /**
      * Cuisine taxonomy tags for this truck.
      *
      * @return BelongsToMany<Tag, $this>
