@@ -1,0 +1,60 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Report this truck
+ | -----------------------------------------------------------------------------
+ | The quiet megaphone control rendered by <x-report-truck> in the truck detail
+ | page footer. Deliberately understated (muted, link-like) so it never competes
+ | with Favourite / Get directions — reporting is a rare, deliberate action. A
+ | hover/focus tooltip explains what it does; once reported the button settles
+ | into a muted "done" state and disables. The global button rule in base.css
+ | supplies the ADA tap target.
+ |
+ |   <x-report-truck :truck-id="…" :label="…" :reported="…" />
+ */
+
+@layer components {
+    .report-truck {
+        @apply relative mt-10 flex justify-center;
+    }
+
+    .report-truck__btn {
+        @apply inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium;
+        color: var(--color-text-muted);
+        transition: var(--transition-fast);
+    }
+
+    .report-truck__btn svg {
+        width: 1.125rem;
+        height: 1.125rem;
+        fill: none;
+        stroke: currentcolor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .report-truck__btn:hover:not(:disabled),
+    .report-truck__btn:focus-visible {
+        color: var(--color-accent-chili);
+    }
+
+    .report-truck__btn--done {
+        color: var(--color-text-muted);
+        cursor: default;
+    }
+
+    /* Tooltip — revealed on hover/focus of the button. */
+    .report-truck__tip {
+        @apply pointer-events-none absolute bottom-full left-1/2 mb-2 w-64 -translate-x-1/2
+            rounded-lg px-3 py-2 text-center text-xs;
+        background: var(--color-primary);
+        color: white;
+        opacity: 0;
+        transition: opacity var(--transition-fast);
+    }
+
+    .report-truck__btn:hover + .report-truck__tip,
+    .report-truck__btn:focus-visible + .report-truck__tip {
+        opacity: 1;
+    }
+}

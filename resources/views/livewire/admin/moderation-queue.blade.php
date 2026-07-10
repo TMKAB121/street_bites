@@ -85,12 +85,81 @@
         </button>
         <button
             type="button"
+            wire:click="setFilter('reported')"
+            @class(['moderation__tab', 'moderation__tab--active' => $filter === 'reported'])
+        >
+            Reported
+            @if ($reportedCount > 0)
+                <span class="moderation__badge moderation__badge--flagged">{{ $reportedCount }}</span>
+            @endif
+        </button>
+        <button
+            type="button"
             wire:click="setFilter('removed')"
             @class(['moderation__tab', 'moderation__tab--active' => $filter === 'removed'])
         >
             Removed
         </button>
+        <button
+            type="button"
+            wire:click="setFilter('reinstatement')"
+            @class(['moderation__tab', 'moderation__tab--active' => $filter === 'reinstatement'])
+        >
+            Reinstatement
+            @if ($pendingReinstatements > 0)
+                <span class="moderation__badge moderation__badge--flagged">{{ $pendingReinstatements }}</span>
+            @endif
+        </button>
     </div>
+
+    {{-- Reinstatement requests: blocked vendors asking to have their ban lifted.
+         Reinstating clears the ban only — their old trucks stay unpublished until
+         they re-save each one (re-running the content screen). --}}
+    @if ($filter === 'reinstatement')
+        @forelse ($reinstatements as $request)
+            <article class="moderation__row" wire:key="reinstate-{{ $request->id }}">
+                <div class="moderation__thumb" aria-hidden="true"></div>
+
+                <div class="moderation__body">
+                    <p class="moderation__name">{{ $request->user->name ?: $request->user->email }}</p>
+                    <p class="moderation__meta">{{ $request->user->email }}</p>
+
+                    <div class="moderation__badges">
+                        <span class="moderation__badge moderation__badge--flagged">Vendor blocked</span>
+                    </div>
+
+                    @if ($request->user->ban_reason)
+                        <p class="moderation__reason">Ban reason: {{ $request->user->ban_reason }}</p>
+                    @endif
+
+                    @if ($request->message)
+                        <p class="moderation__desc">“{{ $request->message }}”</p>
+                    @endif
+
+                    <div class="moderation__actions">
+                        <button
+                            type="button"
+                            class="moderation__action moderation__action--approve"
+                            wire:click="reinstate({{ $request->id }})"
+                            wire:confirm="Reinstate {{ $request->user->email }}? Their ban is lifted; their old trucks stay unpublished until they re-save them."
+                        >
+                            Reinstate
+                        </button>
+                        <button
+                            type="button"
+                            class="moderation__action moderation__action--remove"
+                            wire:click="dismissRequest({{ $request->id }})"
+                            wire:confirm="Dismiss this request? The vendor stays blocked (they can request again)."
+                        >
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            </article>
+        @empty
+            <p class="profile__empty">No reinstatement requests.</p>
+        @endforelse
+    @else
 
     @forelse ($trucks as $truck)
         @php
@@ -118,6 +187,12 @@
                         <span class="moderation__badge moderation__badge--live">Live</span>
                     @else
                         <span class="moderation__badge moderation__badge--held">Unpublished</span>
+                    @endif
+
+                    @if ($filter === 'reported')
+                        <span class="moderation__badge moderation__badge--flagged">
+                            {{ $truck->open_reports_count }} {{ Str::plural('report', $truck->open_reports_count) }}
+                        </span>
                     @endif
 
                     @if ($truck->user->isBanned())
@@ -154,13 +229,24 @@
                             </a>
                         @endif
 
-                        <button
-                            type="button"
-                            class="moderation__action moderation__action--approve"
-                            wire:click="approve({{ $truck->id }})"
-                        >
-                            Approve
-                        </button>
+                        @if ($filter === 'reported')
+                            <button
+                                type="button"
+                                class="moderation__action moderation__action--approve"
+                                wire:click="dismissReports({{ $truck->id }})"
+                                wire:confirm="Dismiss the reports on this truck? It stays live (use Remove if the reports were justified)."
+                            >
+                                Dismiss reports
+                            </button>
+                        @else
+                            <button
+                                type="button"
+                                class="moderation__action moderation__action--approve"
+                                wire:click="approve({{ $truck->id }})"
+                            >
+                                Approve
+                            </button>
+                        @endif
                         <button
                             type="button"
                             class="moderation__action moderation__action--remove"
@@ -185,9 +271,12 @@
         <p class="profile__empty">
             @if ($filter === 'removed')
                 No removed trucks.
+            @elseif ($filter === 'reported')
+                No reported trucks.
             @else
                 Nothing to review right now.
             @endif
         </p>
     @endforelse
+    @endif
 </div>

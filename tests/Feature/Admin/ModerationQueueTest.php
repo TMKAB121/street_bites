@@ -49,20 +49,27 @@ it('forbids a non-admin from the moderation component', function (): void {
         ->assertForbidden();
 });
 
-it('lists unreviewed trucks in review and trashed trucks in removed', function (): void {
-    FoodTruck::factory()->create(['name' => 'Pending Wagon', 'is_published' => true, 'reviewed_at' => null]);
-    FoodTruck::factory()->published()->create(['name' => 'Reviewed Rig', 'reviewed_at' => now()]);
+it('shows only trucks needing review, not clean published ones, and trashed trucks in removed', function (): void {
+    // Held (auto-flagged) — needs a human decision.
+    FoodTruck::factory()->create([
+        'name' => 'Held Wagon',
+        'is_published' => false,
+        'screen_status' => FoodTruck::SCREEN_FLAGGED,
+        'reviewed_at' => null,
+    ]);
+    // Clean and auto-published — the exception queue must NOT surface it.
+    FoodTruck::factory()->published()->create(['name' => 'Clean Cart', 'reviewed_at' => null]);
     $removed = FoodTruck::factory()->create(['name' => 'Gone Grill']);
     $removed->delete();
 
     Livewire::actingAs(moderationAdmin())
         ->test(ModerationQueue::class)
-        ->assertSee('Pending Wagon')
-        ->assertDontSee('Reviewed Rig')
+        ->assertSee('Held Wagon')
+        ->assertDontSee('Clean Cart')
         ->assertDontSee('Gone Grill')
         ->call('setFilter', 'removed')
         ->assertSee('Gone Grill')
-        ->assertDontSee('Pending Wagon');
+        ->assertDontSee('Held Wagon');
 });
 
 it('approves a held truck and publishes it', function (): void {

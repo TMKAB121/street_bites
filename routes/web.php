@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Actions\BlockVendor;
 use App\Actions\GenerateTruckMapImage;
 use App\Actions\GeocodeSearch;
+use App\Actions\RemoveTruck;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\RequireCookieConsent;
 use App\Livewire\Admin\ModerationQueue;
@@ -21,6 +23,7 @@ use App\Models\CookieConsent;
 use App\Models\FoodTruck;
 use App\Models\Post;
 use App\Models\Tag;
+use App\Models\TruckReport;
 use App\Models\User;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
@@ -202,11 +205,26 @@ Route::get('/trucks/{truck}/{slug}', function (string $truck, string $slug): Fac
     $isFavorited = auth()->check()
         && $truck->favoritedBy()->whereKey(auth()->id())->exists();
 
+    // Whether the signed-in visitor has already reported this truck, so the
+    // report control renders in its "reported" state on a revisit. Guests can't
+    // be recognised across requests, so they always start un-reported (the
+    // endpoint dedupes their repeat click by hashed IP anyway).
+    $isReported = auth()->check()
+        && $truck->reports()
+            ->where('status', TruckReport::STATUS_OPEN)
+            ->where('user_id', auth()->id())
+            ->exists();
+
     // Cached OSM static map of the pin's surroundings; null hides the section.
     $mapPath = resolve(GenerateTruckMapImage::class)($truck);
     $mapUrl = $mapPath !== null ? Storage::disk(config('filesystems.public_disk'))->url($mapPath) : null;
 
-    return view('trucks.show', ['truck' => $truck, 'mapUrl' => $mapUrl, 'isFavorited' => $isFavorited]);
+    return view('trucks.show', [
+        'truck' => $truck,
+        'mapUrl' => $mapUrl,
+        'isFavorited' => $isFavorited,
+        'isReported' => $isReported,
+    ]);
 })->whereNumber('truck')->name('trucks.show');
 
 // Favourite/unfavourite toggle for the star buttons (<x-favorite-toggle> →
@@ -227,6 +245,46 @@ Route::post('/api/favorites/{truck}', function (Request $request, string $truck)
 
     return response()->json(['favorited' => $changes['attached'] !== []]);
 })->whereNumber('truck')->middleware(['auth', 'throttle:60,1'])->name('favorites.toggle');
+
+// Public "report this truck" — any visitor (signed-in or not) can flag a truck
+// as potentially offensive, surfacing it on the moderation queue's Reported tab.
+// Deliberately NOT auth-gated (guests can report too) and surface-only: it never
+// unpublishes the truck, so a single click can't be a takedown lever. Deduped per
+// reporter (by user id when signed in, else by hashed IP) so counts can't be
+// inflated, and throttled since it writes on an unauthenticated route. Published
+// trucks only (404 otherwise), and lives under /api so errors render as JSON.
+Route::post('/api/trucks/{truck}/report', function (Request $request, string $truck) {
+    $truck = FoodTruck::query()
+        ->where('is_published', true)
+        ->findOrFail($truck);
+
+    $userId = $request->user()?->id;
+    $ip = $request->ip();
+    $reporterHash = $ip === null ? null : hash('sha256', $ip);
+
+    // One open report per reporter — a signed-in user is keyed by id, a guest by
+    // hashed IP. A repeat click is a no-op that still reports success (idempotent).
+    $alreadyReported = $truck->reports()
+        ->where('status', TruckReport::STATUS_OPEN)
+        ->when(
+            $userId !== null,
+            fn ($q) => $q->where('user_id', $userId),
+            fn ($q) => $reporterHash !== null
+                ? $q->whereNull('user_id')->where('reporter_hash', $reporterHash)
+                : $q->whereRaw('1 = 0'),
+        )
+        ->exists();
+
+    if (! $alreadyReported) {
+        $truck->reports()->create([
+            'user_id' => $userId,
+            'reporter_hash' => $reporterHash,
+            'status' => TruckReport::STATUS_OPEN,
+        ]);
+    }
+
+    return response()->json(['reported' => true]);
+})->whereNumber('truck')->middleware('throttle:10,1')->name('trucks.report');
 
 // News & events landing page — a full-size search page for posts. Unlike
 // /search (which prompts on an empty query), an empty q lists everything
@@ -417,4 +475,22 @@ Route::middleware(['auth', EnsureAdmin::class, RequireCookieConsent::class])
         Route::get('/trucks', ModerationQueue::class)->name('admin.trucks');
         // News & events authoring — the only way posts are created/edited.
         Route::get('/news', NewsManager::class)->name('admin.news');
+
+        // Moderator actions on the public truck detail page (admin-only panel
+        // there). Plain CSRF POSTs — the detail page is plain Blade, not
+        // Livewire — routed through the same guards and the same shared actions
+        // (RemoveTruck / BlockVendor) the moderation queue uses. Both 404 the
+        // truck as a side effect (soft-deleted / unpublished), so each lands on
+        // the moderation queue: remove on the Removed tab, block on review.
+        Route::post('/trucks/{truck}/remove', function (FoodTruck $truck, RemoveTruck $removeTruck) {
+            $removeTruck($truck);
+
+            return redirect()->route('admin.trucks', ['filter' => 'removed']);
+        })->whereNumber('truck')->name('admin.trucks.remove');
+
+        Route::post('/trucks/{truck}/block', function (FoodTruck $truck, BlockVendor $blockVendor) {
+            $blockVendor($truck->user);
+
+            return redirect()->route('admin.trucks');
+        })->whereNumber('truck')->name('admin.trucks.block');
     });
