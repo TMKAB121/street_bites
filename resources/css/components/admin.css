@@ -113,7 +113,7 @@
     }
 
     .moderation__action {
-        @apply rounded-lg px-3 py-2 text-sm font-semibold;
+        @apply inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold no-underline;
         min-height: var(--min-tap-target);
         cursor: pointer;
         transition: var(--transition-fast);

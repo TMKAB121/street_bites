@@ -19,6 +19,12 @@ import './truck-map';
 import './favorites';
 
 /**
+ * The "report this truck" control. Registers the `reportToggle` Alpine component
+ * on `alpine:init` — same pattern as truck-map.js, never imports Alpine.
+ */
+import './report';
+
+/**
  * The header search typeahead. Registers the `truckSearch` Alpine component
  * on `alpine:init` — same pattern as truck-map.js, never imports Alpine.
  */

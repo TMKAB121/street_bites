@@ -438,16 +438,30 @@ admin surface to act on anything offensive:
   moderation (enabled in production). Clean trucks go live immediately; only
   *flagged* ones are held back for review, so honest vendors are never slowed down.
   Admins get an email the moment a truck is held.
-- **Moderation queue** (`/admin/trucks`, admins only) — every truck newest-first,
-  with **Approve**, **Remove** (a recoverable soft-delete that retains the content
-  as evidence), and **Block vendor** actions. Removed trucks disappear from the
-  whole site automatically.
+- **Moderation queue** (`/admin/trucks`, admins only) — an **exception queue** of
+  only the trucks that need a human decision (auto-flagged/held and restored ones);
+  clean trucks publish instantly and never appear here. **Approve**, **Remove** (a
+  recoverable soft-delete that retains the content as evidence), and **Block vendor**
+  actions. Removed trucks disappear from the whole site automatically.
+- **Act from the truck page too** — admins see a **Remove this truck** and **Block
+  this vendor** panel directly on any truck's public detail page (invisible to
+  everyone else), for taking down something offensive spotted live. Each is behind a
+  two-click confirm so a mis-tap can't fire.
+- **Community reporting** — anyone (signed-in or not) can tap the megaphone in a
+  truck page's footer to flag it as offensive. A report **surfaces the truck on a
+  Reported tab** in the moderation queue for an admin to judge — it never takes the
+  truck down on its own, so a single click (or a coordinated pile-on) can't be a
+  censorship lever. Reports are deduped per reporter and rate-limited.
 - **Editable blocklist** — admins add or remove blocked words from the page itself;
   changes take effect immediately, no redeploy. A baseline list ships in
   configuration as an always-on floor.
 - **Vendor blocks** — blocking an offender stops them adding or publishing trucks
   and unpublishes their existing ones, but they can still sign in and browse: the
   block is on their vendor privileges, not their account.
+- **Reinstatement requests** — a blocked vendor can ask to be unblocked from their
+  own profile; admins review the requests on a dedicated tab in the moderation queue
+  and **Reinstate** or **Dismiss** each one. Reinstating lifts the ban only — the
+  vendor re-adds/re-publishes their trucks (which re-runs screening).
 
 Admins are defined by an `ADMIN_EMAILS` allowlist (no role table); image screening
 is off by default and turns on with `MODERATION_REKOGNITION_ENABLED`. See

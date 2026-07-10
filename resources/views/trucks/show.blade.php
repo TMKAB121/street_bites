@@ -199,4 +199,100 @@
             </ul>
         @endif
     </section>
+
+    {{-- Quiet "report this truck" footer control — anyone (guests too) can flag
+         the truck as offensive, surfacing it to moderators without taking it
+         down. Hidden for the truck's own owner (nobody reports themselves). --}}
+    @unless (auth()->id() === $truck->user_id)
+        <x-report-truck :truck-id="$truck->id" :label="$truck->name" :reported="$isReported" />
+    @endunless
+
+    {{-- Moderator controls — rendered only for admins (config email allowlist),
+         so a regular visitor never sees this section at all. The actions post to
+         the same guarded routes + shared actions the moderation queue uses; each
+         is gated behind a two-click Alpine confirm (mirrors the profile
+         delete-account reveal) so a mis-tap can't remove a truck or ban a vendor.
+         People are creative — this is the fast takedown for anything that slips
+         past the auto-screen and is spotted live on the page. --}}
+    @if (auth()->user()?->isAdmin())
+        <section class="mt-12 border-t border-accent-chili/20 pt-6 space-y-3">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-accent-chili">Moderation</h2>
+            <p class="text-sm text-text-muted">
+                Admin-only. Removing hides the truck everywhere but keeps it as
+                evidence — restore it from the
+                <a href="{{ route('admin.trucks', ['filter' => 'removed']) }}" class="underline">moderation queue</a>.
+                Blocked vendors can ask to be reinstated from their profile.
+            </p>
+
+            {{-- Remove this truck --}}
+            <div x-data="{ confirming: false }">
+                <button
+                    type="button"
+                    class="btn w-full border border-accent-chili/30 text-accent-chili"
+                    x-show="!confirming"
+                    @click="confirming = true"
+                >
+                    Remove this truck
+                </button>
+
+                <div x-show="confirming" x-cloak class="rounded-lg border border-accent-chili/30 p-4">
+                    <p class="text-sm text-text-muted mb-3">
+                        Hides “{{ $truck->name }}” from the site. Rows and photos are
+                        kept as evidence, and you can restore it from the moderation
+                        queue’s Removed tab.
+                    </p>
+                    <div class="flex gap-2">
+                        <button
+                            type="button"
+                            class="btn flex-1 border border-primary/15 text-text-muted"
+                            @click="confirming = false"
+                        >
+                            Cancel
+                        </button>
+                        <form method="POST" action="{{ route('admin.trucks.remove', $truck) }}" class="flex-1">
+                            @csrf
+                            <button type="submit" class="btn btn-accent w-full">
+                                Remove truck
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Block this vendor --}}
+            <div x-data="{ confirming: false }">
+                <button
+                    type="button"
+                    class="btn w-full border border-accent-chili/30 text-accent-chili"
+                    x-show="!confirming"
+                    @click="confirming = true"
+                >
+                    Block this vendor
+                </button>
+
+                <div x-show="confirming" x-cloak class="rounded-lg border border-accent-chili/30 p-4">
+                    <p class="text-sm text-text-muted mb-3">
+                        Bans {{ $truck->user->email }} and unpublishes every truck they
+                        own. They can still sign in and browse, and can request
+                        reinstatement from their profile.
+                    </p>
+                    <div class="flex gap-2">
+                        <button
+                            type="button"
+                            class="btn flex-1 border border-primary/15 text-text-muted"
+                            @click="confirming = false"
+                        >
+                            Cancel
+                        </button>
+                        <form method="POST" action="{{ route('admin.trucks.block', $truck) }}" class="flex-1">
+                            @csrf
+                            <button type="submit" class="btn btn-accent w-full">
+                                Block vendor
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+    @endif
 </x-layouts::shell>
