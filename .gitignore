@@ -37,7 +37,10 @@
 /.vscode
 /.nova
 /.zed
-/.claude
+# .claude: track only the repo's agents + skills; ignore worktrees, local settings, etc.
+/.claude/*
+!/.claude/agents/
+!/.claude/skills/
 /.cursor/
 /.codex
 /.phpactor.json
