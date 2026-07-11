@@ -33,7 +33,7 @@ variable "github_repo" {
 }
 
 variable "github_main_branch" {
-  description = "This repo's main/default branch is `develop`, not `main` — used to scope the OIDC trust policy's `sub` claim for terraform-apply.yml."
+  description = "The branch terraform-apply.yml deploys from — used to scope the OIDC trust policy's `sub` claim. Deliberately `main`, not `develop` (this repo's GitHub default/integration branch): infra applies are gated behind promoting develop into main, not every merge to develop."
   type        = string
-  default     = "develop"
+  default     = "main"
 }

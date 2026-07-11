@@ -1007,8 +1007,13 @@ that matter while touching app code:
   `terraform-apply.yml` (infra, gated behind the `production-infra`
   Environment), `release-deploy.yml` (builds + deploys on every published
   GitHub Release, migrating before rolling `web`).
-- This repo's **main/default branch is `develop`, not `main`** — the OIDC
-  trust policies and `terraform-apply.yml` are scoped to `develop` accordingly.
+- This repo's **GitHub default/integration branch is `develop`, not `main`** —
+  PRs and day-to-day work target `develop`. Infra deploys are gated separately:
+  `terraform-apply.yml` triggers on pushes to **`main`**, so a `terraform apply`
+  only runs once `develop` is promoted into `main` (the OIDC trust policy in
+  `terraform/bootstrap` is scoped to `main` via `var.github_main_branch`
+  accordingly). `release-deploy.yml` (app deploys) is unaffected — it triggers
+  on published GitHub Releases, not branch pushes.
 - **Mail is Resend in production** (`MAIL_MAILER=resend` in `main.tf`'s
   `base_environment`; Mailpit is dev-only). Auth (sign-up verification + 2FA
   codes) depends on it. `street-bites.org` is verified as a sending domain in
