@@ -129,6 +129,31 @@ class Post extends Model
     }
 
     /**
+     * The /news feed's visibility + ordering rule, in one place so the route
+     * stays a one-liner. Two tiers: **featured** stories (no event date) lead,
+     * newest-published first; **events** follow, ordered by event date soonest
+     * first. An event whose date has passed drops off the feed entirely — it
+     * stays live at its own URL and in the sitemap, it just leaves the
+     * "what's coming up" listing. event_date is date-only (times live in the
+     * body), so "past" flips at the app's UTC midnight; that coarseness is the
+     * accepted trade for dodging per-post timezones.
+     *
+     * @param  Builder<Post>  $query
+     */
+    #[Scope]
+    protected function feed(Builder $query): void
+    {
+        $query
+            ->where(fn (Builder $q) => $q
+                ->whereNull('event_date')
+                ->orWhereDate('event_date', '>=', today()))
+            ->orderByRaw('event_date is null desc') // featured (null) tier first
+            ->orderBy('event_date')                 // then events, soonest first
+            ->latest('published_at')                // newest within each tier / date tie
+            ->latest('id');
+    }
+
+    /**
      * Posts whose title or body contains the term. One scope backs the /news
      * landing page (and any future suggest endpoint), mirroring
      * FoodTruck::search().

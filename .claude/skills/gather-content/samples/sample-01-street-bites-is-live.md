@@ -1,10 +1,10 @@
 ---
 title: Conquering the Crossroads Summer Rally This Weekend
-event_date: 2026-06-26
-event_location: Crossroads District
+event_date: 06/26/2026
+event_location: Crossroads District, MO
 ---
 
-**Subhead:** The trucks to track, the lines to brave, and the exact strategy you need to conquer the city's biggest asphalt feast.
+**The trucks to track, the lines to brave, and the exact strategy you need to conquer the city's biggest asphalt feast.**
 
 Clear your schedule, grab your lawn chairs. The annual **Crossroads Summer Rally** is officially seizing control of the Arts District lot this Saturday. If you’ve never been, think of it as the ultimate neighborhood block party, but the food options are dialed up to eleven. 
 

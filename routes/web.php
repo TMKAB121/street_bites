@@ -287,18 +287,18 @@ Route::post('/api/trucks/{truck}/report', function (Request $request, string $tr
 })->whereNumber('truck')->middleware('throttle:10,1')->name('trucks.report');
 
 // News & events landing page — a full-size search page for posts. Unlike
-// /search (which prompts on an empty query), an empty q lists everything
-// newest-first: the page doubles as the news feed. Matching is by title or
-// body (Post::search()); query-filtered views are noindex in the view, the
-// bare listing is crawlable.
+// /search (which prompts on an empty query), an empty q lists everything: the
+// page doubles as the feed. Ordering + visibility is Post::feed() — featured
+// stories first (newest), then upcoming events soonest-first, past events
+// dropped. Matching is by title or body (Post::search()); query-filtered views
+// are noindex in the view, the bare listing is crawlable.
 Route::get('/news', function (Request $request): Factory|View {
     $term = trim($request->string('q')->toString());
 
     $posts = Post::query()
         ->where('is_published', true)
         ->when($term !== '', fn ($query) => $query->search($term))
-        ->latest('published_at')
-        ->latest('id')
+        ->feed()
         ->get();
 
     return view('news.index', ['posts' => $posts, 'term' => $term]);
