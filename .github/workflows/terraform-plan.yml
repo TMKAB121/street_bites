@@ -19,7 +19,11 @@ jobs:
       # variables → Actions → Variables). CLOUDFLARE_API_TOKEN is a repo
       # *secret* (Zone:Read + DNS:Edit on the street-bites.org zone) — the
       # cloudflare provider reads it from the environment (see backend.tf).
+      # RESEND_API_KEY is a repo *secret* too (the mail provider's sending
+      # key) — var.resend_api_key is sensitive with no default, so plan
+      # fails without it.
       TF_VAR_s3_bucket_name: ${{ vars.S3_BUCKET_NAME }}
+      TF_VAR_resend_api_key: ${{ secrets.RESEND_API_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     defaults:
       run:

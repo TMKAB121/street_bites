@@ -53,7 +53,7 @@ resource "aws_iam_role_policy" "gha_terraform" {
           "s3:*",
           "iam:*",
           "acm:*", # the domain cutover's certificate (environments/prod/domain.tf)
-          "ses:*", # the SES domain identity (modules/ses) — includes ses:TagResource for provider default_tags
+          "ses:*", # legacy: mail moved to Resend (SES production access denied); kept so the apply that removed the SES identity could run — safe to drop on a future bootstrap apply
         ]
         Resource = "*"
       }

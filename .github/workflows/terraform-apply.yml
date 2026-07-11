@@ -2,7 +2,7 @@ name: Terraform Apply
 
 on:
   push:
-    branches: [develop] # this repo's main/default branch
+    branches: [main] # production-apply gate — deliberately not `develop` (this repo's GitHub default/integration branch); promote via a develop -> main PR/merge when ready to deploy infra
     paths:
       - 'terraform/**'
 
@@ -14,13 +14,14 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     # Gate infra changes behind a reviewed GitHub Environment — merging to
-    # develop queues the apply, but a required reviewer (configure this in the
+    # main queues the apply, but a required reviewer (configure this in the
     # repo's environment settings) must approve before it actually runs.
     environment: production-infra
     env:
-      # See terraform-plan.yml's comment — same repo variable + secret,
-      # same reason.
+      # See terraform-plan.yml's comment — same repo variables + secrets,
+      # same reasons.
       TF_VAR_s3_bucket_name: ${{ vars.S3_BUCKET_NAME }}
+      TF_VAR_resend_api_key: ${{ secrets.RESEND_API_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     defaults:
       run:

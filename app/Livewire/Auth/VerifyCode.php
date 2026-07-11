@@ -52,13 +52,18 @@ class VerifyCode extends Component
 
     public function resend(): void
     {
+        // Same two buckets as EmailEntry::submit() — resends share the per-IP
+        // bucket so rotating between first-send and resend counts together.
         $key = 'verify-email:'.mb_strtolower($this->email);
+        $ipKey = 'verify-email-ip:'.request()->ip();
 
-        if ($this->throttled($key, 'code', 'requests')) {
+        if ($this->throttled($key, 'code', 'requests')
+            || $this->throttled($ipKey, 'code', 'requests', EmailEntry::SEND_IP_MAX_ATTEMPTS)) {
             return;
         }
 
         $this->recordAttempt($key);
+        $this->recordAttempt($ipKey, EmailEntry::SEND_IP_DECAY_SECONDS);
 
         $code = EmailVerification::issueFor($this->email);
         Mail::to($this->email)->send(new EmailVerificationCode($code, $this->email));

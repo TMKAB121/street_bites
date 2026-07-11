@@ -68,6 +68,68 @@ it('issues a code and mails it for a valid email', function (): void {
     );
 });
 
+// --- Send rate limiting ------------------------------------------------------
+// Sign-up mails whatever address the visitor types, so sends are capped twice:
+// per email (5/min) and per IP (10/hr — the address-rotation backstop).
+
+it('throttles repeated code requests for the same email', function (): void {
+    Mail::fake();
+
+    $component = Livewire::test(EmailEntry::class);
+
+    foreach (range(1, 5) as $ignored) {
+        $component->set('email', 'diner@example.com')
+            ->call('submit')
+            ->assertHasNoErrors();
+    }
+
+    $component->set('email', 'diner@example.com')
+        ->call('submit')
+        ->assertHasErrors(['email']);
+
+    Mail::assertSentCount(5);
+});
+
+it('throttles code requests per IP across different emails', function (): void {
+    Mail::fake();
+
+    $component = Livewire::test(EmailEntry::class);
+
+    foreach (range(1, 10) as $i) {
+        $component->set('email', "diner{$i}@example.com")
+            ->call('submit')
+            ->assertHasNoErrors();
+    }
+
+    // An 11th distinct address from the same IP: each per-email bucket is
+    // fresh, but the shared IP bucket is exhausted.
+    $component->set('email', 'diner11@example.com')
+        ->call('submit')
+        ->assertHasErrors(['email']);
+
+    Mail::assertSentCount(10);
+});
+
+it('counts resends against the same per-IP bucket as first sends', function (): void {
+    Mail::fake();
+
+    $entry = Livewire::test(EmailEntry::class);
+
+    foreach (range(1, 10) as $i) {
+        $entry->set('email', "diner{$i}@example.com")->call('submit');
+    }
+
+    // diner1's own per-email bucket has one hit (well under 5), so a denial
+    // here can only come from the shared IP bucket.
+    session(['auth.email' => 'diner1@example.com']);
+
+    Livewire::test(VerifyCode::class)
+        ->call('resend')
+        ->assertHasErrors(['code']);
+
+    Mail::assertSentCount(10);
+});
+
 // --- Step 2: code verification ---------------------------------------------
 
 it('advances to the password step when the code is correct', function (): void {

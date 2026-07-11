@@ -13,7 +13,8 @@
         "laravel/reverb": "^1.0",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.35",
-        "livewire/livewire": "^4.3"
+        "livewire/livewire": "^4.3",
+        "resend/resend-php": "^1.5"
     },
     "require-dev": {
         "driftingly/rector-laravel": "^2.0",

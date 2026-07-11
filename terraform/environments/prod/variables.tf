@@ -35,9 +35,15 @@ variable "reverb_port" {
 }
 
 variable "domain" {
-  description = "The site's domain (DNS hosted at Cloudflare — see domain.tf). Drives APP_URL (https://www.<domain>), the ACM cert, the ws.<domain> Reverb host, and the SES domain identity mail sends from (noreply@<domain>). Not sensitive, so the prod value is the default — no tfvars/CI variable needed."
+  description = "The site's domain (DNS hosted at Cloudflare — see domain.tf). Drives APP_URL (https://www.<domain>), the ACM cert, the ws.<domain> Reverb host, and the from-address mail sends as (noreply@<domain>, verified as a sending domain in the Resend dashboard). Not sensitive, so the prod value is the default — no tfvars/CI variable needed."
   type        = string
   default     = "street-bites.org"
+}
+
+variable "resend_api_key" {
+  description = "Resend API key (create it sending-only, scoped to the domain) backing MAIL_MAILER=resend — auth verification / 2FA / reset codes. Externally issued, so unlike the Terraform-generated secrets it must be supplied: terraform.tfvars locally, TF_VAR_resend_api_key (from the RESEND_API_KEY repo secret) in CI."
+  type        = string
+  sensitive   = true
 }
 
 variable "admin_emails" {

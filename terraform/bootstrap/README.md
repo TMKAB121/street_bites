@@ -36,4 +36,5 @@ destroyed and recreated by re-applying).
    - `production-infra` — used by `terraform-apply.yml` to gate infra changes
      behind a required reviewer before `terraform apply` runs. Add a required
      reviewer here if you want that approval gate; otherwise it applies
-     automatically on every merge to `develop` that touches `terraform/**`.
+     automatically on every merge to `main` (not `develop` — see
+     `github_main_branch` in `variables.tf`) that touches `terraform/**`.
