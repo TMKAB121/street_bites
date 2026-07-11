@@ -15,17 +15,19 @@ resource "aws_iam_openid_connect_provider" "github" {
 
 # --- gha-terraform-role: assumed by terraform-plan.yml / terraform-apply.yml ---
 #
-# Trusted for `pull_request` (plan), pushes to the repo's main branch (this
-# repo's main/default branch is `develop`, not `main`), AND the
-# `production-infra` GitHub Environment. That third one is required because
-# a job's OIDC `sub` claim becomes `repo:OWNER/REPO:environment:NAME` (not the
-# ref-based form) whenever the job declares `environment:` — which
-# terraform-apply.yml does, to gate applies behind an optional required
-# reviewer. Omitting it produces "Not authorized to perform
-# sts:AssumeRoleWithWebIdentity" even though the ref-based sub looks right.
+# Trusted for `pull_request` (plan), pushes to `var.github_main_branch`
+# (`main` — deliberately not `develop`, this repo's GitHub default/
+# integration branch: infra only applies once develop is promoted into
+# main), AND the `production-infra` GitHub Environment. That third one is
+# required because a job's OIDC `sub` claim becomes
+# `repo:OWNER/REPO:environment:NAME` (not the ref-based form) whenever the
+# job declares `environment:` — which terraform-apply.yml does, to gate
+# applies behind an optional required reviewer. Omitting it produces "Not
+# authorized to perform sts:AssumeRoleWithWebIdentity" even though the
+# ref-based sub looks right.
 #
 # Note: this means a PR-triggered plan run holds the same broad infra
-# permissions as an apply on develop — an accepted simplification for a
+# permissions as an apply on main — an accepted simplification for a
 # single-environment first cut. Tightening this (e.g. a read-only role for
 # plan) is a reasonable fast-follow once the pipeline is proven out.
 resource "aws_iam_role" "gha_terraform" {

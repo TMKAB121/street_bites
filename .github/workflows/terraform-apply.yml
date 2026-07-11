@@ -2,7 +2,7 @@ name: Terraform Apply
 
 on:
   push:
-    branches: [develop] # this repo's main/default branch
+    branches: [main] # production-apply gate — deliberately not `develop` (this repo's GitHub default/integration branch); promote via a develop -> main PR/merge when ready to deploy infra
     paths:
       - 'terraform/**'
 
@@ -14,7 +14,7 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     # Gate infra changes behind a reviewed GitHub Environment — merging to
-    # develop queues the apply, but a required reviewer (configure this in the
+    # main queues the apply, but a required reviewer (configure this in the
     # repo's environment settings) must approve before it actually runs.
     environment: production-infra
     env:
