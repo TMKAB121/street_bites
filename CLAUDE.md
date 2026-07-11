@@ -316,8 +316,16 @@ via the session; the user is logged in only at the final step.
   hands off; a single generic error covers both unknown email and wrong password,
   and the code step gives a generic "invalid or expired" error. Every auth step
   is rate-limited through the shared `ThrottlesAttempts` trait
-  (`app/Livewire/Auth/Concerns/`) — one policy (5 attempts / rolling minute) and
-  one generic "slow down" error for all flows. Pending sign-in is tracked by
+  (`app/Livewire/Auth/Concerns/`) — one default policy (5 attempts / rolling
+  minute) and one generic "slow down" error for all flows. **Sign-up code
+  sending is double-capped** (it's the one flow that mails an arbitrary
+  visitor-typed address — a bounce/abuse surface for the mail provider): on top
+  of the per-email bucket, `EmailEntry::submit()` and `VerifyCode::resend()`
+  share a per-IP bucket (`EmailEntry::SEND_IP_MAX_ATTEMPTS` — 10/rolling hour)
+  so rotating addresses can't pump mail, and `EmailEntry` validates
+  `email:rfc,dns` (MX/A lookup) so typo domains never get a send — the dns rule
+  is skipped under the test suite (`runningUnitTests()`, same pattern as the
+  HIBP check). Pending sign-in is tracked by
   `session('auth.login.pending')` = the user id only — never the password. The
   **reset** flow's request step (`ForgotPassword`) is anti-enumeration too: it
   always advances to the code screen with the same message and only actually mails
@@ -1001,12 +1009,18 @@ that matter while touching app code:
   GitHub Release, migrating before rolling `web`).
 - This repo's **main/default branch is `develop`, not `main`** — the OIDC
   trust policies and `terraform-apply.yml` are scoped to `develop` accordingly.
-- **Mail is SES in production** (`MAIL_MAILER=ses` in `main.tf`'s
-  `base_environment`; Mailpit is dev-only). `street-bites.org` is a DKIM-
-  verified SES **domain identity** (`terraform/modules/ses`; sends as
-  `noreply@street-bites.org`); the ECS task role sends via the SDK credential
-  chain — no mail credentials in env. Auth (sign-up verification + 2FA codes)
-  depends on it.
+- **Mail is Resend in production** (`MAIL_MAILER=resend` in `main.tf`'s
+  `base_environment`; Mailpit is dev-only). Auth (sign-up verification + 2FA
+  codes) depends on it. `street-bites.org` is verified as a sending domain in
+  the **Resend dashboard** (its DKIM/SPF/MX records are managed by hand in
+  Cloudflare from the values Resend issues — not in Terraform); sends as
+  `noreply@street-bites.org`. The API key rides in as the `RESEND_API_KEY`
+  ECS secret (Secrets Manager, `secrets.tf`) from the sensitive
+  `resend_api_key` Terraform variable (tfvars locally, the `RESEND_API_KEY`
+  repo secret via `TF_VAR_` in both terraform workflows — plan needs it too).
+  **SES was removed deliberately** (AWS denied production access; decision:
+  don't re-appeal) — don't reintroduce it. `config/services.php` already
+  wires `RESEND_API_KEY` (note: not the Laravel docs' `RESEND_KEY`).
 - **The production site is `https://www.street-bites.org`.** DNS is hosted at
   **Cloudflare** (records managed by Terraform via the `CLOUDFLARE_API_TOKEN`
   env var / CI secret, all DNS-only — no proxying); TLS terminates at the

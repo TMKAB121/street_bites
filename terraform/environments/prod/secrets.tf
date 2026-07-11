@@ -1,7 +1,9 @@
-# Generated once by Terraform and stored in Secrets Manager — never plaintext
-# in the task definitions. Injected into containers via the `secrets` block
-# (see modules/ecs-service), resolved by the ECS agent using the execution
-# role's secretsmanager:GetSecretValue grant (modules/iam-task-roles).
+# Generated once by Terraform (or, for the Resend key, externally issued and
+# passed in via a sensitive variable) and stored in Secrets Manager — never
+# plaintext in the task definitions. Injected into containers via the
+# `secrets` block (see modules/ecs-service), resolved by the ECS agent using
+# the execution role's secretsmanager:GetSecretValue grant
+# (modules/iam-task-roles).
 
 resource "random_password" "db_password" {
   length  = 32
@@ -72,6 +74,20 @@ resource "aws_secretsmanager_secret_version" "reverb_app_secret" {
   secret_string = random_password.reverb_app_secret.result
 }
 
+# The Resend API key backs MAIL_MAILER=resend (auth verification / 2FA /
+# reset codes). Unlike the generated secrets above it can't be minted by
+# Terraform — it comes from the Resend dashboard through the sensitive
+# `resend_api_key` variable (terraform.tfvars locally, TF_VAR_resend_api_key
+# from the RESEND_API_KEY repo secret in CI).
+resource "aws_secretsmanager_secret" "resend_api_key" {
+  name = "${var.project}/resend-api-key"
+}
+
+resource "aws_secretsmanager_secret_version" "resend_api_key" {
+  secret_id     = aws_secretsmanager_secret.resend_api_key.id
+  secret_string = var.resend_api_key
+}
+
 locals {
   secrets_arns = [
     aws_secretsmanager_secret.app_key.arn,
@@ -79,6 +95,7 @@ locals {
     aws_secretsmanager_secret.reverb_app_id.arn,
     aws_secretsmanager_secret.reverb_app_key.arn,
     aws_secretsmanager_secret.reverb_app_secret.arn,
+    aws_secretsmanager_secret.resend_api_key.arn,
   ]
 
   task_secrets = [
@@ -87,5 +104,6 @@ locals {
     { name = "REVERB_APP_ID", valueFrom = aws_secretsmanager_secret.reverb_app_id.arn },
     { name = "REVERB_APP_KEY", valueFrom = aws_secretsmanager_secret.reverb_app_key.arn },
     { name = "REVERB_APP_SECRET", valueFrom = aws_secretsmanager_secret.reverb_app_secret.arn },
+    { name = "RESEND_API_KEY", valueFrom = aws_secretsmanager_secret.resend_api_key.arn },
   ]
 }

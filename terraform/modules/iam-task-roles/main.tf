@@ -36,10 +36,11 @@ resource "aws_iam_role_policy" "execution_secrets" {
 }
 
 # --- Task role: what the running Laravel app itself is allowed to do --------
-# S3 access for the public-storage bucket plus SES send as the verified
-# from-identity — the AWS SDK's default credential chain picks this role up
-# automatically, so AWS_ACCESS_KEY_ID/SECRET stay blank in the app's env
-# (config/filesystems.php's `s3` disk, config/services.php's `ses` mailer).
+# S3 access for the public-storage bucket and Rekognition image screening —
+# the AWS SDK's default credential chain picks this role up automatically, so
+# AWS_ACCESS_KEY_ID/SECRET stay blank in the app's env (config/filesystems.php's
+# `s3` disk). Mail is Resend (an external API key via Secrets Manager), so the
+# task role carries no mail permissions.
 resource "aws_iam_role" "task" {
   name               = "${var.project}-ecs-task"
   assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
@@ -59,24 +60,8 @@ resource "aws_iam_role_policy" "task_s3" {
   })
 }
 
-# Scoped to the from-identity: the app may only send as its own verified
-# address, not as any identity in the account.
-resource "aws_iam_role_policy" "task_ses" {
-  name = "${var.project}-ecs-task-ses"
-  role = aws_iam_role.task.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["ses:SendEmail", "ses:SendRawEmail"]
-      Resource = [var.ses_identity_arn]
-    }]
-  })
-}
-
 # Content-moderation image screening: App\Actions\ScreenImage calls Rekognition
-# DetectModerationLabels via the SDK credential chain (same as S3/SES above),
+# DetectModerationLabels via the SDK credential chain (same as S3 above),
 # gated by MODERATION_REKOGNITION_ENABLED. Rekognition's image operations don't
 # support resource-level permissions, so Resource must be "*".
 resource "aws_iam_role_policy" "task_rekognition" {

@@ -7,10 +7,11 @@ namespace App\Livewire\Auth\Concerns;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
- * The shared rate-limit guard for the auth flows. One policy (5 attempts per
- * rolling minute) and one generic "slow down" error, so brute-force protection
- * can't drift between steps. Callers decide what an attempt costs: hit on every
- * request (code issuing) or only on failure with a clear on success (guesses).
+ * The shared rate-limit guard for the auth flows. One default policy (5
+ * attempts per rolling minute) and one generic "slow down" error, so
+ * brute-force protection can't drift between steps. Callers decide what an
+ * attempt costs: hit on every request (code issuing) or only on failure with
+ * a clear on success (guesses).
  */
 trait ThrottlesAttempts
 {
@@ -23,9 +24,9 @@ trait ThrottlesAttempts
      * to $field, so the caller can simply `return`. $noun matches the flow's
      * copy: 'attempts' for guessable inputs, 'requests' for code issuing.
      */
-    private function throttled(string $key, string $field, string $noun = 'attempts'): bool
+    private function throttled(string $key, string $field, string $noun = 'attempts', int $maxAttempts = self::MAX_ATTEMPTS): bool
     {
-        if (! RateLimiter::tooManyAttempts($key, self::MAX_ATTEMPTS)) {
+        if (! RateLimiter::tooManyAttempts($key, $maxAttempts)) {
             return false;
         }
 
@@ -34,9 +35,9 @@ trait ThrottlesAttempts
         return true;
     }
 
-    private function recordAttempt(string $key): void
+    private function recordAttempt(string $key, int $decaySeconds = self::DECAY_SECONDS): void
     {
-        RateLimiter::hit($key, self::DECAY_SECONDS);
+        RateLimiter::hit($key, $decaySeconds);
     }
 
     private function clearAttempts(string $key): void
