@@ -1,7 +1,9 @@
 {{--
     News & events landing page (route: news.index) — a full-size search page
     for posts that doubles as the feed: an empty query lists everything
-    newest-first (unlike /search, which prompts). The header search stays
+    (unlike /search, which prompts) in Post::feed() order — featured stories
+    first, then upcoming events soonest-first, past events dropped. The header
+    search stays
     trucks-only, so this page carries its own GET form; Enter and the button
     work without JS. Query-filtered views are noindex (internal search results
     shouldn't be indexed); the bare listing is the crawlable news feed.
