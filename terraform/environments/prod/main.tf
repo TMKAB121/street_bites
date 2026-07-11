@@ -38,17 +38,11 @@ module "reverb_lb" {
   certificate_arn   = aws_acm_certificate_validation.this.certificate_arn
 }
 
-module "ses" {
-  source = "../../modules/ses"
-  domain = var.domain
-}
-
 module "iam_task_roles" {
-  source           = "../../modules/iam-task-roles"
-  project          = var.project
-  s3_bucket_arn    = module.s3_public.bucket_arn
-  ses_identity_arn = module.ses.identity_arn
-  secrets_arns     = local.secrets_arns
+  source        = "../../modules/iam-task-roles"
+  project       = var.project
+  s3_bucket_arn = module.s3_public.bucket_arn
+  secrets_arns  = local.secrets_arns
 }
 
 # --- Per-service security groups, created here (not inside modules/ecs-service)
@@ -169,7 +163,7 @@ locals {
     { name = "SESSION_DRIVER", value = "redis" },
     { name = "SESSION_SECURE_COOKIE", value = "true" }, # the ALB serves HTTPS-only (HTTP:80 just redirects)
     { name = "QUEUE_CONNECTION", value = "redis" },
-    { name = "MAIL_MAILER", value = "ses" }, # config/services.php `ses` leaves the key/secret blank → SDK falls through to the ECS task role
+    { name = "MAIL_MAILER", value = "resend" }, # Resend (AWS denied SES production access) — RESEND_API_KEY rides in via task_secrets; the sending domain is verified in the Resend dashboard, not here
     { name = "MAIL_FROM_ADDRESS", value = local.mail_from_address },
     { name = "BROADCAST_CONNECTION", value = "reverb" },
     { name = "REVERB_HOST", value = module.reverb_lb.dns_name },

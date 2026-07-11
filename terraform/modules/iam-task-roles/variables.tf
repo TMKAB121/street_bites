@@ -11,8 +11,3 @@ variable "secrets_arns" {
   description = "Secrets Manager ARNs the execution role may read (APP_KEY, DB password, Reverb credentials) to inject as task definition `secrets`."
   type        = list(string)
 }
-
-variable "ses_identity_arn" {
-  description = "The verified SES from-identity (modules/ses) the task role may send email as — backs MAIL_MAILER=ses (auth verification / 2FA codes)."
-  type        = string
-}

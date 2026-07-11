@@ -1,15 +1,17 @@
 # Everything the street-bites.org domain touches: the ACM certificate, the
-# Cloudflare DNS records that validate it, the records that point the domain
-# at the load balancers, and the SES DKIM records. DNS is hosted at
-# Cloudflare (the registrar), so records are cloudflare_dns_record resources
-# — the AWS side never sees the zone.
+# Cloudflare DNS records that validate it, and the records that point the
+# domain at the load balancers. DNS is hosted at Cloudflare (the registrar),
+# so records are cloudflare_dns_record resources — the AWS side never sees
+# the zone. The mail-sending records (Resend's DKIM/SPF/MX on the send
+# subdomain, plus _dmarc) are managed by hand in the Cloudflare dashboard
+# from the values the Resend dashboard issues — not here.
 #
 # Every record here is deliberately proxied = false (DNS-only, "grey cloud"):
 # TLS terminates at the ALB/NLB with the ACM cert, so Cloudflare is purely a
 # DNS host. Flipping the site records to proxied would put Cloudflare's edge
 # (and its own cert + SSL-mode matrix) in front of the ALB — a separate
-# decision, not a default. The ACM-validation and DKIM records must never be
-# proxied or verification breaks.
+# decision, not a default. The ACM-validation records must never be proxied
+# or validation breaks.
 
 data "cloudflare_zone" "this" {
   filter = {
@@ -21,7 +23,7 @@ locals {
   cloudflare_zone_id = data.cloudflare_zone.this.zone_id
 
   # The app sends auth codes as this address — any local part under the
-  # verified domain identity works; change it freely.
+  # domain verified in the Resend dashboard works; change it freely.
   mail_from_address = "noreply@${var.domain}"
 }
 
@@ -92,19 +94,6 @@ resource "cloudflare_dns_record" "ws" {
   name    = "ws.${var.domain}"
   type    = "CNAME"
   content = module.reverb_lb.dns_name
-  ttl     = 1
-  proxied = false
-}
-
-# --- SES DKIM (verifies the domain identity — see modules/ses) ---------------
-
-resource "cloudflare_dns_record" "ses_dkim" {
-  count = 3
-
-  zone_id = local.cloudflare_zone_id
-  name    = "${module.ses.dkim_tokens[count.index]}._domainkey.${var.domain}"
-  type    = "CNAME"
-  content = "${module.ses.dkim_tokens[count.index]}.dkim.amazonses.com"
   ttl     = 1
   proxied = false
 }
