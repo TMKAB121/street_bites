@@ -6,6 +6,7 @@ use App\Enums\SocialPlatform;
 use App\Livewire\Profile\TruckEditor;
 use App\Models\FoodTruck;
 use App\Models\MenuItem;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -35,6 +36,21 @@ it('hydrates the form from the truck on mount', function (): void {
     Livewire::actingAs($user)
         ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
         ->assertSet('name', 'Curry Cart');
+});
+
+it('always renders the add-cuisine input even when no tags exist yet', function (): void {
+    // Regression: the whole Cuisine tags fieldset used to be gated on
+    // $allTags->isNotEmpty(), so a fresh DB with zero tags hid the "add a new
+    // cuisine" input — a deadlock where the first tag could never be created.
+    Tag::query()->delete();
+
+    $user = User::factory()->create();
+    $truck = FoodTruck::factory()->for($user)->create();
+
+    Livewire::actingAs($user)
+        ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
+        ->assertSee('Cuisine tags')
+        ->assertSee('New cuisine (e.g. Fusion)');
 });
 
 it('saves the name and upserts today\'s operating hours', function (): void {
@@ -218,16 +234,26 @@ it('rejects a non-image upload', function (): void {
     expect($truck->images()->count())->toBe(0);
 });
 
-it('deletes the truck and notifies the parent', function (): void {
+it('hard-deletes the vendor\'s own truck and clears its disk files', function (): void {
+    // A vendor deleting their own truck is a real removal (not moderation), so it
+    // is force-deleted — gone from the DB entirely, never left in the Removed tab
+    // (that's for admin RemoveTruck, which soft-deletes for evidence).
+    Storage::fake('public');
+
     $user = User::factory()->create();
     $truck = FoodTruck::factory()->for($user)->create();
+    Storage::disk('public')->put("truck-images/{$truck->id}/photo.webp", 'x');
+    Storage::disk('public')->put("truck-maps/{$truck->id}/map.png", 'x');
 
     Livewire::actingAs($user)
         ->test(TruckEditor::class, ['truckId' => $truck->id, 'lazy' => false])
         ->call('deleteTruck')
         ->assertDispatched('truck-deleted');
 
-    expect(FoodTruck::query()->find($truck->id))->toBeNull();
+    // Truly gone — withTrashed proves it wasn't merely soft-deleted.
+    expect(FoodTruck::withTrashed()->find($truck->id))->toBeNull();
+    Storage::disk('public')->assertMissing("truck-images/{$truck->id}/photo.webp");
+    Storage::disk('public')->assertMissing("truck-maps/{$truck->id}/map.png");
 });
 
 it('pins the truck at the vendor\'s coordinates with a reverse-geocoded label', function (): void {

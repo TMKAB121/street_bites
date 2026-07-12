@@ -613,7 +613,18 @@ class TruckEditor extends Component
 
     public function deleteTruck(): void
     {
-        $this->truck()->delete();
+        $truck = $this->truck();
+
+        // A vendor deleting their own truck is a genuine removal — hard-delete it
+        // so it never lingers in the moderation queue's Removed tab (that tab is
+        // for admin-removed trucks kept as evidence; RemoveTruck soft-deletes).
+        // The DB cascade drops hours/images/menu/tags/social/favourite rows but
+        // never touches the disk, so clear the stored images/maps first.
+        $disk = Storage::disk(config('filesystems.public_disk'));
+        $disk->deleteDirectory("truck-images/{$truck->id}");
+        $disk->deleteDirectory("truck-maps/{$truck->id}");
+
+        $truck->forceDelete();
 
         // The truck is gone — don't let render() re-resolve it (findOrFail would
         // throw). The parent drops this card from the expanded set.
