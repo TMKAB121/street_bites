@@ -338,6 +338,12 @@ Security follows NIST SP 800-63B / OWASP guidance:
   the session id is regenerated on login.
 - Generic, rate-limited errors at each step to resist account enumeration and
   brute force.
+- **Response-header hardening** on every page (a `SecurityHeaders` middleware):
+  HSTS, a `Content-Security-Policy` (report-only until enforced), `X-Frame-Options`,
+  `X-Content-Type-Options`, `Referrer-Policy`, and a `Permissions-Policy` that scopes
+  geolocation to the site and denies camera/microphone/payment.
+- A **`/.well-known/security.txt`** (RFC 9116) telling researchers how to report a
+  vulnerability.
 
 > The second factor is **email OTP** by design (not TOTP/SMS) to limit PII and
 > complexity for now. See `CLAUDE.md` → *Authentication* for the full convention set.
