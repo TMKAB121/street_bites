@@ -272,6 +272,12 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   whose open-tag bytes a `short_open_tag=On` server (prod) mis-parses, 500ing the
   page. Same trap in PHP `//` comments: a `?>` ends the comment, so keep both out
   of the route file too.
+- `/.well-known/security.txt` → route in `routes/web.php` (`security.txt`) — the
+  **RFC 9116 vulnerability-disclosure file**. A route (not a static file), mirroring
+  the sitemap, so `Expires` rolls forward on every fetch and never goes stale.
+  `Contact` is `security@street-bites.org` (a Cloudflare Email Routing forwarder to
+  the maintainer inbox). nginx already permits `/.well-known` (its dotfile deny rule
+  excludes it), so it falls through to `index.php`. See *Security headers*.
 - `/profile` → `App\Livewire\Profile\ProfilePage` (`auth` middleware) — the
   signed-in profile (see *Profile & vendor management* below). Uses the
   `layouts/shell.blade.php` layout, which factors the welcome shell's chrome
@@ -409,6 +415,49 @@ decision; don't add a category picker without one.
 - **Equal prominence is a legal rule, not styling:** Accept and Decline share
   the single `.cookie-consent__btn` class (same size/color/font). Never restyle
   one of them, hide Decline, or pre-select anything.
+
+## Security headers
+
+Response-header hardening lives in **`App\Http\Middleware\SecurityHeaders`**,
+appended to the `web` group in `bootstrap/app.php`. **The app is the only place
+these can be set** — Cloudflare is DNS-only (grey cloud) and the ALB injects no
+response headers, so neither upstream can add them. Applied to every web response:
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (the app never frames
+itself), `Referrer-Policy: strict-origin-when-cross-origin`, and a
+`Permissions-Policy` that scopes `geolocation` to `self` (the discovery map uses
+it) and denies camera/microphone/payment.
+
+- **HSTS** (`Strict-Transport-Security: max-age=31536000; includeSubDomains`) is
+  emitted **only over HTTPS and never in local** (`$request->isSecure() && !
+  App::environment('local')`). It's actively harmful under Lando: local is HTTPS
+  with Lando's self-signed cert, and an HSTS pin turns the normally-bypassable cert
+  warning into a **hard block with no "proceed anyway"** (if you ever hit that,
+  clear it at `chrome://net-internals/#hsts`). `preload` is **deliberately left
+  off** — it forces every current and future subdomain to HTTPS forever, so adding
+  it (and submitting to hstspreload.org) is a separate, hard-to-reverse decision.
+- **Content-Security-Policy** (HTML responses only — skipped on JSON/XML/plain-text
+  like the API, sitemap, and security.txt) is built by `contentSecurityPolicy()`
+  from an audit of what the app loads: `script-src 'self' 'unsafe-eval'` —
+  `'unsafe-eval'` is required because Livewire 4 bundles Alpine (Function-constructor
+  expression compilation), and there are **no inline `<script>` blocks in views**, so
+  scripts deliberately get **no `'unsafe-inline'`**. `style-src 'self' 'unsafe-inline'`
+  (both `@livewireStyles` and `@fonts` emit inline `<style>`). `img-src` allows OSM
+  tiles (`tile.openstreetmap.org`), `data:`, and — in prod — the S3 public-disk host
+  (parsed from `config('filesystems.disks.s3.url')`). `connect-src 'self'`
+  (favorites/search/geocode/report and Livewire's update endpoint are same-origin;
+  Reverb's wss isn't wired up yet). In **local dev** the Vite dev-server origin from
+  `public/hot` (plus its `wss://` HMR socket) is added to script/style/font/connect.
+- **Report-only until enforced.** The CSP ships as
+  `Content-Security-Policy-Report-Only` (logs violations, blocks nothing) until
+  `config('security.csp_enforce')` — env `CSP_ENFORCE` (`config/security.php`) — is
+  true, which flips the header name to the enforcing `Content-Security-Policy`. Flip
+  it only after watching the browser console for violations across the map,
+  favorites, search, auth, and admin flows. No code change to change modes.
+- **`/.well-known/security.txt`** (see *Pages*) is the paired RFC 9116 disclosure
+  file. Prod-only companions live in the Docker image, not Lando (`recipe: laravel`):
+  `server_tokens off` (`docker/nginx.conf`) and `expose_php = Off`
+  (`docker/php.ini`, a conf.d drop-in) trim version-leaking `Server`/`X-Powered-By`
+  headers. Tests: `tests/Feature/SecurityHeadersTest.php`.
 
 ## Profile & vendor management
 
@@ -988,7 +1037,10 @@ that matter while touching app code:
   compression and browser caching (nothing upstream compresses — the ALB passes
   bytes through): gzip for text responses, `Cache-Control: immutable, 1 year`
   on `/build/` (safe because Vite fingerprints those filenames), a week on
-  `/images/` and the favicons.
+  `/images/` and the favicons, plus `server_tokens off`. `docker/php.ini` (a
+  conf.d drop-in) sets `expose_php = Off`. Both are prod-only — Lando's `laravel`
+  recipe doesn't build this image. The response security headers themselves (HSTS,
+  CSP, …) are app-level, not nginx — see *Security headers*.
 - **`config('filesystems.public_disk')`** (`config/filesystems.php`, env
   `FILESYSTEM_PUBLIC_DISK`) is what every truck-image/map-cache call site
   resolves through instead of a hardcoded `'public'` disk name — `public`

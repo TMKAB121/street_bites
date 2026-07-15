@@ -72,6 +72,7 @@ COPY --from=assets /app/public/build ./public/build
 COPY . .
 
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+COPY docker/php.ini /usr/local/etc/php/conf.d/zz-app.ini
 COPY docker/www.conf /usr/local/etc/php-fpm.d/www.conf
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
