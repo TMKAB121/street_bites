@@ -365,6 +365,26 @@ Route::get('/sitemap.xml', function (): Response {
     ]);
 })->name('sitemap');
 
+// RFC 9116 security disclosure file (/.well-known/security.txt). Tells security
+// researchers how to report a vulnerability. Served as a route (mirroring the
+// sitemap) rather than a static file so `Expires` rolls forward on every fetch
+// and never goes stale — RFC 9116 requires the field and that it not be in the
+// past. `Contact` is the Cloudflare-Email-Routing forwarder (security@ →
+// maintainer inbox); nginx already permits /.well-known (its dotfile deny rule
+// excludes it), so this falls through to index.php like any other route.
+Route::get('/.well-known/security.txt', function (): Response {
+    $lines = [
+        'Contact: mailto:security@street-bites.org',
+        'Expires: '.now()->addYear()->startOfDay()->toIso8601ZuluString(),
+        'Preferred-Languages: en',
+        'Canonical: '.url('/.well-known/security.txt'),
+    ];
+
+    return response(implode("\n", $lines)."\n", 200, [
+        'Content-Type' => 'text/plain; charset=utf-8',
+    ]);
+})->name('security.txt');
+
 // Living style guide — visual reference for the "Urban Vibrant" design tokens.
 Route::view('/styleguide', 'styleguide');
 
