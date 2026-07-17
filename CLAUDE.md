@@ -1038,8 +1038,11 @@ that matter while touching app code:
   bytes through): gzip for text responses, `Cache-Control: immutable, 1 year`
   on `/build/` (safe because Vite fingerprints those filenames), a week on
   `/images/` and the favicons, plus `server_tokens off`. `docker/php.ini` (a
-  conf.d drop-in) sets `expose_php = Off`. Both are prod-only — Lando's `laravel`
-  recipe doesn't build this image. The response security headers themselves (HSTS,
+  conf.d drop-in) sets `expose_php = Off` **and the upload limits**
+  (`upload_max_filesize = 6M`, `post_max_size = 10M`) — the base image ships no
+  php.ini, and its compiled-in 2M default silently 302'd any 2–5 MB Livewire
+  image upload in prod (Lando sets 100M, so it never reproduces locally). Both
+  files are prod-only — Lando's `laravel` recipe doesn't build this image. The response security headers themselves (HSTS,
   CSP, …) are app-level, not nginx — see *Security headers*.
 - **`config('filesystems.public_disk')`** (`config/filesystems.php`, env
   `FILESYSTEM_PUBLIC_DISK`) is what every truck-image/map-cache call site
