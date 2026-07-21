@@ -110,6 +110,16 @@
                 <span class="moderation__badge moderation__badge--flagged">{{ $pendingReinstatements }}</span>
             @endif
         </button>
+        <button
+            type="button"
+            wire:click="setFilter('claims')"
+            @class(['moderation__tab', 'moderation__tab--active' => $filter === 'claims'])
+        >
+            Claims
+            @if ($pendingClaims > 0)
+                <span class="moderation__badge moderation__badge--flagged">{{ $pendingClaims }}</span>
+            @endif
+        </button>
     </div>
 
     {{-- Reinstatement requests: blocked vendors asking to have their ban lifted.
@@ -159,6 +169,54 @@
         @empty
             <p class="profile__empty">No reinstatement requests.</p>
         @endforelse
+
+    {{-- Truck claim requests: signed-in visitors asking to take ownership of an
+         unclaimed listing. Approving transfers the truck to them; dismissing
+         leaves it unclaimed (they may claim again later). --}}
+    @elseif ($filter === 'claims')
+        @forelse ($claims as $claim)
+            <article class="moderation__row" wire:key="claim-{{ $claim->id }}">
+                <div class="moderation__thumb" aria-hidden="true"></div>
+
+                <div class="moderation__body">
+                    @if ($claim->foodTruck)
+                        <p class="moderation__name">
+                            <a href="{{ route('trucks.show', [$claim->foodTruck, $claim->foodTruck->slug]) }}" target="_blank" rel="noopener">
+                                {{ $claim->foodTruck->name }}
+                            </a>
+                        </p>
+                    @else
+                        <p class="moderation__name">(truck removed)</p>
+                    @endif
+                    <p class="moderation__meta">Claimant: {{ $claim->user->email }}</p>
+
+                    @if ($claim->message)
+                        <p class="moderation__desc">“{{ $claim->message }}”</p>
+                    @endif
+
+                    <div class="moderation__actions">
+                        <button
+                            type="button"
+                            class="moderation__action moderation__action--approve"
+                            wire:click="approveClaim({{ $claim->id }})"
+                            wire:confirm="Transfer {{ $claim->foodTruck?->name ?? 'this truck' }} to {{ $claim->user->email }}? They’ll be able to edit it."
+                        >
+                            Approve
+                        </button>
+                        <button
+                            type="button"
+                            class="moderation__action moderation__action--remove"
+                            wire:click="dismissClaim({{ $claim->id }})"
+                            wire:confirm="Dismiss this claim? The truck stays unclaimed (they can claim again)."
+                        >
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            </article>
+        @empty
+            <p class="profile__empty">No pending claims.</p>
+        @endforelse
     @else
 
     @forelse ($trucks as $truck)
@@ -176,7 +234,7 @@
 
             <div class="moderation__body">
                 <p class="moderation__name">{{ $truck->name }}</p>
-                <p class="moderation__meta">{{ $truck->user->email }}</p>
+                <p class="moderation__meta">{{ $truck->user?->email ?? 'Unclaimed listing' }}</p>
 
                 <div class="moderation__badges">
                     @if ($filter === 'removed')
@@ -195,7 +253,9 @@
                         </span>
                     @endif
 
-                    @if ($truck->user->isBanned())
+                    @if ($truck->user === null)
+                        <span class="moderation__badge moderation__badge--held">Unclaimed</span>
+                    @elseif ($truck->user->isBanned())
                         <span class="moderation__badge moderation__badge--flagged">Vendor blocked</span>
                     @endif
                 </div>
@@ -255,14 +315,25 @@
                         >
                             Remove
                         </button>
-                        <button
-                            type="button"
-                            class="moderation__action moderation__action--block"
-                            wire:click="blockOwner({{ $truck->id }})"
-                            wire:confirm="Block {{ $truck->user->email }} and unpublish all their trucks?"
-                        >
-                            Block vendor
-                        </button>
+                        {{-- An unclaimed truck has no vendor to block; admins edit
+                             it directly to fix imported data instead. --}}
+                        @if ($truck->user)
+                            <button
+                                type="button"
+                                class="moderation__action moderation__action--block"
+                                wire:click="blockOwner({{ $truck->id }})"
+                                wire:confirm="Block {{ $truck->user->email }} and unpublish all their trucks?"
+                            >
+                                Block vendor
+                            </button>
+                        @else
+                            <a
+                                href="{{ route('admin.trucks.edit', $truck) }}"
+                                class="moderation__action moderation__action--approve"
+                            >
+                                Edit
+                            </a>
+                        @endif
                     @endif
                 </div>
             </div>

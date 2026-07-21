@@ -19,10 +19,12 @@ use App\Livewire\Auth\ResetVerify;
 use App\Livewire\Auth\SetPassword;
 use App\Livewire\Auth\VerifyCode;
 use App\Livewire\Profile\ProfilePage;
+use App\Mail\TruckClaimSubmitted;
 use App\Models\CookieConsent;
 use App\Models\FoodTruck;
 use App\Models\Post;
 use App\Models\Tag;
+use App\Models\TruckClaimRequest;
 use App\Models\TruckReport;
 use App\Models\User;
 use Illuminate\Contracts\View\Factory;
@@ -30,6 +32,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
@@ -219,13 +222,64 @@ Route::get('/trucks/{truck}/{slug}', function (string $truck, string $slug): Fac
     $mapPath = resolve(GenerateTruckMapImage::class)($truck);
     $mapUrl = $mapPath !== null ? Storage::disk(config('filesystems.public_disk'))->url($mapPath) : null;
 
+    // Whether the signed-in visitor already has a pending claim on this (unclaimed)
+    // truck — swaps the "Claim this truck" form for an "under review" note.
+    $hasPendingClaim = auth()->check()
+        && $truck->user_id === null
+        && auth()->user()->hasPendingClaimFor($truck);
+
     return view('trucks.show', [
         'truck' => $truck,
         'mapUrl' => $mapUrl,
         'isFavorited' => $isFavorited,
         'isReported' => $isReported,
+        'hasPendingClaim' => $hasPendingClaim,
     ]);
 })->whereNumber('truck')->name('trucks.show');
+
+// Claim an unclaimed truck — a signed-in visitor asks to take ownership of a
+// listing seeded by an admin/import (user_id null). A plain CSRF POST (the detail
+// page is plain Blade, mirroring the admin remove/block routes). The truck stays
+// live and unclaimed until an admin approves the request from the moderation
+// queue's Claims tab; this only records the request. Published + unclaimed trucks
+// only; one pending request per user (a repeat is an idempotent no-op).
+Route::post('/trucks/{truck}/claim', function (Request $request, string $truck) {
+    $truck = FoodTruck::query()
+        ->where('is_published', true)
+        ->findOrFail($truck);
+
+    // Only unclaimed trucks can be claimed.
+    abort_if($truck->user_id !== null, 404);
+
+    /** @var User $user */
+    $user = $request->user();
+
+    $validated = $request->validate(['message' => ['nullable', 'string', 'max:1000']]);
+
+    // A banned user can't claim; a duplicate pending claim is a silent no-op.
+    // Either way, fall through to the same redirect so we never leak which case
+    // was hit, and never send a second admin email.
+    if (! $user->isBanned() && ! $user->hasPendingClaimFor($truck)) {
+        $truck->claimRequests()->create([
+            'user_id' => $user->id,
+            'message' => filled($validated['message'] ?? null) ? trim($validated['message']) : null,
+            'status' => TruckClaimRequest::STATUS_PENDING,
+        ]);
+
+        /** @var list<string> $admins */
+        $admins = config('admin.emails', []);
+        if ($admins !== []) {
+            Mail::to($admins)->send(new TruckClaimSubmitted(
+                truckName: $truck->name,
+                claimantEmail: $user->email,
+                message: filled($validated['message'] ?? null) ? trim($validated['message']) : null,
+                reviewUrl: route('admin.trucks', ['filter' => 'claims']),
+            ));
+        }
+    }
+
+    return redirect()->route('trucks.show', [$truck, $truck->slug]);
+})->whereNumber('truck')->middleware('auth')->name('trucks.claim');
 
 // Favourite/unfavourite toggle for the star buttons (<x-favorite-toggle> →
 // resources/js/favorites.js). One endpoint, idempotent per pair: toggle()
@@ -496,6 +550,16 @@ Route::middleware(['auth', EnsureAdmin::class, RequireCookieConsent::class])
         // News & events authoring — the only way posts are created/edited.
         Route::get('/news', NewsManager::class)->name('admin.news');
 
+        // Admin editing of an UNCLAIMED truck — fix imported/seeded data before a
+        // vendor claims it. Only unclaimed trucks (user_id null); an owned truck
+        // is the vendor's to edit (404 here). Embeds the same TruckEditor the
+        // profile uses (whose truck() guard also allows admins on unclaimed trucks).
+        Route::get('/trucks/{truck}/edit', function (FoodTruck $truck): Factory|View {
+            abort_if($truck->user_id !== null, 404);
+
+            return view('admin.truck-edit', ['truck' => $truck]);
+        })->whereNumber('truck')->name('admin.trucks.edit');
+
         // Moderator actions on the public truck detail page (admin-only panel
         // there). Plain CSRF POSTs — the detail page is plain Blade, not
         // Livewire — routed through the same guards and the same shared actions
@@ -509,6 +573,9 @@ Route::middleware(['auth', EnsureAdmin::class, RequireCookieConsent::class])
         })->whereNumber('truck')->name('admin.trucks.remove');
 
         Route::post('/trucks/{truck}/block', function (FoodTruck $truck, BlockVendor $blockVendor) {
+            // An unclaimed truck (user_id null) has no vendor to block.
+            abort_if($truck->user === null, 404);
+
             $blockVendor($truck->user);
 
             return redirect()->route('admin.trucks');

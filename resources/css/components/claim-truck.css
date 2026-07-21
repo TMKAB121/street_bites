@@ -1,0 +1,79 @@
+/*
+ | -----------------------------------------------------------------------------
+ | Claim this truck
+ | -----------------------------------------------------------------------------
+ | The unclaimed-listing disclosure + "Claim this truck" call to action rendered
+ | by <x-claim-truck> on the public detail page, shown only when the truck has no
+ | owner. A soft chili-tinted card: the disclaimer sets expectations, then a
+ | mustard CTA reveals an optional verification form (Alpine two-step). Kept
+ | calm — informative, not alarming. The global .btn rule (button.css) supplies
+ | the CTA sizing/ADA target.
+ |
+ |   <x-claim-truck :truck="…" :pending="…" />
+ */
+
+@layer components {
+    .claim-truck {
+        @apply mb-8 rounded-xl p-4;
+        border: 1px solid color-mix(in srgb, var(--color-accent-chili) 25%, transparent);
+        background: color-mix(in srgb, var(--color-accent-chili) 6%, transparent);
+    }
+
+    .claim-truck__notice {
+        @apply flex items-start gap-2 text-sm;
+        color: var(--color-text-muted);
+    }
+
+    .claim-truck__icon {
+        @apply mt-0.5 shrink-0;
+        width: 1.125rem;
+        height: 1.125rem;
+        fill: none;
+        stroke: var(--color-accent-chili);
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .claim-truck__prompt {
+        @apply mt-3 text-sm font-semibold;
+        color: var(--color-primary);
+    }
+
+    .claim-truck__pending {
+        @apply mt-3 text-sm font-medium;
+        color: var(--color-accent-chili);
+    }
+
+    .claim-truck__cta {
+        @apply mt-2 w-full;
+    }
+
+    .claim-truck__form {
+        @apply mt-3;
+    }
+
+    .claim-truck__label {
+        @apply mb-1 block text-xs;
+        color: var(--color-text-muted);
+    }
+
+    .claim-truck__textarea {
+        @apply w-full;
+        resize: vertical;
+    }
+
+    .claim-truck__actions {
+        @apply mt-2 flex gap-2;
+    }
+
+    .claim-truck__cancel {
+        @apply flex-1;
+        border: 1px solid color-mix(in srgb, var(--color-primary) 15%, transparent);
+        color: var(--color-text-muted);
+    }
+
+    .claim-truck__submit {
+        @apply flex-1;
+    }
+}

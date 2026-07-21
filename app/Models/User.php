@@ -78,6 +78,30 @@ class User extends Authenticatable
     }
 
     /**
+     * Whether this user already has a pending claim on the given truck — used to
+     * swap the detail page's "Claim this truck" form for an "under review" note
+     * and to make a repeat submission an idempotent no-op. A user may claim again
+     * only after a previous request is dismissed.
+     */
+    public function hasPendingClaimFor(FoodTruck $truck): bool
+    {
+        return $this->truckClaimRequests()
+            ->where('food_truck_id', $truck->id)
+            ->where('status', TruckClaimRequest::STATUS_PENDING)
+            ->exists();
+    }
+
+    /**
+     * This user's truck claim requests (see TruckClaimRequest).
+     *
+     * @return HasMany<TruckClaimRequest, $this>
+     */
+    public function truckClaimRequests(): HasMany
+    {
+        return $this->hasMany(TruckClaimRequest::class);
+    }
+
+    /**
      * Trucks this user owns as a vendor. A user has none until they tap
      * "Add a food truck" on their profile.
      *
