@@ -7,14 +7,17 @@ namespace App\Livewire\Admin;
 use App\Actions\BlockVendor;
 use App\Actions\RemoveTruck;
 use App\Livewire\Admin\Concerns\AuthorizesAdmin;
+use App\Mail\TruckClaimApproved;
 use App\Models\FoodTruck;
 use App\Models\ModerationTerm;
 use App\Models\ReinstatementRequest;
 use App\Models\Tag;
+use App\Models\TruckClaimRequest;
 use App\Models\TruckReport;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -31,6 +34,8 @@ use Livewire\Component;
  *  - blockOwner()     — ban the vendor and unpublish all their trucks at once.
  *  - reinstate()      — lift a ban in response to the vendor's reinstatement request.
  *  - dismissRequest() — decline a reinstatement request without lifting the ban.
+ *  - approveClaim()   — transfer an unclaimed truck to the visitor who claimed it.
+ *  - dismissClaim()   — decline a truck claim (the user may claim again later).
  *
  * remove()/blockOwner() delegate to the shared App\Actions\RemoveTruck /
  * App\Actions\BlockVendor so the identical moderation actions on the public
@@ -51,8 +56,9 @@ class ModerationQueue extends Component
     /**
      * Which list to show: 'review' (held/unpublished awaiting a decision),
      * 'reported' (live trucks with open public reports), 'removed' (soft-deleted),
-     * or 'reinstatement' (pending unban requests). URL-bound so the detail-page
-     * remove action can deep-link straight to the Removed tab (?filter=removed).
+     * 'reinstatement' (pending unban requests), or 'claims' (pending truck-claim
+     * requests). URL-bound so the detail-page remove action can deep-link straight
+     * to the Removed tab (?filter=removed) and the claim email to Claims.
      */
     #[Url]
     public string $filter = 'review';
@@ -68,7 +74,7 @@ class ModerationQueue extends Component
 
     public function setFilter(string $filter): void
     {
-        $this->filter = in_array($filter, ['reported', 'removed', 'reinstatement'], true) ? $filter : 'review';
+        $this->filter = in_array($filter, ['reported', 'removed', 'reinstatement', 'claims'], true) ? $filter : 'review';
     }
 
     /**
@@ -121,14 +127,12 @@ class ModerationQueue extends Component
     {
         $truck = $this->truck($truckId);
 
-        /** @var User $owner */
-        $owner = $truck->user;
-
         $truck->update([
             'reviewed_at' => now(),
             // Publishing on approval, unless the owner is blocked (their trucks
-            // stay down regardless).
-            'is_published' => ! $owner->isBanned(),
+            // stay down regardless). An unclaimed truck has no owner to be
+            // banned, so it always publishes.
+            'is_published' => $truck->user === null || ! $truck->user->isBanned(),
             'screen_status' => FoodTruck::SCREEN_PASSED,
             'moderation_reason' => null,
         ]);
@@ -179,8 +183,14 @@ class ModerationQueue extends Component
 
     public function blockOwner(int $truckId, BlockVendor $blockVendor): void
     {
-        /** @var User $owner */
         $owner = $this->truck($truckId)->user;
+
+        // An unclaimed truck has no vendor to block — nothing to do.
+        if ($owner === null) {
+            $this->toast('This truck is unclaimed — there is no vendor to block', 'error');
+
+            return;
+        }
 
         $blockVendor($owner);
 
@@ -229,11 +239,85 @@ class ModerationQueue extends Component
         $this->toast('Reinstatement request dismissed');
     }
 
+    /**
+     * Approve a truck claim: transfer the unclaimed truck to the claimant. The
+     * truck's published/screen state is left untouched — only its owner changes.
+     * All other pending claims on the same truck are auto-dismissed (moot once it
+     * has an owner). Guards cover the races: a truck that gained an owner or was
+     * removed since the claim, and a claimant who was banned in the meantime.
+     */
+    public function approveClaim(int $claimId): void
+    {
+        $this->authorizeAdmin();
+
+        $claim = TruckClaimRequest::query()->with(['user', 'foodTruck'])->findOrFail($claimId);
+
+        $truck = $claim->foodTruck;
+        $claimant = $claim->user;
+
+        // The truck was removed (soft-deleted) or already claimed since, or the
+        // claimant's account is gone — nothing to transfer, so close the claim.
+        if ($truck === null || $truck->user_id !== null || $claimant === null) {
+            $claim->update(['status' => TruckClaimRequest::STATUS_DISMISSED, 'reviewed_at' => now()]);
+            $this->toast('That truck is no longer available to claim — request closed', 'error');
+
+            return;
+        }
+
+        // A banned user can't take ownership; leave the claim pending so it can be
+        // approved after they're reinstated.
+        if ($claimant->isBanned()) {
+            $this->toast('That claimant is blocked — reinstate them first', 'error');
+
+            return;
+        }
+
+        // user_id is out of FoodTruck's fillable, so associate() rather than update().
+        $truck->user()->associate($claimant)->save();
+
+        $claim->update(['status' => TruckClaimRequest::STATUS_APPROVED, 'reviewed_at' => now()]);
+
+        // Every other pending claim on this truck is now moot.
+        TruckClaimRequest::query()
+            ->where('food_truck_id', $truck->id)
+            ->where('status', TruckClaimRequest::STATUS_PENDING)
+            ->update(['status' => TruckClaimRequest::STATUS_DISMISSED, 'reviewed_at' => now()]);
+
+        Mail::to($claimant->email)->send(new TruckClaimApproved(
+            truckName: $truck->name,
+            truckUrl: route('trucks.show', [$truck, $truck->slug]),
+        ));
+
+        $this->toast('Claim approved — truck transferred to the claimant');
+    }
+
+    /**
+     * Decline a truck claim without transferring ownership. The truck stays
+     * unclaimed; the user may submit a fresh claim later.
+     */
+    public function dismissClaim(int $claimId): void
+    {
+        $this->authorizeAdmin();
+
+        TruckClaimRequest::query()->whereKey($claimId)->update([
+            'status' => TruckClaimRequest::STATUS_DISMISSED,
+            'reviewed_at' => now(),
+        ]);
+
+        $this->toast('Claim dismissed');
+    }
+
     public function render(): View
     {
         $pendingRequests = ReinstatementRequest::query()
             ->where('status', ReinstatementRequest::STATUS_PENDING)
             ->with('user')
+            ->latest()
+            ->get();
+
+        $pendingClaims = TruckClaimRequest::query()
+            ->where('status', TruckClaimRequest::STATUS_PENDING)
+            ->with(['user', 'foodTruck'])
             ->latest()
             ->get();
 
@@ -243,10 +327,16 @@ class ModerationQueue extends Component
             ->whereHas('reports', fn ($q) => $q->where('status', TruckReport::STATUS_OPEN))
             ->count();
 
+        // The list tabs (reinstatement, claims) don't render trucks — pass an empty
+        // collection so the truck loop stays quiet.
+        $listOnly = in_array($this->filter, ['reinstatement', 'claims'], true);
+
         return view('livewire.admin.moderation-queue', [
-            'trucks' => $this->filter === 'reinstatement' ? new Collection : $this->trucks(),
+            'trucks' => $listOnly ? new Collection : $this->trucks(),
             'reinstatements' => $pendingRequests,
             'pendingReinstatements' => $pendingRequests->count(),
+            'claims' => $pendingClaims,
+            'pendingClaims' => $pendingClaims->count(),
             'reportedCount' => $reportedCount,
             'terms' => ModerationTerm::query()->orderBy('term')->get(),
             'tags' => Tag::query()->withCount('foodTrucks')->orderBy('name')->get(),

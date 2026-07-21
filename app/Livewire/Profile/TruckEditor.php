@@ -105,14 +105,21 @@ class TruckEditor extends Component
     }
 
     /**
-     * Resolve the truck and assert the current user owns it. Re-run on every
-     * action so a tampered request can never reach another vendor's truck.
+     * Resolve the truck and assert the current user may edit it. Re-run on every
+     * action so a tampered request can never reach another vendor's truck. The
+     * owner may always edit their own; an admin may edit an *unclaimed* truck
+     * (user_id null — a seeded/imported listing) to fix its data before a vendor
+     * claims it. Admins never edit someone else's *owned* truck here — moderation
+     * actions cover that.
      */
     private function truck(): FoodTruck
     {
         $truck = FoodTruck::query()->findOrFail($this->truckId);
 
-        abort_unless($truck->user_id === auth()->id(), 403);
+        $isOwner = $truck->user_id === auth()->id();
+        $isAdminOnUnclaimed = $truck->user_id === null && auth()->user()?->isAdmin();
+
+        abort_unless($isOwner || $isAdminOnUnclaimed, 403);
 
         return $truck;
     }

@@ -205,6 +205,17 @@ class FoodTruck extends Model
     }
 
     /**
+     * Requests from signed-in visitors to take ownership of this truck (only
+     * meaningful while it's unclaimed — user_id null). See TruckClaimRequest.
+     *
+     * @return HasMany<TruckClaimRequest, $this>
+     */
+    public function claimRequests(): HasMany
+    {
+        return $this->hasMany(TruckClaimRequest::class);
+    }
+
+    /**
      * Cuisine taxonomy tags for this truck.
      *
      * @return BelongsToMany<Tag, $this>
