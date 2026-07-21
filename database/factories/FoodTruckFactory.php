@@ -32,6 +32,15 @@ class FoodTruckFactory extends Factory
     }
 
     /**
+     * An unclaimed listing — no owner (`user_id` null), the state an admin/import
+     * seeds. The real vendor claims it later.
+     */
+    public function unclaimed(): static
+    {
+        return $this->state(['user_id' => null]);
+    }
+
+    /**
      * Give the truck a pinned GPS location (fixed coords near ZIP 66202) so
      * tests can exercise the map without caring about specific values.
      */

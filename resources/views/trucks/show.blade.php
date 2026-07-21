@@ -109,6 +109,13 @@
         @endif
     </header>
 
+    {{-- Unclaimed-listing disclosure + "Claim this truck" CTA — only rendered
+         when the truck has no owner (seeded by an admin/import). Placed before the
+         hours/menu so the visitor knows the details may be incomplete first. --}}
+    @if ($truck->user_id === null)
+        <x-claim-truck :truck="$truck" :pending="$hasPendingClaim" />
+    @endif
+
     {{-- Today's window + location. Hours are per-business-date, so anything
          beyond today is unknowable by design. --}}
     <section class="truck-page__today mb-8">
@@ -202,8 +209,10 @@
 
     {{-- Quiet "report this truck" footer control — anyone (guests too) can flag
          the truck as offensive, surfacing it to moderators without taking it
-         down. Hidden for the truck's own owner (nobody reports themselves). --}}
-    @unless (auth()->id() === $truck->user_id)
+         down. Hidden only for the truck's own owner (nobody reports themselves).
+         The non-null owner guard matters for unclaimed trucks: without it, a
+         guest (auth()->id() null) would match null === null and lose the control. --}}
+    @unless ($truck->user_id !== null && auth()->id() === $truck->user_id)
         <x-report-truck :truck-id="$truck->id" :label="$truck->name" :reported="$isReported" />
     @endunless
 
@@ -259,40 +268,50 @@
                 </div>
             </div>
 
-            {{-- Block this vendor --}}
-            <div x-data="{ confirming: false }">
-                <button
-                    type="button"
-                    class="btn w-full border border-accent-chili/30 text-accent-chili"
-                    x-show="!confirming"
-                    @click="confirming = true"
-                >
-                    Block this vendor
-                </button>
+            {{-- Block this vendor — only when the truck HAS an owner. An unclaimed
+                 truck (user_id null) has no vendor to ban; admins edit it directly
+                 (link below) or remove it. --}}
+            @if ($truck->user)
+                <div x-data="{ confirming: false }">
+                    <button
+                        type="button"
+                        class="btn w-full border border-accent-chili/30 text-accent-chili"
+                        x-show="!confirming"
+                        @click="confirming = true"
+                    >
+                        Block this vendor
+                    </button>
 
-                <div x-show="confirming" x-cloak class="rounded-lg border border-accent-chili/30 p-4">
-                    <p class="text-sm text-text-muted mb-3">
-                        Bans {{ $truck->user->email }} and unpublishes every truck they
-                        own. They can still sign in and browse, and can request
-                        reinstatement from their profile.
-                    </p>
-                    <div class="flex gap-2">
-                        <button
-                            type="button"
-                            class="btn flex-1 border border-primary/15 text-text-muted"
-                            @click="confirming = false"
-                        >
-                            Cancel
-                        </button>
-                        <form method="POST" action="{{ route('admin.trucks.block', $truck) }}" class="flex-1">
-                            @csrf
-                            <button type="submit" class="btn btn-accent w-full">
-                                Block vendor
+                    <div x-show="confirming" x-cloak class="rounded-lg border border-accent-chili/30 p-4">
+                        <p class="text-sm text-text-muted mb-3">
+                            Bans {{ $truck->user->email }} and unpublishes every truck they
+                            own. They can still sign in and browse, and can request
+                            reinstatement from their profile.
+                        </p>
+                        <div class="flex gap-2">
+                            <button
+                                type="button"
+                                class="btn flex-1 border border-primary/15 text-text-muted"
+                                @click="confirming = false"
+                            >
+                                Cancel
                             </button>
-                        </form>
+                            <form method="POST" action="{{ route('admin.trucks.block', $truck) }}" class="flex-1">
+                                @csrf
+                                <button type="submit" class="btn btn-accent w-full">
+                                    Block vendor
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
-            </div>
+            @else
+                {{-- Unclaimed truck — admins can edit it directly to fix imported
+                     data (Phase 2.5). --}}
+                <a href="{{ route('admin.trucks.edit', $truck) }}" class="btn w-full border border-accent-chili/30 text-accent-chili">
+                    Edit this truck
+                </a>
+            @endif
         </section>
     @endif
 </x-layouts::shell>

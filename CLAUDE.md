@@ -868,6 +868,104 @@ report, IP dedupe, signed-in attribution, published-only, owner-hidden), and
 `tests/Feature/Moderation/ScreeningTest.php` (text/image flagging, ban guards) —
 they set `config(['admin.emails' => …])` and mock the non-final `ScreenImage`.
 
+## Unclaimed trucks, claiming & data import
+
+The chicken-and-egg of a discovery site: vendors won't sign up for an empty map,
+and the map stays empty without vendors. The fix is **unclaimed trucks** — real
+listings we seed from public data that any visitor can browse, and the real owner
+can later claim.
+
+- **`food_trucks.user_id` is nullable — `NULL` *is* the "unclaimed" state** (no
+  separate flag; migration `2026_07_20_000001_*`). A truck with no owner was seeded
+  by an admin or the import command. The FK keeps `cascadeOnDelete` for owned trucks
+  (the account-deletion route relies on it); NULL rows are never referenced by a
+  user. Factory state: `FoodTruck::factory()->unclaimed()`. **Most of the app was
+  already null-owner-safe** (discovery, search, favorites, the report endpoint,
+  `RemoveTruck` never touch the owner); the null-safety fixes were confined to
+  `ModerationQueue::approve()`/`blockOwner()`, the `admin.trucks.block` route, and
+  two spots in `trucks/show.blade.php` (the report-megaphone gate — a non-null owner
+  guard, else guests lose the control on unclaimed trucks — and the block-vendor
+  panel that reads `$truck->user->email`).
+- **The detail page discloses it and offers a claim.** `<x-claim-truck>`
+  (`claim-truck.css`) renders after the header only when `user_id === null`: a
+  disclaimer ("added by our systems… not managed by the owner yet"), then a
+  state-dependent CTA — guests get a sign-in link, signed-in visitors get an
+  Alpine two-step reveal → a form POSTing to **`POST /trucks/{truck}/claim`**
+  (`trucks.claim`, `auth`, `whereNumber`; a plain CSRF POST like the admin
+  remove/block routes, since the detail page is plain Blade). The route is
+  published-and-unclaimed-only (404 otherwise), records **one pending
+  `truck_claim_requests` row per user** (`User::hasPendingClaimFor()` — a repeat is
+  an idempotent no-op; a banned user is silently refused; re-claim allowed after a
+  dismissal), and queues `TruckClaimSubmitted` to `config('admin.emails')` (the
+  `notifyAdminsOfHold()` pattern — no-op when empty). The truck **stays live and
+  unclaimed until an admin approves** — claiming is never a takedown or instant
+  takeover lever.
+- **Admins review claims on the moderation queue's Claims tab.** A 5th `$filter`
+  value (`claims`, badge-counted) alongside review/reported/removed/reinstatement.
+  `approveClaim()` transfers the truck (`user()->associate($claimant)->save()` —
+  `user_id` is out of `#[Fillable]`), marks the claim approved, **auto-dismisses
+  every other pending claim on that truck**, and emails the new owner
+  (`TruckClaimApproved`); it leaves `is_published`/screen fields untouched (only the
+  owner changes). Guards cover the races: truck removed or already owned since →
+  claim dismissed; claimant banned meanwhile → claim stays pending. `dismissClaim()`
+  closes a claim, leaving the truck unclaimed. Schema mirrors `reinstatement_requests`
+  (`2026_07_20_000002_*`): `food_truck_id` + `user_id` (both `cascadeOnDelete`),
+  nullable `message`, `status` (`pending`/`approved`/`dismissed`), `reviewed_at`.
+  Model `TruckClaimRequest` (`STATUS_*` constants, `user()`/`foodTruck()`).
+- **Admins can edit an unclaimed truck directly** to fix imported data before it's
+  claimed. `TruckEditor::truck()`'s guard now allows the owner **or** an admin on a
+  null-owner truck (never an admin on someone else's *owned* truck — moderation
+  covers that). Route **`GET /admin/trucks/{truck}/edit`** (`admin.trucks.edit`,
+  unclaimed-only 404 guard) renders `admin/truck-edit.blade.php`, embedding the same
+  `<livewire:profile.truck-editor :lazy="false">`. Entry points: an "Edit" link on
+  unclaimed rows in the queue and in the detail-page Moderation panel. Once claimed,
+  the truck has an owner and the admin edit surface disappears.
+- **One-time CSV import: `php artisan trucks:import <path> {--dry-run}`**
+  (`app/Console/Commands/ImportTrucks.php` — the project's first artisan command).
+  Creates **unclaimed** trucks from a header-rowed CSV (pipe-separated multi-value
+  cells): `name` (required, dedup key) · `description` · `address` (geocoded via
+  `GeocodeSearch` when lat/lng absent, throttled to ≤1 req/sec through
+  `Illuminate\Support\Sleep` so it's fakeable in tests) · `latitude`/`longitude` ·
+  `tags` · `menu` (`Item=4.50|Item2`) · `images` (paths relative to the CSV dir or
+  absolute, fed through `StoreTruckImage` via the seeder's `UploadedFile(test: true)`
+  trick) · `social_urls` (platform via `SocialPlatform::fromUrl`) · `timezone`.
+  Dedup is `withTrashed()->where('name')` (admin-removed trucks don't resurrect); the
+  text screen (`ScreenText`) holds a flagged row unpublished + `SCREEN_FLAGGED` (onto
+  the review queue, no per-row email) and denies blocklisted tag names outright; a row
+  with no resolvable location imports **unpinned** (the app supports pinless trucks).
+  No operating hours are imported. `--dry-run` parses/validates only — no writes, no
+  network.
+- **Tests:** `tests/Feature/Trucks/ClaimTruckTest.php` (disclaimer/CTA states, the
+  guest-report regression, POST behaviour + dedupe + bans + admin email),
+  `tests/Feature/Admin/ClaimQueueTest.php` (tab, approve transfer + auto-dismiss +
+  race guards, dismiss, non-admin), `tests/Feature/Admin/UnclaimedTruckTest.php`
+  (null-owner moderation regressions + the admin-edit surface), and
+  `tests/Feature/Console/ImportTrucksTest.php` (`Http::fake`, `Sleep::fake`,
+  `Storage::fake`, `config(['moderation.text_blocklist' => …])`).
+
+### Real-time location crawler (planned — not built)
+
+The import gets us a static footprint; keeping trucks' *live* location fresh is the
+harder, deferred problem. Design intent, so nothing here blocks it:
+
+- **No schema hooks were added now** — unclaimed trucks are themselves the hook
+  (exactly the set a crawler keeps fresh), and `latitude/longitude/location_label/
+  located_at/timezone` are already the write surface (`TruckEditor::setLocation()`'s
+  fields). A future **`truck_sources`** table (`food_truck_id`, `url`, `strategy`,
+  `config` json, `last_crawled_at`, `last_status`) would hold per-source crawl
+  bookkeeping — a truck may have several sources (Instagram + a website), and that
+  churn shouldn't bloat the hot `food_trucks` row.
+- **Execution**: a scheduled artisan command (`routes/console.php` scheduler — also
+  currently empty) dispatching one queued job per due source onto the existing Redis
+  queue, rate-limited per host; geocoding reuses `GeocodeSearch` under the same
+  ≤1 req/sec discipline.
+- **Extraction**: two strategies behind one interface — CSS-selector/regex config per
+  source (cheap, brittle) for structured pages, vs LLM extraction (fetch → prompt for
+  `{address?, lat/lng?, open_now?}` with a confidence floor) for free-text social
+  posts. All crawler writes pass the `ScreenText` blocklist like the importer.
+- **Trust**: crawled updates only ever touch *unclaimed* trucks (or claimed trucks
+  that opt in later); a claim approval would deactivate the truck's sources.
+
 ## Social links
 
 Vendors add social-media profile links to their truck; the detail page shows them
