@@ -1131,7 +1131,8 @@ that matter while touching app code:
 
 - **`Dockerfile` + `docker/`** build one production image; ECS runs it as
   three services (`web`, `reverb`, `queue-worker` — mirrors the `.lando.yml`
-  split) that differ only in container command. `docker/nginx.conf` owns
+  split) that differ only in container command. **`reverb` is not deployed
+  today** — see *Cost posture* below. `docker/nginx.conf` owns
   compression and browser caching (nothing upstream compresses — the ALB passes
   bytes through): gzip for text responses, `Cache-Control: immutable, 1 year`
   on `/build/` (safe because Vite fingerprints those filenames), a week on
@@ -1156,6 +1157,26 @@ that matter while touching app code:
   `environments/prod/` is the actual infrastructure, built from
   `terraform/modules/*`. Adding a second environment later means copying
   `environments/prod/`, not restructuring the modules.
+- **Cost posture — the site runs deliberately lean.** Adoption hasn't happened
+  yet, so prod is tuned for cost over headroom, each lever a single reversible
+  variable (the table in `terraform/environments/prod/README.md` is the
+  reference). What this changes for app code:
+  **(1) Reverb is not deployed** (`enable_reverb = false`) — no NLB, no task,
+  no `ws.street-bites.org`, and `BROADCAST_CONNECTION=log`, so **broadcasts go
+  nowhere in prod**. Nothing subscribes today (`app.js` deliberately doesn't
+  import `echo.js` — see *JavaScript / Alpine*), so the first realtime feature
+  means flipping the variable, re-adding `reverb` to the `deploy-others` matrix
+  in `release-deploy.yml`, and setting the `VITE_REVERB_*` repo variables.
+  **(2) There is no NAT gateway** — Fargate tasks run in the *public* subnets
+  with public IPs, egressing through the internet gateway; inbound is closed at
+  the security groups (`web` admits only the ALB) and RDS/Redis stay private.
+  Anything that runs a one-off task (like `release-deploy.yml`'s migration
+  step) must set `assignPublicIp=ENABLED` or it cannot pull the image.
+  **(3) Container Insights is off** by default — task logs still reach
+  CloudWatch Logs (7-day retention); only the per-task metrics are off, and
+  they're re-enabled by flipping `container_insights` when diagnosing.
+  **(4) `queue-worker` runs on Fargate Spot** — it can be reclaimed with 2
+  minutes' notice, so queued jobs must stay idempotent and retry-safe.
 - **`.github/workflows/`** — `ci.yml` (PR quality gate), `terraform-plan.yml` /
   `terraform-apply.yml` (infra, gated behind the `production-infra`
   Environment), `release-deploy.yml` (builds + deploys on every published

@@ -1,6 +1,12 @@
 module "vpc" {
   source  = "../../modules/vpc"
   project = var.project
+
+  # No NAT gateway (~$33/mo plus per-GB processing). Tasks run in the public
+  # subnets with public IPs instead — see the ECS service modules below. Set
+  # this back to 1 and move those services onto private_subnet_ids together;
+  # one without the other leaves the tasks with no route to the internet.
+  nat_gateway_count = 0
 }
 
 module "ecr" {
@@ -30,6 +36,7 @@ module "alb" {
 }
 
 module "reverb_lb" {
+  count             = var.enable_reverb ? 1 : 0
   source            = "../../modules/reverb-lb"
   project           = var.project
   vpc_id            = module.vpc.vpc_id
@@ -77,6 +84,7 @@ resource "aws_security_group" "web" {
 # simplification (browsers use the NLB's TLS:443 listener; this port also
 # carries the server-side broadcast hairpin).
 resource "aws_security_group" "reverb" {
+  count       = var.enable_reverb ? 1 : 0
   name_prefix = "${var.project}-reverb-"
   vpc_id      = module.vpc.vpc_id
 
@@ -131,18 +139,32 @@ module "elasticache" {
   project                    = var.project
   vpc_id                     = module.vpc.vpc_id
   private_subnet_ids         = module.vpc.private_subnet_ids
-  allowed_security_group_ids = [aws_security_group.web.id, aws_security_group.reverb.id, aws_security_group.queue_worker.id]
+  allowed_security_group_ids = concat([aws_security_group.web.id, aws_security_group.queue_worker.id], aws_security_group.reverb[*].id)
 }
 
-# --- Shared env vars for all three services ---------------------------------
+# --- Shared env vars for all services ---------------------------------------
 #
-# REVERB_HOST here points at the same public NLB DNS name used by the browser
-# (no internal service-discovery/Cloud Map in this first cut) — the `web` and
-# `queue-worker` containers hairpin out through the NLB to broadcast events.
-# Cheaper/faster internal-only routing via AWS Cloud Map is a reasonable
-# fast-follow, not a correctness requirement.
+# With enable_reverb = false (the default) there is no NLB and no reverb task,
+# so BROADCAST_CONNECTION falls back to `log` and the REVERB_* vars drop out
+# entirely — nothing in the app subscribes to Reverb yet (resources/js/app.js
+# deliberately doesn't import echo.js), so broadcasts have no listeners either way.
+#
+# When enable_reverb is true, REVERB_HOST points at the same public NLB DNS name
+# the browser uses (no internal service-discovery/Cloud Map in this first cut) —
+# the `web` and `queue-worker` containers hairpin out through the NLB to
+# broadcast events. Cheaper/faster internal-only routing via AWS Cloud Map is a
+# reasonable fast-follow, not a correctness requirement.
 locals {
-  base_environment = [
+  reverb_environment = var.enable_reverb ? [
+    { name = "BROADCAST_CONNECTION", value = "reverb" },
+    { name = "REVERB_HOST", value = module.reverb_lb[0].dns_name },
+    { name = "REVERB_PORT", value = tostring(var.reverb_port) },
+    { name = "REVERB_SCHEME", value = "http" },
+    ] : [
+    { name = "BROADCAST_CONNECTION", value = "log" },
+  ]
+
+  base_environment = concat(local.reverb_environment, [
     { name = "APP_NAME", value = "Street Bites" },
     { name = "APP_ENV", value = "production" },
     { name = "APP_DEBUG", value = "false" },
@@ -165,10 +187,6 @@ locals {
     { name = "QUEUE_CONNECTION", value = "redis" },
     { name = "MAIL_MAILER", value = "resend" }, # Resend (AWS denied SES production access) — RESEND_API_KEY rides in via task_secrets; the sending domain is verified in the Resend dashboard, not here
     { name = "MAIL_FROM_ADDRESS", value = local.mail_from_address },
-    { name = "BROADCAST_CONNECTION", value = "reverb" },
-    { name = "REVERB_HOST", value = module.reverb_lb.dns_name },
-    { name = "REVERB_PORT", value = tostring(var.reverb_port) },
-    { name = "REVERB_SCHEME", value = "http" },
     { name = "FILESYSTEM_PUBLIC_DISK", value = "s3" },
     { name = "AWS_DEFAULT_REGION", value = var.aws_region },
     { name = "AWS_BUCKET", value = module.s3_public.bucket_name },
@@ -179,9 +197,15 @@ locals {
     # Text screening (a word-list) always runs and needs nothing here.
     { name = "ADMIN_EMAILS", value = var.admin_emails },
     { name = "MODERATION_REKOGNITION_ENABLED", value = "true" },
-  ]
+  ])
 }
 
+# All services run in the *public* subnets with public IPs — the NAT gateway is
+# gone for cost (modules/vpc, nat_gateway_count = 0), so this is how tasks reach
+# ECR, Secrets Manager, Resend, and OSM. A public IP is not public reach:
+# inbound is still governed by the per-service security groups above (web admits
+# only the ALB; queue-worker admits nothing at all). RDS and ElastiCache stay in
+# the private subnets, unreachable from the internet.
 module "web" {
   source                = "../../modules/ecs-service"
   project               = var.project
@@ -189,7 +213,8 @@ module "web" {
   cluster_arn           = module.ecs_cluster.cluster_arn
   cluster_name          = module.ecs_cluster.cluster_name
   vpc_id                = module.vpc.vpc_id
-  private_subnet_ids    = module.vpc.private_subnet_ids
+  subnet_ids            = module.vpc.public_subnet_ids
+  assign_public_ip      = true
   security_group_id     = aws_security_group.web.id
   container_image       = "${module.ecr.repository_url}:${var.image_tag}"
   container_port        = 8080
@@ -198,6 +223,7 @@ module "web" {
   environment_variables = local.base_environment
   secrets               = local.task_secrets
   desired_count         = 1
+  log_retention_days    = 7
   target_group_arn      = module.alb.target_group_arn
   enable_autoscaling    = true
   min_capacity          = 1
@@ -205,14 +231,16 @@ module "web" {
 }
 
 module "reverb" {
+  count                 = var.enable_reverb ? 1 : 0
   source                = "../../modules/ecs-service"
   project               = var.project
   service_name          = "reverb"
   cluster_arn           = module.ecs_cluster.cluster_arn
   cluster_name          = module.ecs_cluster.cluster_name
   vpc_id                = module.vpc.vpc_id
-  private_subnet_ids    = module.vpc.private_subnet_ids
-  security_group_id     = aws_security_group.reverb.id
+  subnet_ids            = module.vpc.public_subnet_ids
+  assign_public_ip      = true
+  security_group_id     = aws_security_group.reverb[0].id
   container_image       = "${module.ecr.repository_url}:${var.image_tag}"
   container_command     = ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=${var.reverb_port}"]
   container_port        = var.reverb_port
@@ -221,9 +249,11 @@ module "reverb" {
   environment_variables = local.base_environment
   secrets               = local.task_secrets
   desired_count         = 1
-  target_group_arn      = module.reverb_lb.target_group_arn
+  log_retention_days    = 7
+  target_group_arn      = module.reverb_lb[0].target_group_arn
 }
 
+# Interruption-tolerant (a reclaimed job is retried), so this one runs on Spot.
 module "queue_worker" {
   source                = "../../modules/ecs-service"
   project               = var.project
@@ -231,7 +261,8 @@ module "queue_worker" {
   cluster_arn           = module.ecs_cluster.cluster_arn
   cluster_name          = module.ecs_cluster.cluster_name
   vpc_id                = module.vpc.vpc_id
-  private_subnet_ids    = module.vpc.private_subnet_ids
+  subnet_ids            = module.vpc.public_subnet_ids
+  assign_public_ip      = true
   security_group_id     = aws_security_group.queue_worker.id
   container_image       = "${module.ecr.repository_url}:${var.image_tag}"
   container_command     = ["php", "artisan", "queue:work", "redis", "--tries=3"]
@@ -240,4 +271,6 @@ module "queue_worker" {
   environment_variables = local.base_environment
   secrets               = local.task_secrets
   desired_count         = 1
+  log_retention_days    = 7
+  use_fargate_spot      = true
 }

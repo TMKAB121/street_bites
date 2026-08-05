@@ -14,7 +14,7 @@ variable "az_count" {
 }
 
 variable "nat_gateway_count" {
-  description = "1 = single shared NAT gateway (cost-optimized default, single point of failure across AZs). Set to var.az_count for one-per-AZ HA — a fast-follow, not the day-one default."
+  description = "0 = no NAT gateway (the cost default: ~$33/mo plus per-GB processing, for a site with near-zero traffic). Tasks then run in the public subnets with public IPs and reach the internet through the IGW; inbound stays closed at the security groups. 1 = single shared NAT (requires moving tasks back to private subnets); var.az_count = one per AZ for HA."
   type        = number
-  default     = 1
+  default     = 0
 }

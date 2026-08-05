@@ -94,14 +94,21 @@ jobs:
             --services "${{ vars.PROJECT_NAME }}-web" --query 'services[0]')
           SUBNETS=$(echo "$SERVICE" | jq -c '.networkConfiguration.awsvpcConfiguration.subnets')
           SGS=$(echo "$SERVICE" | jq -c '.networkConfiguration.awsvpcConfiguration.securityGroups')
+          # Mirrored from the web service rather than hardcoded: with no NAT
+          # gateway (modules/vpc, nat_gateway_count = 0) tasks run in public
+          # subnets and a migration task without a public IP can't pull the ECR
+          # image or read Secrets Manager — it just hangs until the wait fails.
+          PUBLIC_IP=$(echo "$SERVICE" | jq -r '.networkConfiguration.awsvpcConfiguration.assignPublicIp')
           echo "subnets=$SUBNETS" >> "$GITHUB_OUTPUT"
           echo "security_groups=$SGS" >> "$GITHUB_OUTPUT"
+          echo "assign_public_ip=$PUBLIC_IP" >> "$GITHUB_OUTPUT"
 
       - name: Run migration task
         id: run_migration
         env:
           SUBNETS: ${{ steps.netconf.outputs.subnets }}
           SECURITY_GROUPS: ${{ steps.netconf.outputs.security_groups }}
+          ASSIGN_PUBLIC_IP: ${{ steps.netconf.outputs.assign_public_ip }}
           TASK_DEF_ARN: ${{ steps.register.outputs.task_def_arn }}
         run: |
           # Built via jq --argjson (not string-concatenation) — mixing GitHub
@@ -112,7 +119,8 @@ jobs:
           NETWORK_CONFIG=$(jq -n \
             --argjson subnets "$SUBNETS" \
             --argjson sgs "$SECURITY_GROUPS" \
-            '{awsvpcConfiguration: {subnets: $subnets, securityGroups: $sgs, assignPublicIp: "DISABLED"}}')
+            --arg public_ip "$ASSIGN_PUBLIC_IP" \
+            '{awsvpcConfiguration: {subnets: $subnets, securityGroups: $sgs, assignPublicIp: $public_ip}}')
 
           TASK_ARN=$(aws ecs run-task \
             --cluster "$ECS_CLUSTER" \
@@ -160,7 +168,11 @@ jobs:
     needs: [build-and-push, deploy]
     strategy:
       matrix:
-        service: [reverb, queue-worker]
+        # `reverb` is absent because the service isn't deployed (the
+        # enable_reverb Terraform variable defaults to false — see
+        # terraform/environments/prod/variables.tf). Add it back to this list
+        # when that flag is flipped on, or the restored service never rolls.
+        service: [queue-worker]
 
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
