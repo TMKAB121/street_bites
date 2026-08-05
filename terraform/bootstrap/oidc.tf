@@ -13,6 +13,33 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = [data.tls_certificate.github.certificates[0].sha1_fingerprint]
 }
 
+locals {
+  # Every spelling of the OIDC `sub` claim prefix that CI might legitimately
+  # present, because GitHub changed this format underneath us.
+  #
+  # GitHub now appends the owner's and repo's immutable numeric IDs
+  # ("repo:OWNER@6655240/REPO@1274615786:ref:...") so that renaming an account
+  # or repository can't hand this role to whoever claims the freed-up name.
+  # Matching only the legacy name-only form is exactly what started failing
+  # every run with "Not authorized to perform sts:AssumeRoleWithWebIdentity"
+  # — the same break the sibling louisburg-community-choir repo hit on
+  # 2026-07-30 and fixed the same way.
+  #
+  # Both forms are listed so a revert of that rollout doesn't break CI a second
+  # time, and both spellings of the owner login are listed because the policy
+  # that worked here historically used `tmkab121` while the sibling repo's
+  # working policy uses the account's actual `TMKAB121` casing — IAM string
+  # matching is case-sensitive, so rather than bet on which one GitHub sends,
+  # accept both. Every entry is an exact string with no wildcards, so a longer
+  # list is not a looser policy.
+  github_sub_prefixes = flatten([
+    for owner in distinct([var.github_org, lower(var.github_org)]) : [
+      "repo:${owner}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}",
+      "repo:${owner}/${var.github_repo}",
+    ]
+  ])
+}
+
 # --- gha-terraform-role: assumed by terraform-plan.yml / terraform-apply.yml ---
 #
 # Trusted for `pull_request` (plan), pushes to `var.github_main_branch`
@@ -44,11 +71,13 @@ resource "aws_iam_role" "gha_terraform" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = [
-            "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/${var.github_main_branch}",
-            "repo:${var.github_org}/${var.github_repo}:pull_request",
-            "repo:${var.github_org}/${var.github_repo}:environment:production-infra",
-          ]
+          "token.actions.githubusercontent.com:sub" = flatten([
+            for prefix in local.github_sub_prefixes : [
+              "${prefix}:ref:refs/heads/${var.github_main_branch}",
+              "${prefix}:pull_request",
+              "${prefix}:environment:production-infra",
+            ]
+          ])
         }
       }
     }]
@@ -73,7 +102,11 @@ resource "aws_iam_role" "gha_deploy" {
       Condition = {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_org}/${var.github_repo}:environment:production"
+          # A list is OR-matched — see local.github_sub_prefixes for why there
+          # is more than one acceptable spelling.
+          "token.actions.githubusercontent.com:sub" = [
+            for prefix in local.github_sub_prefixes : "${prefix}:environment:production"
+          ]
         }
       }
     }]

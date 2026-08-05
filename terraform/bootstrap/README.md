@@ -16,6 +16,34 @@ terraform apply \
   -var="github_org=<your-github-org-or-username>"
 ```
 
+For this repo specifically, that is:
+
+```bash
+terraform apply -var="state_bucket_name=streetbites-terraform-state" -var="github_org=TMKAB121"
+```
+
+Pass `github_org` in the account's **canonical casing** (`TMKAB121`, not
+`tmkab121`). IAM string matching is case-sensitive and the trust policy derives
+its lowercase variants from this value — passing lowercase silently produces a
+policy that omits the uppercase spellings. See `local.github_sub_prefixes` in
+`oidc.tf`.
+
+### If CI fails with "Not authorized to perform sts:AssumeRoleWithWebIdentity"
+
+GitHub changed the OIDC `sub` claim to append the owner's and repo's immutable
+numeric IDs (`repo:OWNER@6655240/REPO@1274615786:ref:...`), so a trust policy
+matching only the legacy name-only form stops authorizing every workflow. The
+policies here accept both forms; if the IDs ever change (a repo transfer),
+refresh them with:
+
+```bash
+gh api repos/OWNER/REPO --jq '{repo: .id, owner: .owner.id}'
+```
+
+and update `github_owner_id` / `github_repo_id` in `variables.tf`. Because CI
+itself can't authenticate while this is broken, the fix **must** be applied by
+hand from here — that's the chicken-and-egg this root exists to solve.
+
 State for this root itself stays local (`terraform.tfstate` in this
 directory) — commit it nowhere, keep it somewhere safe (or accept that
 re-running `apply` is idempotent and cheap if it's lost; nothing here is

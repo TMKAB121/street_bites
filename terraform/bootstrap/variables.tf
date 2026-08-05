@@ -32,6 +32,26 @@ variable "github_repo" {
   default     = "street_bites"
 }
 
+variable "github_owner_id" {
+  description = <<-EOT
+    Numeric, immutable GitHub ID of var.github_org. GitHub now issues OIDC
+    subject claims with the owner's and repo's IDs appended
+    ("repo:OWNER@<owner_id>/REPO@<repo_id>:ref:..."), so that renaming an
+    account or repo cannot hand the role to whoever claims the freed name.
+    The trust policies accept that form as well as the legacy name-only one.
+    Read both with:
+      gh api repos/OWNER/REPO --jq '{repo: .id, owner: .owner.id}'
+  EOT
+  type        = string
+  default     = "6655240"
+}
+
+variable "github_repo_id" {
+  description = "Numeric, immutable GitHub ID of var.github_repo — see var.github_owner_id for why both are needed."
+  type        = string
+  default     = "1274615786"
+}
+
 variable "github_main_branch" {
   description = "The branch terraform-apply.yml deploys from — used to scope the OIDC trust policy's `sub` claim. Deliberately `main`, not `develop` (this repo's GitHub default/integration branch): infra applies are gated behind promoting develop into main, not every merge to develop."
   type        = string
