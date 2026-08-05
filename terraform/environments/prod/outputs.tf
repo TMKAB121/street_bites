@@ -9,13 +9,13 @@ output "alb_dns_name" {
 }
 
 output "reverb_browser_host" {
-  description = "Browser-facing WebSocket host: set the VITE_REVERB_HOST repo variable to this (with VITE_REVERB_PORT=443, VITE_REVERB_SCHEME=https) and publish a release to rebake the JS bundle."
-  value       = "ws.${var.domain}"
+  description = "Browser-facing WebSocket host: set the VITE_REVERB_HOST repo variable to this (with VITE_REVERB_PORT=443, VITE_REVERB_SCHEME=https) and publish a release to rebake the JS bundle. null while var.enable_reverb is false."
+  value       = var.enable_reverb ? "ws.${var.domain}" : null
 }
 
 output "reverb_dns_name" {
-  description = "The Reverb NLB's own DNS name — the server-side broadcast hairpin target (REVERB_HOST) and what the Cloudflare ws CNAME points at."
-  value       = module.reverb_lb.dns_name
+  description = "The Reverb NLB's own DNS name — the server-side broadcast hairpin target (REVERB_HOST) and what the Cloudflare ws CNAME points at. null while var.enable_reverb is false."
+  value       = one(module.reverb_lb[*].dns_name)
 }
 
 output "ecr_repository_url" {
@@ -32,7 +32,8 @@ output "web_service_name" {
 }
 
 output "reverb_service_name" {
-  value = module.reverb.service_name
+  description = "null while var.enable_reverb is false."
+  value       = one(module.reverb[*].service_name)
 }
 
 output "queue_worker_service_name" {

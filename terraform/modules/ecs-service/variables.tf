@@ -20,7 +20,11 @@ variable "vpc_id" {
   type = string
 }
 
-variable "private_subnet_ids" {
+# Named generically because these are the *public* subnets in prod: with the
+# NAT gateway removed for cost, tasks get public IPs and reach ECR/Secrets/
+# Resend through the internet gateway instead. Inbound is still closed —
+# security groups admit only the ALB (see environments/prod/main.tf).
+variable "subnet_ids" {
   type = list(string)
 }
 
@@ -87,7 +91,13 @@ variable "security_group_id" {
 }
 
 variable "assign_public_ip" {
-  description = "Tasks run in private subnets behind a NAT gateway; false unless a service specifically needs a public IP."
+  description = "Required when tasks run in public subnets with no NAT gateway — without it they can't pull the ECR image or reach Secrets Manager."
+  type        = bool
+  default     = false
+}
+
+variable "use_fargate_spot" {
+  description = "Run on FARGATE_SPOT (~70% cheaper) instead of on-demand. Safe for interruption-tolerant work (queue-worker: AWS gives 2 minutes' notice and jobs retry); leave false for user-facing services."
   type        = bool
   default     = false
 }

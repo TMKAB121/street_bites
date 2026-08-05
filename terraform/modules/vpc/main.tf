@@ -69,17 +69,22 @@ resource "aws_nat_gateway" "this" {
   depends_on = [aws_internet_gateway.this]
 }
 
-# Each private subnet routes through nat_gateway_count NAT gateways round-robin
-# — with the default of 1, every private subnet shares the single NAT; set
-# nat_gateway_count = var.az_count for one-per-AZ HA.
+# At nat_gateway_count = 0 (the cost-optimized default) these tables carry no
+# default route at all: only RDS and ElastiCache live in the private subnets and
+# neither initiates outbound traffic. The dynamic block — rather than a plain
+# route — is what makes 0 legal; indexing aws_nat_gateway unconditionally would
+# divide by zero.
 resource "aws_route_table" "private" {
   count  = var.az_count
   vpc_id = aws_vpc.this.id
   tags   = { Name = "${var.project}-private-${local.azs[count.index]}" }
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.this[count.index % var.nat_gateway_count].id
+  dynamic "route" {
+    for_each = var.nat_gateway_count > 0 ? [1] : []
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.this[count.index % var.nat_gateway_count].id
+    }
   }
 }
 

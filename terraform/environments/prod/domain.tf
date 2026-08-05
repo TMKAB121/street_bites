@@ -89,11 +89,15 @@ resource "cloudflare_dns_record" "www" {
   proxied = false
 }
 
+# Only exists while Reverb does (var.enable_reverb) — there's no NLB to point at
+# otherwise. The cert below keeps its ws.<domain> SAN either way: certs are free,
+# and editing SANs forces a replacement plus revalidation for no saving.
 resource "cloudflare_dns_record" "ws" {
+  count   = var.enable_reverb ? 1 : 0
   zone_id = local.cloudflare_zone_id
   name    = "ws.${var.domain}"
   type    = "CNAME"
-  content = module.reverb_lb.dns_name
+  content = module.reverb_lb[0].dns_name
   ttl     = 1
   proxied = false
 }

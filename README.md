@@ -533,6 +533,12 @@ for the full architecture writeup.
 
 ---
 
+## Troubleshooting
+
+If Vite fails out in an un-organic manner (hard shutdown or reset) the public/hot will persist. This will cause following vite runs to fail to load properly in browser. To fix run a rm public/hot followed by another npm run dev.
+
+---
+
 ## YouTube Series
 
 This project is built live across a YouTube series. Each commit maps to a video episode — follow along to see every decision made from scratch.

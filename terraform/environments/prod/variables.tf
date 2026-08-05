@@ -34,6 +34,18 @@ variable "reverb_port" {
   default = 8080
 }
 
+# Reverb costs a dedicated Fargate task plus its own public NLB (~$30/mo) and
+# currently serves nothing: resources/js/app.js deliberately doesn't import
+# echo.js, so no browser subscribes and no feature broadcasts. Off until the
+# first realtime feature lands — flipping this to true restores the NLB, the
+# ws.<domain> record, the reverb service, and BROADCAST_CONNECTION=reverb.
+# Re-add `reverb` to the deploy-others matrix in release-deploy.yml at the same
+# time, or releases won't roll the restored service.
+variable "enable_reverb" {
+  type    = bool
+  default = false
+}
+
 variable "domain" {
   description = "The site's domain (DNS hosted at Cloudflare — see domain.tf). Drives APP_URL (https://www.<domain>), the ACM cert, the ws.<domain> Reverb host, and the from-address mail sends as (noreply@<domain>, verified as a sending domain in the Resend dashboard). Not sensitive, so the prod value is the default — no tfvars/CI variable needed."
   type        = string
