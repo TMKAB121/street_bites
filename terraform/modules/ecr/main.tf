@@ -15,16 +15,31 @@ resource "aws_ecr_lifecycle_policy" "this" {
   repository = aws_ecr_repository.this.name
 
   policy = jsonencode({
-    rules = [{
-      rulePriority = 1
-      description  = "Expire untagged images after 14 days"
-      selection = {
-        tagStatus   = "untagged"
-        countType   = "sinceImagePushed"
-        countUnit   = "days"
-        countNumber = 14
-      }
-      action = { type = "expire" }
-    }]
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Expire untagged images after 14 days"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 14
+        }
+        action = { type = "expire" }
+      },
+      # Every release pushes a uniquely-tagged immutable image, so without this
+      # rule the repository grows forever. Ten keeps plenty of rollback targets.
+      {
+        rulePriority = 2
+        description  = "Keep only the 10 most recent tagged images"
+        selection = {
+          tagStatus      = "tagged"
+          tagPatternList = ["*"]
+          countType      = "imageCountMoreThan"
+          countNumber    = 10
+        }
+        action = { type = "expire" }
+      },
+    ]
   })
 }

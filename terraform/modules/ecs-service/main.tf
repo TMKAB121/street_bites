@@ -42,10 +42,22 @@ resource "aws_ecs_service" "this" {
   cluster         = var.cluster_arn
   task_definition = aws_ecs_task_definition.this.arn
   desired_count   = var.desired_count
-  launch_type     = "FARGATE"
+
+  # launch_type and capacity_provider_strategy are mutually exclusive, so Spot
+  # is expressed by dropping launch_type entirely and letting the strategy pick
+  # the provider. FARGATE_SPOT is already registered on the cluster.
+  launch_type = var.use_fargate_spot ? null : "FARGATE"
+
+  dynamic "capacity_provider_strategy" {
+    for_each = var.use_fargate_spot ? [1] : []
+    content {
+      capacity_provider = "FARGATE_SPOT"
+      weight            = 100
+    }
+  }
 
   network_configuration {
-    subnets          = var.private_subnet_ids
+    subnets          = var.subnet_ids
     security_groups  = [var.security_group_id]
     assign_public_ip = var.assign_public_ip
   }
