@@ -216,9 +216,9 @@ street_bites/
 │   ├── admin.php               # ADMIN_EMAILS allowlist (moderation admins)
 │   └── moderation.php          # text blocklist baseline + Rekognition image screening
 ├── tests/                      # Pest tests (Feature + Unit)
-├── .github/workflows/          # CI + Terraform plan/apply + release-deploy (see Deployment)
+├── .github/workflows/          # CI quality gate (deploy workflows removed — see Deployment)
 ├── docker/                     # nginx/php-fpm/supervisord config for the production image
-├── terraform/                  # AWS infrastructure (bootstrap/, modules/, environments/prod/)
+├── terraform/                  # bootstrap/ (shared, still applied) + dormant prod reference code
 ├── Dockerfile                  # production image (see Deployment)
 ├── .githooks/pre-commit        # quality gate (Pint, Larastan, ESLint, ...)
 ├── .stylelintrc.json           # Stylelint config (Tailwind-aware)
@@ -515,21 +515,20 @@ Services communicate by Docker service name, not `localhost`:
 
 ---
 
-## Deployment (AWS)
+## Deployment (AWS) — decommissioned
 
-Production runs on **ECS Fargate** — three services from one Docker image
-(`web`, `reverb`, `queue-worker`), RDS MariaDB, ElastiCache Redis, and S3 for
-truck images/map caches. Infrastructure is defined in `terraform/` and rolled
-out via GitHub Actions (`.github/workflows/`): a PR quality gate, Terraform
-plan/apply on infra changes, and a release-triggered build-and-deploy
-pipeline. This is entirely separate from local dev (no Lando involved).
+Production hosting was **shut down on 2026-10-18**. The AWS stack (ECS Fargate,
+RDS MariaDB, ElastiCache Redis, ALB, ECR, S3) was destroyed with Terraform and
+the GitHub Actions deploy workflows, variables, secrets, and environments were
+removed; only the PR quality gate (`ci.yml`) remains. Local development with
+Lando is unaffected.
 
-See [`terraform/bootstrap/README.md`](terraform/bootstrap/README.md) for
-one-time AWS/GitHub setup,
-[`terraform/environments/prod/README.md`](terraform/environments/prod/README.md)
-for provisioning the environment, and
-[`docs_and_archetecture/deployment-infrastructure.md`](../docs_and_archetecture/deployment-infrastructure.md)
-for the full architecture writeup.
+`terraform/bootstrap` is **still applied on purpose** — it owns the Terraform
+state bucket, lock table, and GitHub OIDC provider that sibling projects on the
+same AWS account depend on (see its README before touching it). The rest of
+`terraform/`, `Dockerfile`, and `docker/` are kept as a reference for the
+original design, which is written up in
+[`docs_and_archetecture/street_bites/deployment-infrastructure.md`](../docs_and_archetecture/street_bites/deployment-infrastructure.md).
 
 ---
 
