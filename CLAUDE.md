@@ -276,7 +276,8 @@ in `<head>` and `@livewireScripts` before `</body>` — present in `welcome`,
   **RFC 9116 vulnerability-disclosure file**. A route (not a static file), mirroring
   the sitemap, so `Expires` rolls forward on every fetch and never goes stale.
   `Contact` is `security@street-bites.org` (a Cloudflare Email Routing forwarder to
-  the maintainer inbox). nginx already permits `/.well-known` (its dotfile deny rule
+  the maintainer inbox — user-managed; the site itself is no longer hosted, see
+  *Deployment (AWS)*). nginx already permits `/.well-known` (its dotfile deny rule
   excludes it), so it falls through to `index.php`. See *Security headers*.
 - `/profile` → `App\Livewire\Profile\ProfilePage` (`auth` middleware) — the
   signed-in profile (see *Profile & vendor management* below). Uses the
@@ -420,8 +421,9 @@ decision; don't add a category picker without one.
 
 Response-header hardening lives in **`App\Http\Middleware\SecurityHeaders`**,
 appended to the `web` group in `bootstrap/app.php`. **The app is the only place
-these can be set** — Cloudflare is DNS-only (grey cloud) and the ALB injects no
-response headers, so neither upstream can add them. Applied to every web response:
+these can be set** — in the (now decommissioned) AWS deployment Cloudflare was
+DNS-only (grey cloud) and the ALB injected no response headers, so no upstream
+could add them. Applied to every web response:
 `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (the app never frames
 itself), `Referrer-Policy: strict-origin-when-cross-origin`, and a
 `Permissions-Policy` that scopes `geolocation` to `self` (the discovery map uses
@@ -1122,91 +1124,48 @@ built manifest in `public/build`.
 
 The `reverb` Lando service polls for `/app/artisan` before starting `artisan reverb:start`. It auto-recovers once the Laravel install exists — no manual restart needed after `lando composer install`.
 
-## Deployment (AWS)
+## Deployment (AWS) — decommissioned 2026-10-18
 
-Production deployment is entirely separate from Lando — Terraform and Docker
-run directly on the host (or in CI), never through `lando`. Full detail is in
-`docs_and_archetecture/deployment-infrastructure.md`; the cross-cutting facts
-that matter while touching app code:
+**There is no production environment.** The AWS stack behind
+`https://www.street-bites.org` (VPC, ALB + ACM cert, ECS Fargate `web` +
+`queue-worker`, RDS MariaDB, ElastiCache Redis, ECR, the public S3 bucket, the
+Secrets Manager secrets, the ECS task roles) was `terraform destroy`ed on
+2026-10-18 to stop its ~$70/month bill. The GitHub Actions deploy plumbing went
+with it: the `terraform-plan` / `terraform-apply` / `release-deploy` workflows
+are deleted (only `ci.yml` remains), and the repo's AWS variables, the
+`CLOUDFLARE_API_TOKEN` / `RESEND_API_KEY` secrets, and the `production` /
+`production-infra` environments are removed. Local Lando dev is unaffected.
 
-- **`Dockerfile` + `docker/`** build one production image; ECS runs it as
-  three services (`web`, `reverb`, `queue-worker` — mirrors the `.lando.yml`
-  split) that differ only in container command. **`reverb` is not deployed
-  today** — see *Cost posture* below. `docker/nginx.conf` owns
-  compression and browser caching (nothing upstream compresses — the ALB passes
-  bytes through): gzip for text responses, `Cache-Control: immutable, 1 year`
-  on `/build/` (safe because Vite fingerprints those filenames), a week on
-  `/images/` and the favicons, plus `server_tokens off`. `docker/php.ini` (a
-  conf.d drop-in) sets `expose_php = Off` **and the upload limits**
-  (`upload_max_filesize = 6M`, `post_max_size = 10M`) — the base image ships no
-  php.ini, and its compiled-in 2M default silently 302'd any 2–5 MB Livewire
-  image upload in prod (Lando sets 100M, so it never reproduces locally). Both
-  files are prod-only — Lando's `laravel` recipe doesn't build this image. The response security headers themselves (HSTS,
-  CSP, …) are app-level, not nginx — see *Security headers*.
-- **`config('filesystems.public_disk')`** (`config/filesystems.php`, env
-  `FILESYSTEM_PUBLIC_DISK`) is what every truck-image/map-cache call site
-  resolves through instead of a hardcoded `'public'` disk name — `public`
-  (local disk) here in Lando, `s3` in production. Never hardcode `'public'` in
-  new code that writes to the public disk; use the config key. The `s3` disk's
-  `options` stamp `CacheControl: immutable, 1 year` on every object written —
-  safe because all current write paths are content-addressed (uuid image names,
-  fingerprinted map paths); keep new write paths content-unique or scope them
-  their own options.
-- **`terraform/`** — `bootstrap/` (applied once, by hand, never by CI) creates
-  the state backend and the two GitHub OIDC IAM roles;
-  `environments/prod/` is the actual infrastructure, built from
-  `terraform/modules/*`. Adding a second environment later means copying
-  `environments/prod/`, not restructuring the modules.
-- **Cost posture — the site runs deliberately lean.** Adoption hasn't happened
-  yet, so prod is tuned for cost over headroom, each lever a single reversible
-  variable (the table in `terraform/environments/prod/README.md` is the
-  reference). What this changes for app code:
-  **(1) Reverb is not deployed** (`enable_reverb = false`) — no NLB, no task,
-  no `ws.street-bites.org`, and `BROADCAST_CONNECTION=log`, so **broadcasts go
-  nowhere in prod**. Nothing subscribes today (`app.js` deliberately doesn't
-  import `echo.js` — see *JavaScript / Alpine*), so the first realtime feature
-  means flipping the variable, re-adding `reverb` to the `deploy-others` matrix
-  in `release-deploy.yml`, and setting the `VITE_REVERB_*` repo variables.
-  **(2) There is no NAT gateway** — Fargate tasks run in the *public* subnets
-  with public IPs, egressing through the internet gateway; inbound is closed at
-  the security groups (`web` admits only the ALB) and RDS/Redis stay private.
-  Anything that runs a one-off task (like `release-deploy.yml`'s migration
-  step) must set `assignPublicIp=ENABLED` or it cannot pull the image.
-  **(3) Container Insights is off** by default — task logs still reach
-  CloudWatch Logs (7-day retention); only the per-task metrics are off, and
-  they're re-enabled by flipping `container_insights` when diagnosing.
-  **(4) `queue-worker` runs on Fargate Spot** — it can be reclaimed with 2
-  minutes' notice, so queued jobs must stay idempotent and retry-safe.
-- **`.github/workflows/`** — `ci.yml` (PR quality gate), `terraform-plan.yml` /
-  `terraform-apply.yml` (infra, gated behind the `production-infra`
-  Environment), `release-deploy.yml` (builds + deploys on every published
-  GitHub Release, migrating before rolling `web`).
-- This repo's **GitHub default/integration branch is `develop`, not `main`** —
-  PRs and day-to-day work target `develop`. Infra deploys are gated separately:
-  `terraform-apply.yml` triggers on pushes to **`main`**, so a `terraform apply`
-  only runs once `develop` is promoted into `main` (the OIDC trust policy in
-  `terraform/bootstrap` is scoped to `main` via `var.github_main_branch`
-  accordingly). `release-deploy.yml` (app deploys) is unaffected — it triggers
-  on published GitHub Releases, not branch pushes.
-- **Mail is Resend in production** (`MAIL_MAILER=resend` in `main.tf`'s
-  `base_environment`; Mailpit is dev-only). Auth (sign-up verification + 2FA
-  codes) depends on it. `street-bites.org` is verified as a sending domain in
-  the **Resend dashboard** (its DKIM/SPF/MX records are managed by hand in
-  Cloudflare from the values Resend issues — not in Terraform); sends as
-  `noreply@street-bites.org`. The API key rides in as the `RESEND_API_KEY`
-  ECS secret (Secrets Manager, `secrets.tf`) from the sensitive
-  `resend_api_key` Terraform variable (tfvars locally, the `RESEND_API_KEY`
-  repo secret via `TF_VAR_` in both terraform workflows — plan needs it too).
-  **SES was removed deliberately** (AWS denied production access; decision:
-  don't re-appeal) — don't reintroduce it. `config/services.php` already
-  wires `RESEND_API_KEY` (note: not the Laravel docs' `RESEND_KEY`).
-- **The production site is `https://www.street-bites.org`.** DNS is hosted at
-  **Cloudflare** (records managed by Terraform via the `CLOUDFLARE_API_TOKEN`
-  env var / CI secret, all DNS-only — no proxying); TLS terminates at the
-  ALB (HTTPS:443, port 80 redirects) and at the Reverb NLB's TLS:443 listener
-  (`ws.street-bites.org`, the browser's `VITE_REVERB_HOST` baked in by
-  release-deploy.yml) with one ACM cert — see
-  `terraform/environments/prod/domain.tf`. Because TLS ends at the load
-  balancer, `bootstrap/app.php` trusts proxy `X-Forwarded-*` headers
-  (`trustProxies`, AWS_ELB header set) — don't remove it, or generated URLs
-  fall back to `http://`.
+What survives, and why:
+
+- **`terraform/bootstrap` is account-level and must stay applied.** It owns the
+  S3 state bucket `streetbites-terraform-state`, the DynamoDB lock table
+  `street-bites-terraform-locks`, and the account's single GitHub OIDC provider —
+  all three are used by the sibling **louisburg-community-choir**, **sayge_dev**,
+  and **divapets** repos (distinct state keys in the same bucket; they
+  `data`-lookup the OIDC provider). All three carry `prevent_destroy`; never run
+  a plain `terraform destroy` there and never tag-sweep `Project=street-bites`.
+  Its state is the local, gitignored `terraform/bootstrap/terraform.tfstate`.
+- **Data:** a final manual RDS snapshot `street-bites-final-2026-10-18`
+  (us-east-1, restorable into any VPC) and a local copy of the public bucket at
+  `~/projects/street_bites_backup/public-storage/`.
+- **Reference code:** `Dockerfile`, `docker/`, `terraform/environments/prod`, and
+  `terraform/modules` are kept but dormant (`terraform/environments/prod/README.md`
+  carries the decommission banner; `domain.tf` there is a destroy-time stub, the
+  real file is `domain.tf.off`). Re-hosting is a deliberate project, not a
+  re-apply — it needs new CI roles, a new state key, and fresh Cloudflare/Resend
+  credentials. Full history of the original design is in
+  `docs_and_archetecture/street_bites/deployment-infrastructure.md`.
+- **Still true in code, no longer live:** `config('filesystems.public_disk')` is
+  the public-disk indirection (`public` in Lando, was `s3` in prod) — keep using
+  it rather than hardcoding `'public'`; `bootstrap/app.php` still trusts
+  `X-Forwarded-*` proxy headers; `SecurityHeaders` still emits HSTS only off-local.
+  `MAIL_MAILER=resend` config and `RESEND_API_KEY` wiring remain in
+  `config/services.php` (SES was deliberately dropped — don't reintroduce it).
+- **Outside AWS, user-managed:** the Cloudflare zone for `street-bites.org`
+  (the apex/www/ACM-validation CNAMEs Terraform created still need deleting by
+  hand — the only Cloudflare token on this machine is scoped to another zone),
+  the hand-managed Resend DKIM/SPF/MX records, the Resend sending domain + API
+  key, and the `security@street-bites.org` Email Routing forwarder that
+  `/.well-known/security.txt` still advertises.
+- The GitHub default/integration branch is still **`develop`**.

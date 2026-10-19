@@ -1,4 +1,19 @@
-# prod environment
+# prod environment — DECOMMISSIONED 2026-10-18
+
+> **Nothing described below exists any more.** The whole stack (VPC, ALB, ECS
+> cluster + services, RDS, ElastiCache, ECR, the public S3 bucket, the Secrets
+> Manager secrets, the ACM cert, the task roles) was `terraform destroy`ed on
+> 2026-10-18 and the `environments/prod/terraform.tfstate` object was removed from
+> the shared state bucket. The CI roles, GitHub Actions variables/secrets/
+> environments, and the three deploy workflows are gone too. What survives is
+> only `terraform/bootstrap` (shared account plumbing — see its README), a final
+> RDS snapshot `street-bites-final-2026-10-18`, and a local copy of the public
+> bucket at `~/projects/street_bites_backup/public-storage/`.
+>
+> The code is kept as a reference. Re-applying it is a deliberate choice that
+> needs new CI roles, a new backend state key, the Cloudflare token, and the
+> Resend key — read *First-time setup* from the top. Note `domain.tf` was
+> stubbed for the destroy (the real one is `domain.tf.off`); restore it first.
 
 The only environment today. Provisions the VPC, ECS cluster + the Fargate
 services (`web` and `queue-worker`; `reverb` only when enabled — see *Cost

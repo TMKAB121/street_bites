@@ -1,68 +1,38 @@
-# Bootstrap
+# Bootstrap — account-level, outlives street_bites
 
-Applied **once, by hand**, with your own AWS credentials — this is the one
-Terraform root never run by CI. It solves the chicken-and-egg problem of
-Terraform remote state (the bucket that holds state can't be managed by the
-config that uses it as a backend) and creates the two IAM roles every GitHub
-Actions workflow assumes.
+> **The street_bites app was decommissioned on 2026-10-18** (its `environments/prod`
+> stack is destroyed). This root is the one thing from that project that must
+> **stay applied**: it owns three account-wide resources that the other projects
+> on the same AWS account (`916554063143`) depend on.
 
-## Apply
+| Resource | Depended on by |
+|---|---|
+| S3 bucket `streetbites-terraform-state` | Terraform remote state for **louisburg-community-choir** (`lccsite/prod/terraform.tfstate`), **sayge_dev** (`sayge-dev/prod/terraform.tfstate`), **divapets** (`divapets/prod/terraform.tfstate`) |
+| DynamoDB table `street-bites-terraform-locks` | State locking for the same three backends |
+| IAM OIDC provider `token.actions.githubusercontent.com` | Every sibling repo's GitHub Actions CI roles (they `data`-lookup it with `create_github_oidc_provider = false`); AWS allows only one per account |
+
+All three carry `prevent_destroy`. **Never run a plain `terraform destroy` here**,
+and never do a tag-based cleanup of `Project=street-bites` — the provider still
+wears that tag.
+
+The two street_bites CI roles (`street-bites-gha-terraform` / `-deploy`) and
+their policies were removed with a targeted destroy on 2026-10-18; the code was
+deleted to match. If this repo is ever archived, move this directory **and its
+local `terraform.tfstate`** to a standalone account-bootstrap repo first.
+
+## Apply (idempotent; re-run only to change the shared resources)
+
+Applied **by hand**, with your own AWS credentials — never by CI. State for this
+root stays local (`terraform.tfstate` in this directory, gitignored). Keep a copy
+somewhere safe; if it's lost, `terraform import` the three resources above by
+name/ARN rather than re-applying (an apply without state would try to create a
+bucket that already exists).
 
 ```bash
 cd terraform/bootstrap
 terraform init
-terraform apply \
-  -var="state_bucket_name=<globally-unique-bucket-name>" \
-  -var="github_org=<your-github-org-or-username>"
+terraform plan -var="state_bucket_name=streetbites-terraform-state"   # expect: No changes
 ```
 
-For this repo specifically, that is:
-
-```bash
-terraform apply -var="state_bucket_name=streetbites-terraform-state" -var="github_org=TMKAB121"
-```
-
-Pass `github_org` in the account's **canonical casing** (`TMKAB121`, not
-`tmkab121`). IAM string matching is case-sensitive and the trust policy derives
-its lowercase variants from this value — passing lowercase silently produces a
-policy that omits the uppercase spellings. See `local.github_sub_prefixes` in
-`oidc.tf`.
-
-### If CI fails with "Not authorized to perform sts:AssumeRoleWithWebIdentity"
-
-GitHub changed the OIDC `sub` claim to append the owner's and repo's immutable
-numeric IDs (`repo:OWNER@6655240/REPO@1274615786:ref:...`), so a trust policy
-matching only the legacy name-only form stops authorizing every workflow. The
-policies here accept both forms; if the IDs ever change (a repo transfer),
-refresh them with:
-
-```bash
-gh api repos/OWNER/REPO --jq '{repo: .id, owner: .owner.id}'
-```
-
-and update `github_owner_id` / `github_repo_id` in `variables.tf`. Because CI
-itself can't authenticate while this is broken, the fix **must** be applied by
-hand from here — that's the chicken-and-egg this root exists to solve.
-
-State for this root itself stays local (`terraform.tfstate` in this
-directory) — commit it nowhere, keep it somewhere safe (or accept that
-re-running `apply` is idempotent and cheap if it's lost; nothing here is
-destroyed and recreated by re-applying).
-
-## After applying
-
-1. Copy the `state_bucket_name` and `lock_table_name` outputs into
-   `terraform/environments/prod/backend.tf`.
-2. Copy `gha_terraform_role_arn` and `gha_deploy_role_arn` into this repo's
-   GitHub Actions **repository variables** (Settings → Secrets and variables →
-   Actions → Variables): `AWS_TERRAFORM_ROLE_ARN` and `AWS_DEPLOY_ROLE_ARN`.
-3. Create two GitHub **Environments** in the repo's settings (Settings →
-   Environments):
-   - `production` — required for `gha-deploy-role`'s OIDC trust policy; its
-     `sub` claim only matches workflow runs that reference this environment
-     (used by `release-deploy.yml`).
-   - `production-infra` — used by `terraform-apply.yml` to gate infra changes
-     behind a required reviewer before `terraform apply` runs. Add a required
-     reviewer here if you want that approval gate; otherwise it applies
-     automatically on every merge to `main` (not `develop` — see
-     `github_main_branch` in `variables.tf`) that touches `terraform/**`.
+The state bucket is versioned (old versions expire after 90 days) and encrypted;
+the lock table is on-demand billing. Together they cost well under $1/month.
